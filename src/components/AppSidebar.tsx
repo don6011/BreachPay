@@ -1,6 +1,7 @@
 import { LayoutDashboard, Search, Scale, FileText, Shield, Settings, LogOut, ShieldAlert } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import logo from "@/assets/logo.png";
 
 const userNav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -18,8 +19,7 @@ export function AppSidebar() {
     <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-5">
-        <ShieldAlert className="h-6 w-6 text-primary" />
-        <span className="text-lg font-bold tracking-tight">BreachPay</span>
+        <img src={logo} alt="BreachPay" className="h-7" />
       </div>
 
       {/* Nav */}

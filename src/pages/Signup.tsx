@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ShieldAlert } from "lucide-react";
+import logo from "@/assets/logo.png";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -21,8 +21,7 @@ const Signup = () => {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex items-center justify-center gap-2">
-          <ShieldAlert className="h-8 w-8 text-primary" />
-          <span className="text-2xl font-bold">BreachPay</span>
+          <img src={logo} alt="BreachPay" className="h-10" />
         </div>
         <div className="rounded-lg border bg-card p-8">
           <h2 className="mb-1 text-xl font-bold">Create Account</h2>

@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { ShieldAlert, Database, DollarSign, Users, Radio, ArrowRight, Shield, Search, FileText } from "lucide-react";
+import { Database, DollarSign, Users, Radio, ArrowRight, Shield, Search, FileText } from "lucide-react";
 import { Link } from "react-router-dom";
+import logo from "@/assets/logo.png";
 
 const stats = [
   { icon: Database, value: "12,000+", label: "Databases Scanned" },
@@ -23,8 +24,7 @@ const Landing = () => {
       <header className="sticky top-0 z-50 border-b border-border/50 bg-background/80 backdrop-blur-lg">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-2">
-            <ShieldAlert className="h-6 w-6 text-primary" />
-            <span className="text-lg font-bold">BreachPay</span>
+            <img src={logo} alt="BreachPay" className="h-8" />
           </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" asChild><Link to="/login">Log In</Link></Button>
