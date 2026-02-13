@@ -6,16 +6,21 @@ import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { mockMonitoring, mockAlerts } from "@/data/mockData";
 import { Shield, Database, AlertTriangle, Clock, Bell, Mail, Zap, Crown, Check } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const premiumBenefits = [
-  "Daily breach scans (vs. weekly)",
-  "Instant email alerts for new breaches",
+  "Daily monitoring scans",
+  "Instant email alerts",
+  "30-day deadline alerts",
   "Priority settlement matching",
-  "Dedicated support channel",
-  "Advanced identity monitoring",
+  "Risk trend history + score changes",
+  "Priority support",
 ];
 
 const Monitoring = () => {
+  // TODO: read from user_profiles.plan when wired to Supabase
+  const isPremium = false;
+
   return (
     <div>
       <PageHeader title="Monitoring Center" subtitle="Your identity monitoring status" />
@@ -62,23 +67,35 @@ const Monitoring = () => {
           </div>
         </div>
 
-        {/* Premium Upsell */}
-        <div className="rounded-2xl border border-primary/20 bg-card p-6 shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)]">
-          <div className="flex items-center gap-2 mb-2">
-            <Crown className="h-5 w-5 text-primary" />
-            <h2 className="font-semibold">Upgrade to Premium</h2>
+        {/* Premium Upsell / Active Badge */}
+        {isPremium ? (
+          <div className="rounded-2xl border border-primary/20 bg-card p-6 shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)] flex items-center gap-3">
+            <Crown className="h-6 w-6 text-primary" />
+            <div>
+              <h2 className="font-semibold text-primary">Premium Active</h2>
+              <p className="text-sm text-muted-foreground">You're getting daily scans, instant alerts, and priority matching.</p>
+            </div>
           </div>
-          <p className="text-sm text-muted-foreground mb-4">Get advanced monitoring and priority matching</p>
-          <ul className="space-y-2 mb-5">
-            {premiumBenefits.map((b) => (
-              <li key={b} className="flex items-center gap-2 text-sm">
-                <Check className="h-3.5 w-3.5 text-primary shrink-0" />
-                {b}
-              </li>
-            ))}
-          </ul>
-          <Button className="w-full rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300">Upgrade — $9.99/mo</Button>
-        </div>
+        ) : (
+          <div className="rounded-2xl border border-primary/20 bg-card p-6 shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)]">
+            <div className="flex items-center gap-2 mb-2">
+              <Crown className="h-5 w-5 text-primary" />
+              <h2 className="font-semibold">Upgrade to Premium</h2>
+            </div>
+            <p className="text-sm text-muted-foreground mb-4">Get advanced monitoring and priority matching — $9.99/mo</p>
+            <ul className="space-y-2 mb-5">
+              {premiumBenefits.map((b) => (
+                <li key={b} className="flex items-center gap-2 text-sm">
+                  <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+                  {b}
+                </li>
+              ))}
+            </ul>
+            <Button asChild className="w-full rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300">
+              <Link to="/pricing">Upgrade — $9.99/mo</Link>
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Alert History */}

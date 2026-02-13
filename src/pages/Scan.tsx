@@ -4,7 +4,8 @@ import { StatusPill } from "@/components/StatusPill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { mockBreaches } from "@/data/mockData";
-import { Search, Shield, AlertTriangle, Loader2 } from "lucide-react";
+import { Search, Shield, AlertTriangle, Loader2, Crown, Check } from "lucide-react";
+import { Link } from "react-router-dom";
 
 type ScanState = "idle" | "scanning" | "results";
 
@@ -12,6 +13,8 @@ const Scan = () => {
   const [state, setState] = useState<ScanState>("idle");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  // TODO: read from user_profiles.plan when wired to Supabase
+  const isPremium = false;
 
   useEffect(() => {
     if (state === "scanning") {
@@ -86,6 +89,22 @@ const Scan = () => {
               <Button variant="outline" onClick={reset} className="rounded-xl">Run Another Scan</Button>
             </div>
           </div>
+
+          {/* Premium Upsell — only for Free users */}
+          {!isPremium && (
+            <div className="mb-6 rounded-2xl border border-primary/20 bg-card p-5 flex items-center justify-between shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)]">
+              <div className="flex items-center gap-3">
+                <Crown className="h-5 w-5 text-primary shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold">Get daily scans + instant breach alerts</p>
+                  <p className="text-xs text-muted-foreground">Upgrade to Premium for $9.99/mo</p>
+                </div>
+              </div>
+              <Button asChild size="sm" className="rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300 shrink-0">
+                <Link to="/pricing">Upgrade</Link>
+              </Button>
+            </div>
+          )}
 
           <div className="space-y-3">
             {mockBreaches.map((breach) => (

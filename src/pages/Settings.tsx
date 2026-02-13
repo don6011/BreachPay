@@ -1,8 +1,21 @@
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
-import { User, Shield, Download, Trash2, FileText, ExternalLink, LogOut } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { User, Shield, Download, Trash2, FileText, ExternalLink, LogOut, Crown } from "lucide-react";
+import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 const Settings = () => {
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  // TODO: read from user_profiles.plan when wired to Supabase
+  const isPremium = false;
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/");
+  };
+
   return (
     <div className="max-w-2xl">
       <PageHeader title="Settings" subtitle="Manage your account and preferences" />
@@ -14,10 +27,36 @@ const Settings = () => {
           <h2 className="font-semibold">Account</h2>
         </div>
         <div className="space-y-3 text-sm">
-          <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span>user@example.com</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Plan</span><span className="text-primary font-medium">Free</span></div>
-          <div className="flex justify-between"><span className="text-muted-foreground">Member Since</span><span>June 2025</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span>{user?.email ?? "—"}</span></div>
+          <div className="flex justify-between"><span className="text-muted-foreground">Member Since</span><span>{user?.created_at ? new Date(user.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "—"}</span></div>
         </div>
+      </section>
+
+      {/* Plan */}
+      <section className="mb-6 rounded-2xl border bg-card p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Crown className="h-4 w-4 text-primary" />
+          <h2 className="font-semibold">Plan</h2>
+        </div>
+        {isPremium ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">Premium Active</span>
+              <p className="mt-2 text-sm text-muted-foreground">$9.99/mo · Daily scans, instant alerts, priority matching</p>
+            </div>
+            <Button variant="outline" className="rounded-xl text-sm">Manage</Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">Free</span>
+              <p className="mt-2 text-sm text-muted-foreground">Weekly scans, batched alerts, standard matching</p>
+            </div>
+            <Button asChild className="rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300 text-sm">
+              <Link to="/pricing">Upgrade</Link>
+            </Button>
+          </div>
+        )}
       </section>
 
       {/* Monitored Identifiers */}
@@ -50,7 +89,7 @@ const Settings = () => {
         </div>
       </section>
 
-      <Button variant="outline" className="w-full rounded-xl"><LogOut className="mr-2 h-4 w-4" />Log Out</Button>
+      <Button variant="outline" className="w-full rounded-xl" onClick={handleLogout}><LogOut className="mr-2 h-4 w-4" />Log Out</Button>
     </div>
   );
 };
