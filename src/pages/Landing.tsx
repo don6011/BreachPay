@@ -91,24 +91,34 @@ const Landing = () => {
           }}
         />
         <div className="relative mx-auto max-w-4xl px-6 text-center">
-          <div className="mb-8 flex justify-center">
-            <img src={logo} alt="BreachPay" className="h-20 sm:h-24 lg:h-28" />
+          {/* Pulsing Shield */}
+          <div className="mb-6 flex justify-center">
+            <div className="relative">
+              <div className="absolute inset-0 rounded-full bg-primary/20 animate-[pulse_3s_cubic-bezier(0.4,0,0.6,1)_infinite]" />
+              <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-primary/30 bg-primary/10">
+                <Shield className="h-7 w-7 text-primary" />
+              </div>
+            </div>
           </div>
+
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
             Your Data Was Breached.{" "}
-            <span className="text-primary">You Could Be Owed Money.</span>
+            <span className="bg-gradient-to-r from-primary to-[hsl(172_60%_70%)] bg-clip-text text-transparent">
+              You Could Be Owed Money.
+            </span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
             BreachPay scans thousands of breach databases, matches you to eligible settlements, and helps you file claims — all in one place.
           </p>
-          <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground/70">
-            Scanning 12,000+ verified breach databases.
+          <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground/60 tracking-wide">
+            Encrypted identity scan • No credit impact • Results in seconds
           </p>
-          <div className="mt-8 flex items-center justify-center gap-4">
+
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button
               size="lg"
               asChild
-              className="rounded-xl bg-primary text-primary-foreground font-semibold hover:shadow-[0_0_24px_hsl(172_89%_52%/0.3)] transition-all duration-300"
+              className="rounded-xl bg-primary text-primary-foreground font-semibold shadow-[0_0_20px_hsl(172_89%_52%/0.25)] hover:shadow-[0_0_32px_hsl(172_89%_52%/0.4)] transition-all duration-500"
             >
               <Link to="/scan">Start Free Scan <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
@@ -116,7 +126,8 @@ const Landing = () => {
               <Link to="/signup">Create Account</Link>
             </Button>
           </div>
-          <div className="mt-8 flex items-center justify-center gap-8 text-sm text-muted-foreground">
+
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-primary" />
               <span>No upfront claim fees</span>
@@ -130,6 +141,10 @@ const Landing = () => {
               <span>Cancel anytime</span>
             </div>
           </div>
+
+          <p className="mt-6 text-xs text-muted-foreground/50">
+            Scanning 12,000+ verified breach and settlement databases.
+          </p>
         </div>
       </section>
 
