@@ -52,6 +52,7 @@ const AdminAnalytics = () => {
   const [claimsCount, setClaimsCount] = useState(0);
   const [usersCount, setUsersCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [sendingAlerts, setSendingAlerts] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -92,12 +93,32 @@ const AdminAnalytics = () => {
 
     fetchAdminData();
   }, [user]);
+
+  const handleSendAlerts = async () => {
+    setSendingAlerts(true);
+    try {
+      const response = await fetch('/functions/v1/run-deadline-alerts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await response.json();
+      if (data.success) {
+        console.log(`Alerts sent: ${data.alerts_sent}`);
+      }
+    } catch (error) {
+      console.error('Failed to send alerts:', error);
+    } finally {
+      setSendingAlerts(false);
+    }
+  };
+
   return (
     <div>
       <PageHeader title="Platform Intelligence" subtitle="Admin analytics dashboard">
         <Button size="sm" asChild className="rounded-xl"><Link to="/admin/settlements"><Plus className="mr-1 h-3 w-3" />Add Settlement</Link></Button>
         <Button size="sm" variant="outline" asChild className="rounded-xl"><Link to="/admin/claims">Review Claims</Link></Button>
-        <Button size="sm" variant="outline" className="rounded-xl"><Send className="mr-1 h-3 w-3" />Send Alerts</Button>
+        <Button size="sm" variant="outline" className="rounded-xl" onClick={handleSendAlerts} disabled={sendingAlerts}><Send className="mr-1 h-3 w-3" />{sendingAlerts ? "Sending..." : "Send Alerts"}</Button>
         <Button size="sm" variant="outline" className="rounded-xl"><Download className="mr-1 h-3 w-3" />Export</Button>
       </PageHeader>
 
