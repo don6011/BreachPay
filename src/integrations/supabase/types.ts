@@ -14,16 +14,580 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admin_activity_logs: {
+        Row: {
+          action: string
+          admin_user_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+          meta: Json
+        }
+        Insert: {
+          action: string
+          admin_user_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          meta?: Json
+        }
+        Update: {
+          action?: string
+          admin_user_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+          meta?: Json
+        }
+        Relationships: []
+      }
+      alerts: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          is_read: boolean
+          related_claim_id: string | null
+          related_scan_run_id: string | null
+          related_settlement_id: string | null
+          severity: Database["public"]["Enums"]["risk_level_t"]
+          title: string
+          type: Database["public"]["Enums"]["alert_type_t"]
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          related_claim_id?: string | null
+          related_scan_run_id?: string | null
+          related_settlement_id?: string | null
+          severity?: Database["public"]["Enums"]["risk_level_t"]
+          title: string
+          type: Database["public"]["Enums"]["alert_type_t"]
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          related_claim_id?: string | null
+          related_scan_run_id?: string | null
+          related_settlement_id?: string | null
+          severity?: Database["public"]["Enums"]["risk_level_t"]
+          title?: string
+          type?: Database["public"]["Enums"]["alert_type_t"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alerts_related_claim_id_fkey"
+            columns: ["related_claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alerts_related_scan_run_id_fkey"
+            columns: ["related_scan_run_id"]
+            isOneToOne: false
+            referencedRelation: "scan_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "alerts_related_settlement_id_fkey"
+            columns: ["related_settlement_id"]
+            isOneToOne: false
+            referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      breach_events: {
+        Row: {
+          breach_year: number | null
+          created_at: string
+          details: Json
+          exposed_fields: string[]
+          id: string
+          record_count_estimate: number | null
+          risk_level: Database["public"]["Enums"]["risk_level_t"]
+          scan_run_id: string | null
+          source: string
+          user_id: string
+        }
+        Insert: {
+          breach_year?: number | null
+          created_at?: string
+          details?: Json
+          exposed_fields?: string[]
+          id?: string
+          record_count_estimate?: number | null
+          risk_level?: Database["public"]["Enums"]["risk_level_t"]
+          scan_run_id?: string | null
+          source: string
+          user_id: string
+        }
+        Update: {
+          breach_year?: number | null
+          created_at?: string
+          details?: Json
+          exposed_fields?: string[]
+          id?: string
+          record_count_estimate?: number | null
+          risk_level?: Database["public"]["Enums"]["risk_level_t"]
+          scan_run_id?: string | null
+          source?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "breach_events_scan_run_id_fkey"
+            columns: ["scan_run_id"]
+            isOneToOne: false
+            referencedRelation: "scan_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      claim_documents: {
+        Row: {
+          claim_id: string
+          created_at: string
+          file_path: string
+          file_type: string | null
+          id: string
+          note: string | null
+          user_id: string
+        }
+        Insert: {
+          claim_id: string
+          created_at?: string
+          file_path: string
+          file_type?: string | null
+          id?: string
+          note?: string | null
+          user_id: string
+        }
+        Update: {
+          claim_id?: string
+          created_at?: string
+          file_path?: string
+          file_type?: string | null
+          id?: string
+          note?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_documents_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      claims: {
+        Row: {
+          created_at: string
+          est_payout: number | null
+          fee_percent: number
+          filed_at: string | null
+          final_payout: number | null
+          flag_reason: string | null
+          flagged: boolean
+          id: string
+          scan_run_id: string | null
+          settlement_id: string
+          status: Database["public"]["Enums"]["claim_status_t"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          est_payout?: number | null
+          fee_percent?: number
+          filed_at?: string | null
+          final_payout?: number | null
+          flag_reason?: string | null
+          flagged?: boolean
+          id?: string
+          scan_run_id?: string | null
+          settlement_id: string
+          status?: Database["public"]["Enums"]["claim_status_t"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          est_payout?: number | null
+          fee_percent?: number
+          filed_at?: string | null
+          final_payout?: number | null
+          flag_reason?: string | null
+          flagged?: boolean
+          id?: string
+          scan_run_id?: string | null
+          settlement_id?: string
+          status?: Database["public"]["Enums"]["claim_status_t"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claims_scan_run_id_fkey"
+            columns: ["scan_run_id"]
+            isOneToOne: false
+            referencedRelation: "scan_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "claims_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      monitored_identifiers: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          type: string
+          updated_at: string
+          user_id: string
+          value_hash: string
+          value_last4: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          type: string
+          updated_at?: string
+          user_id: string
+          value_hash: string
+          value_last4?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          type?: string
+          updated_at?: string
+          user_id?: string
+          value_hash?: string
+          value_last4?: string | null
+        }
+        Relationships: []
+      }
+      scan_runs: {
+        Row: {
+          breaches_detected: number
+          completed_at: string | null
+          created_at: string
+          databases_scanned: number
+          eligible_settlements: number
+          error_message: string | null
+          id: string
+          provider: string | null
+          requested_email_hash: string | null
+          requested_phone_hash: string | null
+          risk_score: number
+          started_at: string | null
+          status: Database["public"]["Enums"]["scan_status_t"]
+          user_id: string
+        }
+        Insert: {
+          breaches_detected?: number
+          completed_at?: string | null
+          created_at?: string
+          databases_scanned?: number
+          eligible_settlements?: number
+          error_message?: string | null
+          id?: string
+          provider?: string | null
+          requested_email_hash?: string | null
+          requested_phone_hash?: string | null
+          risk_score?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["scan_status_t"]
+          user_id: string
+        }
+        Update: {
+          breaches_detected?: number
+          completed_at?: string | null
+          created_at?: string
+          databases_scanned?: number
+          eligible_settlements?: number
+          error_message?: string | null
+          id?: string
+          provider?: string | null
+          requested_email_hash?: string | null
+          requested_phone_hash?: string | null
+          risk_score?: number
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["scan_status_t"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      settlement_matches: {
+        Row: {
+          created_at: string
+          id: string
+          match_reason: string | null
+          payout_estimate: number | null
+          scan_run_id: string | null
+          settlement_id: string
+          status: Database["public"]["Enums"]["settlement_status_t"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          match_reason?: string | null
+          payout_estimate?: number | null
+          scan_run_id?: string | null
+          settlement_id: string
+          status?: Database["public"]["Enums"]["settlement_status_t"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          match_reason?: string | null
+          payout_estimate?: number | null
+          scan_run_id?: string | null
+          settlement_id?: string
+          status?: Database["public"]["Enums"]["settlement_status_t"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settlement_matches_scan_run_id_fkey"
+            columns: ["scan_run_id"]
+            isOneToOne: false
+            referencedRelation: "scan_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "settlement_matches_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      settlements: {
+        Row: {
+          breach_year: number | null
+          company: string
+          created_at: string
+          created_by: string | null
+          deadline: string | null
+          description: string | null
+          id: string
+          name: string
+          payout_max: number | null
+          payout_min: number | null
+          status: Database["public"]["Enums"]["settlement_status_t"]
+          tags: string[]
+          updated_at: string
+          url: string | null
+        }
+        Insert: {
+          breach_year?: number | null
+          company: string
+          created_at?: string
+          created_by?: string | null
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          payout_max?: number | null
+          payout_min?: number | null
+          status?: Database["public"]["Enums"]["settlement_status_t"]
+          tags?: string[]
+          updated_at?: string
+          url?: string | null
+        }
+        Update: {
+          breach_year?: number | null
+          company?: string
+          created_at?: string
+          created_by?: string | null
+          deadline?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          payout_max?: number | null
+          payout_min?: number | null
+          status?: Database["public"]["Enums"]["settlement_status_t"]
+          tags?: string[]
+          updated_at?: string
+          url?: string | null
+        }
+        Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          created_at: string
+          current_period_end: string | null
+          id: string
+          provider: string | null
+          provider_customer_id: string | null
+          provider_subscription_id: string | null
+          status: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          provider?: string | null
+          provider_customer_id?: string | null
+          provider_subscription_id?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          provider?: string | null
+          provider_customer_id?: string | null
+          provider_subscription_id?: string | null
+          status?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_profiles: {
+        Row: {
+          created_at: string
+          deadline_alerts: boolean
+          email: string | null
+          email_alerts: boolean
+          last_scan_at: string | null
+          monitoring_enabled: boolean
+          next_scan_at: string | null
+          plan: Database["public"]["Enums"]["plan_t"]
+          push_alerts: boolean
+          scan_frequency_days: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          deadline_alerts?: boolean
+          email?: string | null
+          email_alerts?: boolean
+          last_scan_at?: string | null
+          monitoring_enabled?: boolean
+          next_scan_at?: string | null
+          plan?: Database["public"]["Enums"]["plan_t"]
+          push_alerts?: boolean
+          scan_frequency_days?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          deadline_alerts?: boolean
+          email?: string | null
+          email_alerts?: boolean
+          last_scan_at?: string | null
+          monitoring_enabled?: boolean
+          next_scan_at?: string | null
+          plan?: Database["public"]["Enums"]["plan_t"]
+          push_alerts?: boolean
+          scan_frequency_days?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_risk_snapshots: {
+        Row: {
+          breaches_detected: number
+          created_at: string
+          id: string
+          risk_score: number
+          user_id: string
+        }
+        Insert: {
+          breaches_detected?: number
+          created_at?: string
+          id?: string
+          risk_score: number
+          user_id: string
+        }
+        Update: {
+          breaches_detected?: number
+          created_at?: string
+          id?: string
+          risk_score?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: { Args: { p_user: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      alert_type_t:
+        | "breach_detected"
+        | "settlement_found"
+        | "deadline_alert"
+        | "claim_update"
+        | "payout_update"
+        | "system"
+      claim_status_t:
+        | "submitted"
+        | "under_review"
+        | "documentation_required"
+        | "approved"
+        | "rejected"
+        | "paid"
+      plan_t: "free" | "premium"
+      risk_level_t: "low" | "medium" | "high" | "critical"
+      scan_status_t: "queued" | "running" | "completed" | "failed"
+      settlement_status_t: "open" | "pending" | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +714,27 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      alert_type_t: [
+        "breach_detected",
+        "settlement_found",
+        "deadline_alert",
+        "claim_update",
+        "payout_update",
+        "system",
+      ],
+      claim_status_t: [
+        "submitted",
+        "under_review",
+        "documentation_required",
+        "approved",
+        "rejected",
+        "paid",
+      ],
+      plan_t: ["free", "premium"],
+      risk_level_t: ["low", "medium", "high", "critical"],
+      scan_status_t: ["queued", "running", "completed", "failed"],
+      settlement_status_t: ["open", "pending", "closed"],
+    },
   },
 } as const
