@@ -10,6 +10,7 @@ import { AdminLayout } from "@/layouts/AdminLayout";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
+import Pricing from "./pages/Pricing";
 import Dashboard from "./pages/Dashboard";
 import Scan from "./pages/Scan";
 import Settlements from "./pages/Settlements";
@@ -36,6 +37,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
+            <Route path="/pricing" element={<Pricing />} />
 
             {/* User App - Protected */}
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>

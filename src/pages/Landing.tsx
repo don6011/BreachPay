@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Database, DollarSign, Users, Radio, ArrowRight, Shield, Search, FileText } from "lucide-react";
+import { Database, DollarSign, Users, Radio, ArrowRight, Shield, Search, FileText, Check, Crown } from "lucide-react";
 import { Link } from "react-router-dom";
 import logo from "@/assets/logo.png";
 
@@ -17,6 +17,44 @@ const steps = [
   { icon: DollarSign, title: "File & Get Paid", description: "File claims with one click and track payouts through your wallet." },
 ];
 
+const pricingPlans = [
+  {
+    name: "Free",
+    price: "$0",
+    period: "",
+    description: "Get started with basic breach scanning",
+    cta: "Start Free Scan",
+    ctaLink: "/scan",
+    highlighted: false,
+    features: [
+      "1 secure scan (manual)",
+      "Weekly monitoring scans",
+      "Breach exposure summary",
+      "Standard settlement matching",
+      "14-day deadline alerts",
+      "Email alerts (batched)",
+    ],
+  },
+  {
+    name: "Premium",
+    price: "$9.99",
+    period: "/mo",
+    description: "Advanced monitoring and priority matching",
+    cta: "Upgrade to Premium",
+    ctaLink: "/signup",
+    highlighted: true,
+    badge: "Most Popular",
+    features: [
+      "Daily monitoring scans",
+      "Instant email alerts",
+      "30-day deadline alerts",
+      "Priority settlement matching",
+      "Risk trend history + score changes",
+      "Priority support",
+    ],
+  },
+];
+
 const Landing = () => {
   return (
     <div className="min-h-screen bg-background">
@@ -25,6 +63,9 @@ const Landing = () => {
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <img src={logo} alt="BreachPay" className="h-10" />
           <div className="flex items-center gap-3">
+            <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground hover:bg-muted">
+              <Link to="/pricing">Pricing</Link>
+            </Button>
             <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground hover:bg-muted">
               <Link to="/login">Log In</Link>
             </Button>
@@ -110,13 +151,76 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Pricing Section */}
+      <section className="py-20 bg-background border-t border-border">
+        <div className="mx-auto max-w-4xl px-6">
+          <h2 className="mb-3 text-center text-3xl font-bold">Pricing</h2>
+          <p className="mb-12 text-center text-muted-foreground">Start for free. Upgrade when you need more.</p>
+          <div className="grid gap-6 md:grid-cols-2">
+            {pricingPlans.map((plan) => (
+              <div
+                key={plan.name}
+                className={`relative rounded-2xl border p-8 transition-all duration-300 ${
+                  plan.highlighted
+                    ? "border-primary/30 bg-card shadow-[0_0_30px_0_hsl(172_89%_52%/0.08)]"
+                    : "border-border bg-card"
+                }`}
+              >
+                {plan.badge && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-bold text-primary-foreground">
+                    {plan.badge}
+                  </div>
+                )}
+                <h3 className="text-lg font-semibold">{plan.name}</h3>
+                <div className="mt-2 flex items-baseline gap-1">
+                  <span className="text-4xl font-bold">{plan.price}</span>
+                  {plan.period && <span className="text-muted-foreground">{plan.period}</span>}
+                </div>
+                <p className="mt-2 text-sm text-muted-foreground">{plan.description}</p>
+                {plan.highlighted && (
+                  <p className="mt-1 text-xs text-muted-foreground">Cancel anytime</p>
+                )}
+                <ul className="mt-6 space-y-3">
+                  {plan.features.map((f) => (
+                    <li key={f} className="flex items-center gap-2.5 text-sm">
+                      <Check className="h-4 w-4 shrink-0 text-primary" />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+                <Button
+                  asChild
+                  className={`mt-8 w-full rounded-xl transition-all duration-300 ${
+                    plan.highlighted
+                      ? "bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)]"
+                      : "bg-muted text-foreground hover:bg-muted/80"
+                  }`}
+                >
+                  <Link to={plan.ctaLink}>{plan.cta}</Link>
+                </Button>
+              </div>
+            ))}
+          </div>
+          <p className="mt-6 text-center text-xs text-muted-foreground">
+            BreachPay is not a law firm and does not provide legal advice.
+          </p>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-border py-8 bg-background">
-        <div className="mx-auto max-w-6xl px-6 text-center text-xs text-muted-foreground space-y-1">
-          <p>BreachPay is not a law firm and does not provide legal advice.</p>
-          <p>We help users identify eligible settlement claims and track deadlines.</p>
-          <p>Data may be sourced from third-party providers and may be incomplete.</p>
-          <p className="pt-2">© 2026 BreachPay. All rights reserved.</p>
+        <div className="mx-auto max-w-6xl px-6 flex flex-col items-center gap-4">
+          <div className="flex items-center gap-6 text-sm text-muted-foreground">
+            <Link to="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
+            <Link to="/login" className="hover:text-foreground transition-colors">Log In</Link>
+            <Link to="/signup" className="hover:text-foreground transition-colors">Sign Up</Link>
+          </div>
+          <div className="text-center text-xs text-muted-foreground space-y-1">
+            <p>BreachPay is not a law firm and does not provide legal advice.</p>
+            <p>We help users identify eligible settlement claims and track deadlines.</p>
+            <p>Data may be sourced from third-party providers and may be incomplete.</p>
+            <p className="pt-2">© 2026 BreachPay. All rights reserved.</p>
+          </div>
         </div>
       </footer>
     </div>
