@@ -256,6 +256,50 @@ export type Database = {
           },
         ]
       }
+      fraud_flags: {
+        Row: {
+          claim_id: string
+          created_at: string
+          id: string
+          reason: string
+          resolved: boolean
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          user_id: string
+        }
+        Insert: {
+          claim_id: string
+          created_at?: string
+          id?: string
+          reason: string
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          user_id: string
+        }
+        Update: {
+          claim_id?: string
+          created_at?: string
+          id?: string
+          reason?: string
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fraud_flags_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       monitored_identifiers: {
         Row: {
           created_at: string
@@ -288,6 +332,44 @@ export type Database = {
           value_last4?: string | null
         }
         Relationships: []
+      }
+      payouts: {
+        Row: {
+          amount: number
+          claim_id: string
+          created_at: string
+          id: string
+          paid_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          claim_id: string
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          claim_id?: string
+          created_at?: string
+          id?: string
+          paid_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payouts_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       scan_runs: {
         Row: {
@@ -381,6 +463,56 @@ export type Database = {
           },
           {
             foreignKeyName: "settlement_matches_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      settlement_performance_metrics: {
+        Row: {
+          avg_payout: number | null
+          conversion_rate: number | null
+          created_at: string
+          id: string
+          settlement_id: string
+          total_approved: number
+          total_claims_filed: number
+          total_matches: number
+          total_paid: number
+          total_payout_amount: number
+          updated_at: string
+        }
+        Insert: {
+          avg_payout?: number | null
+          conversion_rate?: number | null
+          created_at?: string
+          id?: string
+          settlement_id: string
+          total_approved?: number
+          total_claims_filed?: number
+          total_matches?: number
+          total_paid?: number
+          total_payout_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          avg_payout?: number | null
+          conversion_rate?: number | null
+          created_at?: string
+          id?: string
+          settlement_id?: string
+          total_approved?: number
+          total_claims_filed?: number
+          total_matches?: number
+          total_paid?: number
+          total_payout_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settlement_performance_metrics_settlement_id_fkey"
             columns: ["settlement_id"]
             isOneToOne: false
             referencedRelation: "settlements"
