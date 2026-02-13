@@ -9,11 +9,11 @@ const AdminActivityLogs = () => {
 
       <div className="space-y-2">
         {mockActivityLogs.map((log) => (
-          <div key={log.id} className="flex items-start gap-4 rounded-lg border bg-card p-4">
+          <div key={log.id} className="flex items-start gap-4 rounded-2xl border bg-card p-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-medium">{log.action}</span>
-                <span className="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">{log.admin_name}</span>
+                <span className="rounded-lg bg-muted px-2 py-0.5 text-xs text-muted-foreground">{log.admin_name}</span>
               </div>
               <p className="text-xs text-muted-foreground">{log.target}</p>
             </div>

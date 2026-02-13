@@ -28,7 +28,7 @@ const Settlements = () => {
       <PageHeader title="Settlements" subtitle="Your eligible settlement matches" />
 
       {/* Summary */}
-      <div className="mb-6 rounded-lg border border-primary/20 bg-card p-5 shadow-[0_0_15px_0_hsl(164_100%_42%/0.06)]">
+      <div className="mb-6 rounded-2xl border border-primary/20 bg-card p-6 shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)]">
         <div className="flex items-center gap-3">
           <Scale className="h-5 w-5 text-primary" />
           <div>
@@ -44,7 +44,7 @@ const Settlements = () => {
           <button
             key={tab.value}
             onClick={() => setFilter(tab.value)}
-            className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${filter === tab.value ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:text-foreground"}`}
+            className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${filter === tab.value ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"}`}
           >
             {tab.label}
           </button>
@@ -56,7 +56,7 @@ const Settlements = () => {
         {filtered.map((settlement) => {
           const daysLeft = Math.max(0, Math.ceil((new Date(settlement.deadline).getTime() - Date.now()) / 86400000));
           return (
-            <div key={settlement.id} className="rounded-lg border bg-card p-5 transition-all hover:border-primary/20">
+            <div key={settlement.id} className="rounded-2xl border bg-card p-6 transition-all hover:border-primary/20">
               <div className="flex items-start justify-between mb-2">
                 <div>
                   <h3 className="font-semibold">{settlement.name}</h3>
@@ -80,9 +80,11 @@ const Settlements = () => {
               </div>
               <div className="mt-3">
                 {settlement.status === "open" ? (
-                  <Button size="sm" asChild><Link to="/claims">File Claim <ArrowRight className="ml-1 h-3 w-3" /></Link></Button>
+                  <Button size="sm" asChild className="rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_16px_hsl(172_89%_52%/0.3)] transition-all duration-300">
+                    <Link to="/claims">File Claim <ArrowRight className="ml-1 h-3 w-3" /></Link>
+                  </Button>
                 ) : settlement.status === "pending" ? (
-                  <Button size="sm" variant="outline" asChild><Link to="/claims">Track Claim</Link></Button>
+                  <Button size="sm" variant="outline" asChild className="rounded-xl"><Link to="/claims">Track Claim</Link></Button>
                 ) : null}
               </div>
             </div>

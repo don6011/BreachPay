@@ -18,7 +18,7 @@ export function AdminSidebar() {
     <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-5">
         <img src={logo} alt="BreachPay" className="h-9" />
-        <span className="ml-auto rounded bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary uppercase tracking-wider">Admin</span>
+        <span className="ml-auto rounded-lg bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary uppercase tracking-wider">Admin</span>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
@@ -29,7 +29,7 @@ export function AdminSidebar() {
               key={item.url}
               to={item.url}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                 active
                   ? "bg-primary/10 text-primary"
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -45,7 +45,7 @@ export function AdminSidebar() {
       <div className="border-t border-sidebar-border px-3 py-3">
         <NavLink
           to="/dashboard"
-          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+          className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to App

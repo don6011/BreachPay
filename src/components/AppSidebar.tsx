@@ -17,12 +17,10 @@ export function AppSidebar() {
 
   return (
     <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
-      {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-5">
         <img src={logo} alt="BreachPay" className="h-9" />
       </div>
 
-      {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
         {userNav.map((item) => {
           const active = location.pathname === item.url;
@@ -31,7 +29,7 @@ export function AppSidebar() {
               key={item.url}
               to={item.url}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
                 active
                   ? "bg-primary/10 text-primary"
                   : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
@@ -44,12 +42,11 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* Bottom */}
       <div className="border-t border-sidebar-border px-3 py-3 space-y-1">
         <NavLink
           to="/admin/analytics"
           className={cn(
-            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+            "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
             location.pathname.startsWith("/admin")
               ? "bg-primary/10 text-primary"
               : "text-sidebar-foreground hover:bg-sidebar-accent"
@@ -58,7 +55,7 @@ export function AppSidebar() {
           <ShieldAlert className="h-4 w-4" />
           Admin Portal
         </NavLink>
-        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-colors">
+        <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-colors">
           <LogOut className="h-4 w-4" />
           Log Out
         </button>

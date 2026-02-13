@@ -21,7 +21,7 @@ const Monitoring = () => {
       <PageHeader title="Monitoring Center" subtitle="Your identity monitoring status" />
 
       {/* Status Card */}
-      <div className="mb-6 rounded-lg border border-primary/20 bg-card p-6 shadow-[0_0_15px_0_hsl(164_100%_42%/0.06)]">
+      <div className="mb-6 rounded-2xl border border-primary/20 bg-card p-6 shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)]">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <Shield className="h-5 w-5 text-primary" />
@@ -40,7 +40,7 @@ const Monitoring = () => {
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Alert Preferences */}
-        <div className="rounded-lg border bg-card p-6">
+        <div className="rounded-2xl border bg-card p-6">
           <div className="flex items-center gap-2 mb-4">
             <Bell className="h-4 w-4 text-primary" />
             <h2 className="font-semibold">Alert Preferences</h2>
@@ -63,7 +63,7 @@ const Monitoring = () => {
         </div>
 
         {/* Premium Upsell */}
-        <div className="rounded-lg border border-primary/30 bg-card p-6 shadow-[0_0_15px_0_hsl(164_100%_42%/0.08)]">
+        <div className="rounded-2xl border border-primary/20 bg-card p-6 shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)]">
           <div className="flex items-center gap-2 mb-2">
             <Crown className="h-5 w-5 text-primary" />
             <h2 className="font-semibold">Upgrade to Premium</h2>
@@ -77,7 +77,7 @@ const Monitoring = () => {
               </li>
             ))}
           </ul>
-          <Button className="w-full">Upgrade — $9.99/mo</Button>
+          <Button className="w-full rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300">Upgrade — $9.99/mo</Button>
         </div>
       </div>
 

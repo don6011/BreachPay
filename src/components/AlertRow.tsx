@@ -11,7 +11,7 @@ interface AlertRowProps {
 export function AlertRow({ alert, className }: AlertRowProps) {
   return (
     <div className={cn(
-      "flex items-start gap-3 rounded-lg border bg-card p-4 transition-colors",
+      "flex items-start gap-3 rounded-2xl border bg-card p-4 transition-colors",
       !alert.read && "border-primary/20 bg-primary/[0.03]",
       className
     )}>

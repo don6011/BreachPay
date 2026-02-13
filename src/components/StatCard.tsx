@@ -13,14 +13,14 @@ interface StatCardProps {
 export function StatCard({ icon: Icon, label, value, subtitle, variant = "default", className }: StatCardProps) {
   return (
     <div className={cn(
-      "rounded-lg border bg-card p-5 transition-all",
-      variant === "teal" && "border-primary/30 shadow-[0_0_15px_0_hsl(164_100%_42%/0.08)]",
+      "rounded-2xl border bg-card p-6 transition-all",
+      variant === "teal" && "border-primary/20 shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)]",
       className
     )}>
       <div className="flex items-center gap-3 mb-3">
         <div className={cn(
-          "flex h-9 w-9 items-center justify-center rounded-lg",
-          variant === "teal" ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"
+          "flex h-9 w-9 items-center justify-center rounded-xl",
+          variant === "teal" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
         )}>
           <Icon className="h-4 w-4" />
         </div>

@@ -31,7 +31,7 @@ const Claims = () => {
         {mockClaims.map((claim) => {
           const currentIndex = statusSteps.indexOf(claim.status as any);
           return (
-            <div key={claim.id} className="rounded-lg border bg-card p-5">
+            <div key={claim.id} className="rounded-2xl border bg-card p-6">
               <div className="flex items-start justify-between mb-3">
                 <div>
                   <h3 className="font-semibold">{claim.settlement_name}</h3>
@@ -50,13 +50,13 @@ const Claims = () => {
                   return (
                     <div key={step} className="flex flex-1 items-center">
                       <div className="flex flex-col items-center flex-1">
-                        <div className={`h-2.5 w-2.5 rounded-full ${isComplete ? "bg-primary" : "bg-secondary"} ${isCurrent ? "ring-2 ring-primary/30" : ""}`} />
+                        <div className={`h-2.5 w-2.5 rounded-full ${isComplete ? "bg-primary" : "bg-muted"} ${isCurrent ? "ring-2 ring-primary/30" : ""}`} />
                         <span className={`mt-1 text-[10px] ${isComplete ? "text-primary" : "text-muted-foreground"}`}>
                           {step === "under_review" ? "Review" : step.charAt(0).toUpperCase() + step.slice(1)}
                         </span>
                       </div>
                       {i < statusSteps.length - 1 && (
-                        <div className={`h-0.5 flex-1 ${i < currentIndex ? "bg-primary" : "bg-secondary"}`} />
+                        <div className={`h-0.5 flex-1 ${i < currentIndex ? "bg-primary" : "bg-muted"}`} />
                       )}
                     </div>
                   );
@@ -68,7 +68,7 @@ const Claims = () => {
       </div>
 
       {/* Payment Method */}
-      <div className="rounded-lg border border-dashed bg-card p-6 text-center">
+      <div className="rounded-2xl border border-dashed bg-card p-6 text-center">
         <CreditCard className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
         <h3 className="font-semibold mb-1">Payment Method</h3>
         <p className="text-sm text-muted-foreground">Direct deposit and payment setup coming soon</p>
