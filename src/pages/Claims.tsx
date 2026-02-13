@@ -1,20 +1,96 @@
 import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
 import { StatusPill } from "@/components/StatusPill";
-import { mockClaims } from "@/data/mockData";
 import { Wallet, Clock, CheckCircle, DollarSign, CreditCard, Crown, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
 import type { ClaimStatus } from "@/types";
 
 const statusSteps: ClaimStatus[] = ["submitted", "under_review", "approved", "paid"];
 
+interface PayoutData {
+  id: string;
+  amount: number;
+  status: string;
+  claim_id: string;
+  paid_at: string | null;
+}
+
+interface ClaimData {
+  id: string;
+  settlement_id: string;
+  status: string;
+  est_payout: number;
+  filed_at: string | null;
+  updated_at: string;
+  settlement_name?: string;
+  estimated_payout?: number;
+}
+
 const Claims = () => {
+  const { user } = useAuth();
+  const [claims, setClaims] = useState<ClaimData[]>([]);
+  const [payouts, setPayouts] = useState<PayoutData[]>([]);
+  const [loading, setLoading] = useState(true);
   const isPremium = false;
-  const totalRecovered = mockClaims.filter(c => c.status === "paid").reduce((a, c) => a + c.estimated_payout, 0);
-  const pendingPayouts = mockClaims.filter(c => c.status === "approved" || c.status === "under_review").reduce((a, c) => a + c.estimated_payout, 0);
-  const approvedCount = mockClaims.filter(c => c.status === "approved" || c.status === "paid").length;
-  const totalEstimated = mockClaims.reduce((a, c) => a + c.estimated_payout, 0);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchData = async () => {
+      try {
+        // Fetch claims with settlement names
+        const { data: claimsData } = await supabase
+          .from("claims")
+          .select(`
+            id,
+            settlement_id,
+            status,
+            est_payout,
+            filed_at,
+            updated_at,
+            settlements(name)
+          `)
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (claimsData) {
+          const formattedClaims = claimsData.map(c => ({
+            ...c,
+            settlement_name: (c.settlements as any)?.name || "Unknown Settlement",
+            estimated_payout: Number(c.est_payout) || 0,
+          }));
+          setClaims(formattedClaims);
+        }
+
+        // Fetch payouts
+        const { data: payoutsData } = await supabase
+          .from("payouts")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (payoutsData) setPayouts(payoutsData);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user]);
+
+  const totalRecovered = payouts
+    .filter(p => p.status === "paid")
+    .reduce((a, p) => a + (Number(p.amount) || 0), 0);
+  const pendingPayouts = payouts
+    .filter(p => p.status === "pending" || p.status === "processing")
+    .reduce((a, p) => a + (Number(p.amount) || 0), 0);
+  const approvedCount = claims.filter(c => c.status === "approved" || c.status === "paid").length;
   const lifetimeEarnings = totalRecovered;
 
   return (
@@ -23,10 +99,10 @@ const Claims = () => {
 
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-8">
-        <StatCard icon={Wallet} label="Total Recovered" value={`$${totalRecovered}`} variant="teal" />
-        <StatCard icon={Clock} label="Pending Payouts" value={`$${pendingPayouts}`} />
+        <StatCard icon={Wallet} label="Total Recovered" value={`$${totalRecovered.toLocaleString()}`} variant="teal" />
+        <StatCard icon={Clock} label="Pending Payouts" value={`$${pendingPayouts.toLocaleString()}`} />
         <StatCard icon={CheckCircle} label="Approved" value={approvedCount} />
-        <StatCard icon={TrendingUp} label="Lifetime Earnings" value={`$${lifetimeEarnings}`} variant="teal" />
+        <StatCard icon={TrendingUp} label="Lifetime Earnings" value={`$${lifetimeEarnings.toLocaleString()}`} variant="teal" />
       </div>
 
       {/* Premium Auto-Filing Upsell */}
@@ -46,66 +122,81 @@ const Claims = () => {
       )}
 
       {/* Claim Tracker */}
-      <h2 className="mb-4 text-lg font-semibold">Claim Tracker</h2>
-      <div className="space-y-3 mb-8">
-        {mockClaims.map((claim) => {
-          const currentIndex = statusSteps.indexOf(claim.status as any);
-          return (
-            <div key={claim.id} className="glass-card p-6">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold">{claim.settlement_name}</h3>
-                  <p className="text-xs text-muted-foreground">Filed: {claim.filed_at} · Updated: {claim.updated_at}</p>
-                </div>
-                <div className="text-right">
-                  <StatusPill variant={claim.status} />
-                  <p className="mt-1 text-sm font-semibold text-primary">${claim.estimated_payout}</p>
-                </div>
-              </div>
-              {/* Timeline */}
-              <div className="flex items-center gap-1">
-                {statusSteps.map((step, i) => {
-                  const isComplete = i <= currentIndex;
-                  const isCurrent = i === currentIndex;
-                  return (
-                    <div key={step} className="flex flex-1 items-center">
-                      <div className="flex flex-col items-center flex-1">
-                        <div className={`h-2.5 w-2.5 rounded-full ${isComplete ? "bg-primary" : "bg-muted"} ${isCurrent ? "ring-2 ring-primary/30" : ""}`} />
-                        <span className={`mt-1 text-[10px] ${isComplete ? "text-primary" : "text-muted-foreground"}`}>
-                          {step === "under_review" ? "Review" : step.charAt(0).toUpperCase() + step.slice(1)}
-                        </span>
+      {!loading && (
+        <>
+          <h2 className="mb-4 text-lg font-semibold">Claim Tracker</h2>
+          <div className="space-y-3 mb-8">
+            {claims.length === 0 ? (
+              <div className="glass-card p-6 text-center text-muted-foreground">No claims filed yet</div>
+            ) : (
+              claims.map((claim) => {
+                const currentIndex = statusSteps.indexOf(claim.status as any);
+                return (
+                  <div key={claim.id} className="glass-card p-6">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h3 className="font-semibold">{claim.settlement_name}</h3>
+                        <p className="text-xs text-muted-foreground">Filed: {claim.filed_at ? new Date(claim.filed_at).toLocaleDateString() : "—"} · Updated: {new Date(claim.updated_at).toLocaleDateString()}</p>
                       </div>
-                      {i < statusSteps.length - 1 && (
-                        <div className={`h-0.5 flex-1 ${i < currentIndex ? "bg-primary" : "bg-muted"}`} />
-                      )}
+                      <div className="text-right">
+                        <StatusPill variant={claim.status as ClaimStatus} />
+                        <p className="mt-1 text-sm font-semibold text-primary">${claim.estimated_payout?.toLocaleString()}</p>
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                    {/* Timeline */}
+                    <div className="flex items-center gap-1">
+                      {statusSteps.map((step, i) => {
+                        const isComplete = i <= currentIndex;
+                        const isCurrent = i === currentIndex;
+                        return (
+                          <div key={step} className="flex flex-1 items-center">
+                            <div className="flex flex-col items-center flex-1">
+                              <div className={`h-2.5 w-2.5 rounded-full ${isComplete ? "bg-primary" : "bg-muted"} ${isCurrent ? "ring-2 ring-primary/30" : ""}`} />
+                              <span className={`mt-1 text-[10px] ${isComplete ? "text-primary" : "text-muted-foreground"}`}>
+                                {step === "under_review" ? "Review" : step.charAt(0).toUpperCase() + step.slice(1)}
+                              </span>
+                            </div>
+                            {i < statusSteps.length - 1 && (
+                              <div className={`h-0.5 flex-1 ${i < currentIndex ? "bg-primary" : "bg-muted"}`} />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </>
+      )}
 
       {/* Payout Timeline */}
       <h2 className="mb-4 text-lg font-semibold">Payout Timeline</h2>
       <div className="glass-card p-6 mb-8">
         <div className="space-y-4">
-          {mockClaims.map((claim) => (
-            <div key={claim.id} className="flex items-center gap-4">
-              <div className={`h-3 w-3 rounded-full shrink-0 ${
-                claim.status === "paid" ? "bg-success" : claim.status === "approved" ? "bg-primary" : "bg-muted"
-              }`} />
-              <div className="flex-1">
-                <p className="text-sm font-medium">{claim.settlement_name}</p>
-                <p className="text-xs text-muted-foreground">{claim.updated_at}</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-semibold text-primary">${claim.estimated_payout}</p>
-                <StatusPill variant={claim.status} />
-              </div>
-            </div>
-          ))}
+          {payouts.length === 0 ? (
+            <p className="text-center text-sm text-muted-foreground">No payouts yet</p>
+          ) : (
+            payouts.map((payout) => {
+              const claim = claims.find(c => c.id === payout.claim_id);
+              return (
+                <div key={payout.id} className="flex items-center gap-4">
+                  <div className={`h-3 w-3 rounded-full shrink-0 ${
+                    payout.status === "paid" ? "bg-success" : payout.status === "processing" ? "bg-primary" : "bg-muted"
+                  }`} />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{claim?.settlement_name || "Unknown"}</p>
+                    <p className="text-xs text-muted-foreground">{new Date(payout.paid_at || Date.now()).toLocaleDateString()}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-semibold text-primary">${Number(payout.amount).toLocaleString()}</p>
+                    <span className="text-xs bg-muted/50 px-2 py-0.5 rounded capitalize">{payout.status}</span>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
 
