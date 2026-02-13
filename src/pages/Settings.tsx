@@ -8,7 +8,7 @@ const Settings = () => {
       <PageHeader title="Settings" subtitle="Manage your account and preferences" />
 
       {/* Account */}
-      <section className="mb-8 rounded-lg border bg-card p-6">
+      <section className="mb-6 rounded-2xl border bg-card p-6">
         <div className="flex items-center gap-2 mb-4">
           <User className="h-4 w-4 text-primary" />
           <h2 className="font-semibold">Account</h2>
@@ -21,7 +21,7 @@ const Settings = () => {
       </section>
 
       {/* Monitored Identifiers */}
-      <section className="mb-8 rounded-lg border bg-card p-6">
+      <section className="mb-6 rounded-2xl border bg-card p-6">
         <div className="flex items-center gap-2 mb-4">
           <Shield className="h-4 w-4 text-primary" />
           <h2 className="font-semibold">Monitored Identifiers</h2>
@@ -30,16 +30,16 @@ const Settings = () => {
       </section>
 
       {/* Data Controls */}
-      <section className="mb-8 rounded-lg border bg-card p-6">
+      <section className="mb-6 rounded-2xl border bg-card p-6">
         <h2 className="font-semibold mb-4">Data Controls</h2>
         <div className="flex flex-wrap gap-3">
-          <Button variant="outline"><Download className="mr-2 h-4 w-4" />Export My Data</Button>
-          <Button variant="destructive"><Trash2 className="mr-2 h-4 w-4" />Delete Account</Button>
+          <Button variant="outline" className="rounded-xl"><Download className="mr-2 h-4 w-4" />Export My Data</Button>
+          <Button variant="destructive" className="rounded-xl"><Trash2 className="mr-2 h-4 w-4" />Delete Account</Button>
         </div>
       </section>
 
       {/* Legal */}
-      <section className="mb-8 rounded-lg border bg-card p-6">
+      <section className="mb-6 rounded-2xl border bg-card p-6">
         <h2 className="font-semibold mb-3">Legal</h2>
         <div className="space-y-2">
           {["Terms of Service", "Privacy Policy", "Disclaimer"].map((link) => (
@@ -50,7 +50,7 @@ const Settings = () => {
         </div>
       </section>
 
-      <Button variant="outline" className="w-full"><LogOut className="mr-2 h-4 w-4" />Log Out</Button>
+      <Button variant="outline" className="w-full rounded-xl"><LogOut className="mr-2 h-4 w-4" />Log Out</Button>
     </div>
   );
 };

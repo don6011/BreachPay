@@ -33,9 +33,9 @@ const Scan = () => {
 
       {state === "idle" && (
         <div className="mx-auto max-w-lg">
-          <div className="rounded-lg border bg-card p-8">
+          <div className="rounded-2xl border bg-card p-8">
             <div className="mb-6 flex items-center justify-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
                 <Shield className="h-8 w-8 text-primary" />
               </div>
             </div>
@@ -44,13 +44,13 @@ const Scan = () => {
             <form onSubmit={handleScan} className="space-y-4">
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Email Address</label>
-                <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="rounded-xl" />
               </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium">Phone Number <span className="text-muted-foreground">(optional)</span></label>
-                <Input type="tel" placeholder="+1 (555) 000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                <Input type="tel" placeholder="+1 (555) 000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl" />
               </div>
-              <Button type="submit" className="w-full" size="lg">
+              <Button type="submit" className="w-full rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300" size="lg">
                 <Search className="mr-2 h-4 w-4" /> Start Secure Scan
               </Button>
             </form>
@@ -63,7 +63,7 @@ const Scan = () => {
           <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary mb-4" />
           <h2 className="text-xl font-bold mb-2">Scanning Databases...</h2>
           <p className="text-sm text-muted-foreground">Checking 12,847 breach databases for your identity</p>
-          <div className="mt-6 mx-auto max-w-xs rounded-full bg-secondary h-2 overflow-hidden">
+          <div className="mt-6 mx-auto max-w-xs rounded-full bg-muted h-2 overflow-hidden">
             <div className="h-full bg-primary animate-pulse rounded-full" style={{ width: "70%" }} />
           </div>
         </div>
@@ -73,7 +73,7 @@ const Scan = () => {
         <div>
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-critical/10">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-critical/10">
                 <AlertTriangle className="h-5 w-5 text-critical" />
               </div>
               <div>
@@ -82,14 +82,14 @@ const Scan = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="rounded bg-warning/15 px-2 py-1 text-xs font-medium text-warning">Demo Mode</span>
-              <Button variant="outline" onClick={reset}>Run Another Scan</Button>
+              <span className="rounded-xl bg-warning/15 px-2 py-1 text-xs font-medium text-warning">Demo Mode</span>
+              <Button variant="outline" onClick={reset} className="rounded-xl">Run Another Scan</Button>
             </div>
           </div>
 
           <div className="space-y-3">
             {mockBreaches.map((breach) => (
-              <div key={breach.id} className="rounded-lg border bg-card p-5 transition-all hover:border-primary/20">
+              <div key={breach.id} className="rounded-2xl border bg-card p-6 transition-all hover:border-primary/20">
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <h3 className="font-semibold">{breach.company}</h3>
@@ -100,7 +100,7 @@ const Scan = () => {
                 <p className="text-sm text-muted-foreground mb-3">{breach.description}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {breach.exposed_data.map((d) => (
-                    <span key={d} className="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">{d}</span>
+                    <span key={d} className="rounded-lg bg-muted px-2 py-0.5 text-xs text-muted-foreground">{d}</span>
                   ))}
                 </div>
               </div>

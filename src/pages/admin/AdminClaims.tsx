@@ -8,14 +8,14 @@ const AdminClaims = () => {
   return (
     <div>
       <PageHeader title="Claims Management" subtitle="Review and manage filed claims">
-        <Button size="sm" variant="outline"><Download className="mr-1 h-3 w-3" />Export CSV</Button>
-        <Button size="sm" variant="outline"><Flag className="mr-1 h-3 w-3" />Flag Suspicious</Button>
+        <Button size="sm" variant="outline" className="rounded-xl"><Download className="mr-1 h-3 w-3" />Export CSV</Button>
+        <Button size="sm" variant="outline" className="rounded-xl"><Flag className="mr-1 h-3 w-3" />Flag Suspicious</Button>
       </PageHeader>
 
-      <div className="rounded-lg border bg-card overflow-hidden">
+      <div className="rounded-2xl border bg-card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b bg-secondary/50">
+            <tr className="border-b bg-muted/50">
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">ID</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Settlement</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
@@ -26,7 +26,7 @@ const AdminClaims = () => {
           </thead>
           <tbody>
             {mockClaims.map((c) => (
-              <tr key={c.id} className="border-b last:border-0 hover:bg-secondary/30 transition-colors">
+              <tr key={c.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3 font-mono text-xs">{c.id}</td>
                 <td className="px-4 py-3 font-medium">{c.settlement_name}</td>
                 <td className="px-4 py-3"><StatusPill variant={c.status} /></td>

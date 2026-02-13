@@ -16,34 +16,34 @@ const AdminSettlements = () => {
       <PageHeader title="Settlement Management" subtitle="Manage settlement records">
         <Dialog>
           <DialogTrigger asChild>
-            <Button size="sm"><Plus className="mr-1 h-3 w-3" />Add Settlement</Button>
+            <Button size="sm" className="rounded-xl"><Plus className="mr-1 h-3 w-3" />Add Settlement</Button>
           </DialogTrigger>
-          <DialogContent className="bg-card">
+          <DialogContent className="bg-card rounded-2xl">
             <DialogHeader><DialogTitle>Add Settlement</DialogTitle></DialogHeader>
             <div className="space-y-3">
-              <Input placeholder="Settlement Name" />
-              <Input placeholder="Company" />
+              <Input placeholder="Settlement Name" className="rounded-xl" />
+              <Input placeholder="Company" className="rounded-xl" />
               <div className="grid grid-cols-2 gap-3">
-                <Input placeholder="Breach Year" type="number" />
-                <Input placeholder="Status" />
+                <Input placeholder="Breach Year" type="number" className="rounded-xl" />
+                <Input placeholder="Status" className="rounded-xl" />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Input placeholder="Payout Min ($)" type="number" />
-                <Input placeholder="Payout Max ($)" type="number" />
+                <Input placeholder="Payout Min ($)" type="number" className="rounded-xl" />
+                <Input placeholder="Payout Max ($)" type="number" className="rounded-xl" />
               </div>
-              <Input placeholder="Deadline" type="date" />
-              <Input placeholder="Description" />
-              <Button className="w-full">Add Settlement</Button>
+              <Input placeholder="Deadline" type="date" className="rounded-xl" />
+              <Input placeholder="Description" className="rounded-xl" />
+              <Button className="w-full rounded-xl bg-primary text-primary-foreground">Add Settlement</Button>
             </div>
           </DialogContent>
         </Dialog>
-        <Button size="sm" variant="outline"><Send className="mr-1 h-3 w-3" />Send Deadline Alerts</Button>
+        <Button size="sm" variant="outline" className="rounded-xl"><Send className="mr-1 h-3 w-3" />Send Deadline Alerts</Button>
       </PageHeader>
 
-      <div className="rounded-lg border bg-card overflow-hidden">
+      <div className="rounded-2xl border bg-card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b bg-secondary/50">
+            <tr className="border-b bg-muted/50">
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Name</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Company</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Year</th>
@@ -54,7 +54,7 @@ const AdminSettlements = () => {
           </thead>
           <tbody>
             {settlements.map((s) => (
-              <tr key={s.id} className="border-b last:border-0 hover:bg-secondary/30 transition-colors">
+              <tr key={s.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
                 <td className="px-4 py-3 font-medium">{s.name}</td>
                 <td className="px-4 py-3">{s.company}</td>
                 <td className="px-4 py-3">{s.breach_year}</td>

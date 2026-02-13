@@ -17,22 +17,22 @@ const Login = () => {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
-        <div className="mb-8 flex items-center justify-center gap-2">
-          <img src={logo} alt="BreachPay" className="h-10" />
+        <div className="mb-8 flex items-center justify-center">
+          <img src={logo} alt="BreachPay" className="h-12" />
         </div>
-        <div className="rounded-lg border bg-card p-8">
+        <div className="rounded-2xl border bg-card p-8">
           <h2 className="mb-1 text-xl font-bold">Welcome Back</h2>
           <p className="mb-6 text-sm text-muted-foreground">Log in to your BreachPay account</p>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="mb-1.5 block text-sm font-medium">Email</label>
-              <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="rounded-xl" />
             </div>
             <div>
               <label className="mb-1.5 block text-sm font-medium">Password</label>
-              <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="rounded-xl" />
             </div>
-            <Button type="submit" className="w-full">Log In</Button>
+            <Button type="submit" className="w-full rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300">Log In</Button>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
             Don't have an account? <Link to="/signup" className="text-primary hover:underline">Sign up</Link>

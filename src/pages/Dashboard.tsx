@@ -16,7 +16,7 @@ const Dashboard = () => {
 
       <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
         {/* Risk Gauge */}
-        <div className="flex items-center justify-center rounded-lg border bg-card p-6 lg:row-span-2">
+        <div className="flex items-center justify-center rounded-2xl border bg-card p-6 lg:row-span-2">
           <RiskGauge score={82} />
         </div>
 
@@ -30,9 +30,15 @@ const Dashboard = () => {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-3">
-          <Button asChild><Link to="/scan"><Search className="mr-2 h-4 w-4" />Run Scan</Link></Button>
-          <Button variant="outline" asChild><Link to="/settlements">View Settlements <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
-          <Button variant="outline" asChild><Link to="/claims">Track Claims <ArrowRight className="ml-2 h-4 w-4" /></Link></Button>
+          <Button asChild className="rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300">
+            <Link to="/scan"><Search className="mr-2 h-4 w-4" />Run Scan</Link>
+          </Button>
+          <Button variant="outline" asChild className="rounded-xl">
+            <Link to="/settlements">View Settlements <ArrowRight className="ml-2 h-4 w-4" /></Link>
+          </Button>
+          <Button variant="outline" asChild className="rounded-xl">
+            <Link to="/claims">Track Claims <ArrowRight className="ml-2 h-4 w-4" /></Link>
+          </Button>
         </div>
       </div>
 
