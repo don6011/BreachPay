@@ -1,5 +1,7 @@
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Database, DollarSign, Users, Radio, ArrowRight, Shield, Search, FileText, Check, Crown, Lock, LogOut, Zap } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Database, DollarSign, Users, Radio, ArrowRight, Shield, Search, FileText, Check, Crown, Lock, LogOut, Zap, AlertTriangle, TrendingUp } from "lucide-react";
 import { Link } from "react-router-dom";
 import logo from "@/assets/logo.png";
 
@@ -55,9 +57,56 @@ const pricingPlans = [
   },
 ];
 
+const breachTickerItems = [
+  { company: "National Health Corp", records: "14.2M", date: "Feb 2026" },
+  { company: "StreamVault", records: "8.7M", date: "Jan 2026" },
+  { company: "PayLink Financial", records: "3.1M", date: "Jan 2026" },
+  { company: "CloudSync Pro", records: "22M", date: "Dec 2025" },
+  { company: "TravelEase", records: "5.4M", date: "Dec 2025" },
+  { company: "RetailMax", records: "11.8M", date: "Nov 2025" },
+  { company: "FinSecure Bank", records: "2.9M", date: "Nov 2025" },
+  { company: "EduConnect", records: "7.6M", date: "Oct 2025" },
+];
+
+const urgencyStats = [
+  { value: "847", label: "Active Breaches This Month", icon: AlertTriangle, color: "text-critical" },
+  { value: "$18.2M", label: "Unclaimed Settlement Funds", icon: DollarSign, color: "text-primary" },
+  { value: "23", label: "Deadlines Closing This Week", icon: TrendingUp, color: "text-warning" },
+];
+
 const Landing = () => {
+  const [calcBreaches, setCalcBreaches] = useState("3");
+  const calcMin = parseInt(calcBreaches || "0") * 75;
+  const calcMax = parseInt(calcBreaches || "0") * 5000;
+
+  const [tickerOffset, setTickerOffset] = useState(0);
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTickerOffset((prev) => prev + 1);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const currentBreach = breachTickerItems[tickerOffset % breachTickerItems.length];
+
   return (
     <div className="min-h-screen bg-background">
+      {/* Breach Ticker */}
+      <div className="border-b border-border/50 bg-destructive/5 py-2">
+        <div className="mx-auto max-w-6xl px-6 flex items-center justify-center gap-3 text-sm">
+          <span className="flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive" />
+            </span>
+            <span className="font-semibold text-destructive">LIVE</span>
+          </span>
+          <span className="text-muted-foreground">
+            <span className="font-medium text-foreground">{currentBreach.company}</span> breach — {currentBreach.records} records exposed · {currentBreach.date}
+          </span>
+        </div>
+      </div>
+
       {/* Navbar */}
       <header className="sticky top-0 z-50 border-b border-border/50 backdrop-blur-xl bg-background/85">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
@@ -148,14 +197,48 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Urgency Breach Stats */}
+      <section className="border-y border-destructive/10 bg-destructive/[0.03]">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-6 py-8 sm:grid-cols-3">
+          {urgencyStats.map((s) => (
+            <div key={s.label} className="glass-card flex items-center gap-4 p-5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-destructive/10">
+                <s.icon className={`h-5 w-5 ${s.color}`} />
+              </div>
+              <div>
+                <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+                <p className="text-xs text-muted-foreground">{s.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Stats Bar */}
-      <section className="border-y border-border bg-card">
+      <section className="border-b border-border bg-card/50">
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-6 py-10 lg:grid-cols-4">
           {stats.map((s) => (
             <div key={s.label} className="flex flex-col items-center text-center">
               <s.icon className="mb-2 h-6 w-6 text-primary" />
               <span className="text-2xl font-bold">{s.value}</span>
               <span className="text-sm text-muted-foreground">{s.label}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Trust Badge Row */}
+      <section className="py-8 bg-background">
+        <div className="mx-auto max-w-4xl px-6 flex flex-wrap items-center justify-center gap-6">
+          {[
+            { icon: Shield, text: "SOC 2 Compliant" },
+            { icon: Lock, text: "256-bit AES Encryption" },
+            { icon: Check, text: "GDPR & CCPA Ready" },
+            { icon: Shield, text: "Zero Data Selling" },
+          ].map((badge) => (
+            <div key={badge.text} className="flex items-center gap-2 rounded-xl border border-border/50 bg-card/50 px-4 py-2.5 text-sm text-muted-foreground">
+              <badge.icon className="h-4 w-4 text-primary" />
+              {badge.text}
             </div>
           ))}
         </div>
@@ -169,7 +252,7 @@ const Landing = () => {
             {steps.map((step, i) => (
               <div
                 key={step.title}
-                className="rounded-2xl border border-border p-6 text-center bg-card transition-all duration-300 hover:border-primary/20 hover:shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)]"
+                className="glass-card p-6 text-center transition-all duration-300 hover:border-primary/20 hover:shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)]"
               >
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
                   <step.icon className="h-5 w-5 text-primary" />
@@ -183,6 +266,39 @@ const Landing = () => {
         </div>
       </section>
 
+      {/* Settlement Calculator */}
+      <section className="py-16 bg-background border-t border-border">
+        <div className="mx-auto max-w-xl px-6">
+          <h2 className="mb-2 text-center text-3xl font-bold">Estimate Your Payout</h2>
+          <p className="mb-8 text-center text-muted-foreground">See how much you could recover from data breach settlements.</p>
+          <div className="glass-card-glow p-8">
+            <label className="block text-sm font-medium mb-2">How many breaches have affected you?</label>
+            <Input
+              type="number"
+              min="1"
+              max="20"
+              value={calcBreaches}
+              onChange={(e) => setCalcBreaches(e.target.value)}
+              className="rounded-xl text-center text-lg font-bold mb-6"
+            />
+            <div className="rounded-xl bg-muted/50 p-6 text-center">
+              <p className="text-sm text-muted-foreground mb-1">Estimated Recovery Range</p>
+              <p className="text-3xl font-bold text-primary drop-shadow-[0_0_10px_hsl(172_89%_52%/0.3)]">
+                ${calcMin.toLocaleString()} – ${calcMax.toLocaleString()}
+              </p>
+              <p className="text-xs text-muted-foreground mt-2">Based on average settlement payouts</p>
+            </div>
+            <Button
+              asChild
+              size="lg"
+              className="w-full mt-6 rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300"
+            >
+              <Link to="/scan">Scan Now — It's Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
+            </Button>
+          </div>
+        </div>
+      </section>
+
       {/* Pricing Section */}
       <section className="py-20 bg-background border-t border-border">
         <div className="mx-auto max-w-4xl px-6">
@@ -192,10 +308,8 @@ const Landing = () => {
             {pricingPlans.map((plan) => (
               <div
                 key={plan.name}
-                className={`relative rounded-2xl border p-8 transition-all duration-300 ${
-                  plan.highlighted
-                    ? "border-primary/30 bg-card shadow-[0_0_30px_0_hsl(172_89%_52%/0.08)]"
-                    : "border-border bg-card"
+                className={`relative p-8 transition-all duration-300 ${
+                  plan.highlighted ? "glass-card-glow" : "glass-card"
                 }`}
               >
                 {plan.badge && (

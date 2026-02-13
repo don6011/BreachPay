@@ -13,8 +13,8 @@ interface StatCardProps {
 export function StatCard({ icon: Icon, label, value, subtitle, variant = "default", className }: StatCardProps) {
   return (
     <div className={cn(
-      "rounded-2xl border bg-card p-6 transition-all",
-      variant === "teal" && "border-primary/20 shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)]",
+      "p-6 transition-all duration-300",
+      variant === "teal" ? "glass-card-glow" : "glass-card",
       className
     )}>
       <div className="flex items-center gap-3 mb-3">

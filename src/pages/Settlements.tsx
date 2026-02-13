@@ -17,6 +17,7 @@ import {
   Sparkles,
   TrendingUp,
   CheckCircle2,
+  Target,
 } from "lucide-react";
 import type { SettlementStatus } from "@/types";
 import { Link } from "react-router-dom";
@@ -45,6 +46,14 @@ const difficultyMap: Record<string, { label: string; color: string }> = {
   s3: { label: "Advanced", color: "text-critical" },
   s4: { label: "Easy", color: "text-success" },
   s5: { label: "Easy", color: "text-success" },
+};
+
+const confidenceMap: Record<string, number> = {
+  s1: 95,
+  s2: 88,
+  s3: 72,
+  s4: 91,
+  s5: 65,
 };
 
 const Settlements = () => {
@@ -89,19 +98,12 @@ const Settlements = () => {
     return claim.status;
   };
 
-  const getStatusGlow = (status: string, settlementStatus: SettlementStatus) => {
-    if (settlementStatus === "closed") return "border-muted-foreground/20";
-    if (status === "approved" || status === "paid") return "border-success/30 shadow-[0_0_15px_hsl(142_71%_45%/0.08)]";
-    if (settlementStatus === "open") return "border-primary/20 shadow-[0_0_15px_hsl(172_89%_52%/0.06)]";
-    return "border-border";
-  };
-
   return (
     <div>
       <PageHeader title="Settlement Matches" subtitle="Your eligible settlement matches and claim opportunities" />
 
       {/* Compensation Summary Banner */}
-      <div className="mb-6 rounded-2xl border border-primary/20 bg-card p-6 shadow-[0_0_30px_0_hsl(172_89%_52%/0.08)]">
+      <div className="mb-6 glass-card-glow p-6">
         <div className="flex items-center gap-2 mb-4">
           <Shield className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-bold">You Qualify for Compensation</h2>
@@ -164,7 +166,7 @@ const Settlements = () => {
             <ChevronDown className="h-3.5 w-3.5" />
           </button>
           {showSort && (
-            <div className="absolute right-0 top-full mt-1 z-10 rounded-xl border bg-card p-1 shadow-lg min-w-[180px]">
+            <div className="absolute right-0 top-full mt-1 z-10 glass-card p-1 shadow-lg min-w-[180px]">
               {sortOptions.map((opt) => (
                 <button
                   key={opt.value}
@@ -188,14 +190,16 @@ const Settlements = () => {
           const filingStatus = getFilingStatus(settlement.id);
           const claim = claimMap[settlement.id];
           const difficulty = difficultyMap[settlement.id] || { label: "Easy", color: "text-success" };
+          const confidence = confidenceMap[settlement.id] || 80;
           const payoutProgress = claim ? Math.min(100, (claim.estimated_payout / settlement.payout_max) * 100) : 0;
           const isUrgent = daysLeft <= 30;
+          const deadlineProgress = Math.max(0, Math.min(100, 100 - (daysLeft / 365) * 100));
 
           return (
             <div key={settlement.id}>
               {/* Auto-filing upsell after 2nd card */}
               {idx === 2 && (
-                <div className="mb-3 rounded-2xl border border-primary/15 bg-gradient-to-r from-card via-card to-primary/[0.03] p-6">
+                <div className="mb-3 glass-card-glow p-6">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="flex items-start gap-3">
                       <div className="rounded-xl bg-primary/10 p-2.5">
@@ -215,9 +219,9 @@ const Settlements = () => {
                 </div>
               )}
 
-              <div
-                className={`rounded-2xl border bg-card p-6 transition-all duration-300 hover:translate-y-[-1px] ${getStatusGlow(filingStatus, settlement.status)}`}
-              >
+              <div className={`glass-card p-6 transition-all duration-300 hover:translate-y-[-1px] ${
+                settlement.status === "closed" ? "" : filingStatus === "approved" || filingStatus === "paid" ? "!border-success/30" : settlement.status === "open" ? "hover:border-primary/25" : ""
+              }`}>
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
@@ -233,6 +237,21 @@ const Settlements = () => {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
+                    {/* Match Confidence */}
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                            confidence >= 85 ? "bg-success/10 text-success" : confidence >= 70 ? "bg-warning/10 text-warning" : "bg-muted text-muted-foreground"
+                          }`}>
+                            <Target className="h-2.5 w-2.5" /> {confidence}% Match
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-card border text-sm">
+                          Confidence score based on breach data overlap and eligibility criteria.
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     {filingStatus !== "not_filed" && (
                       <StatusPill variant={filingStatus as any} />
                     )}
@@ -272,6 +291,17 @@ const Settlements = () => {
                     </TooltipProvider>
                   )}
                 </div>
+
+                {/* Deadline Countdown Bar */}
+                {settlement.status !== "closed" && (
+                  <div className="mb-3">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                      <span>Deadline</span>
+                      <span className={isUrgent ? "text-critical font-medium" : ""}>{settlement.deadline}</span>
+                    </div>
+                    <Progress value={deadlineProgress} className={`h-1.5 ${isUrgent ? "[&>div]:bg-critical" : ""}`} />
+                  </div>
+                )}
 
                 {/* Payout Progress Bar (for filed claims) */}
                 {claim && (

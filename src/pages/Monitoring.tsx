@@ -5,8 +5,9 @@ import { StatusPill } from "@/components/StatusPill";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { mockMonitoring, mockAlerts } from "@/data/mockData";
-import { Shield, Database, AlertTriangle, Clock, Bell, Mail, Zap, Crown, Check } from "lucide-react";
+import { Shield, Database, AlertTriangle, Clock, Bell, Mail, Zap, Crown, Check, Lightbulb, Activity } from "lucide-react";
 import { Link } from "react-router-dom";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 const premiumBenefits = [
   "Daily monitoring scans",
@@ -17,8 +18,24 @@ const premiumBenefits = [
   "Priority support",
 ];
 
+const riskTrendData = [
+  { date: "Aug", score: 45 },
+  { date: "Sep", score: 52 },
+  { date: "Oct", score: 58 },
+  { date: "Nov", score: 65 },
+  { date: "Dec", score: 72 },
+  { date: "Jan", score: 78 },
+  { date: "Feb", score: 82 },
+];
+
+const protectionTips = [
+  { title: "Enable Two-Factor Authentication", description: "Add 2FA on all accounts found in breaches to prevent unauthorized access." },
+  { title: "Change Compromised Passwords", description: "Update passwords for all services where your credentials were exposed." },
+  { title: "Freeze Your Credit", description: "Contact Equifax, Experian, and TransUnion to place a credit freeze." },
+  { title: "Monitor Financial Statements", description: "Review bank and credit card statements weekly for unauthorized charges." },
+];
+
 const Monitoring = () => {
-  // TODO: read from user_profiles.plan when wired to Supabase
   const isPremium = false;
 
   return (
@@ -26,7 +43,7 @@ const Monitoring = () => {
       <PageHeader title="Monitoring Center" subtitle="Your identity monitoring status" />
 
       {/* Status Card */}
-      <div className="mb-6 rounded-2xl border border-primary/20 bg-card p-6 shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)]">
+      <div className="mb-6 glass-card-glow p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <Shield className="h-5 w-5 text-primary" />
@@ -43,9 +60,42 @@ const Monitoring = () => {
         <p className="mt-3 text-xs text-muted-foreground">Scan Frequency: {mockMonitoring.scan_frequency}</p>
       </div>
 
+      {/* Risk Trend Graph */}
+      <div className="mb-6 glass-card p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Activity className="h-4 w-4 text-primary" />
+            <h2 className="font-semibold">Risk Score Trend</h2>
+          </div>
+          {!isPremium && (
+            <span className="flex items-center gap-1 rounded-full bg-warning/10 px-3 py-1 text-xs font-semibold text-warning">
+              <Crown className="h-3 w-3" /> Premium — Full History
+            </span>
+          )}
+        </div>
+        <div className={!isPremium ? "relative" : ""}>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={riskTrendData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="hsl(219, 31%, 16%)" />
+              <XAxis dataKey="date" tick={{ fill: "hsl(217, 16%, 62%)", fontSize: 12 }} />
+              <YAxis domain={[0, 100]} tick={{ fill: "hsl(217, 16%, 62%)", fontSize: 12 }} />
+              <Tooltip contentStyle={{ background: "hsl(221, 45%, 7%)", border: "1px solid hsl(219, 31%, 16%)", borderRadius: 12 }} />
+              <Line type="monotone" dataKey="score" stroke="hsl(0, 84%, 60%)" strokeWidth={2} dot={{ fill: "hsl(0, 84%, 60%)" }} />
+            </LineChart>
+          </ResponsiveContainer>
+          {!isPremium && (
+            <div className="absolute inset-0 flex items-center justify-center bg-background/40 backdrop-blur-[1px] rounded-xl">
+              <Button asChild size="sm" className="rounded-xl bg-primary text-primary-foreground">
+                <Link to="/pricing"><Crown className="mr-1.5 h-3.5 w-3.5" /> Unlock Full Trend History</Link>
+              </Button>
+            </div>
+          )}
+        </div>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Alert Preferences */}
-        <div className="rounded-2xl border bg-card p-6">
+        <div className="glass-card p-6">
           <div className="flex items-center gap-2 mb-4">
             <Bell className="h-4 w-4 text-primary" />
             <h2 className="font-semibold">Alert Preferences</h2>
@@ -69,7 +119,7 @@ const Monitoring = () => {
 
         {/* Premium Upsell / Active Badge */}
         {isPremium ? (
-          <div className="rounded-2xl border border-primary/20 bg-card p-6 shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)] flex items-center gap-3">
+          <div className="glass-card-glow p-6 flex items-center gap-3">
             <Crown className="h-6 w-6 text-primary" />
             <div>
               <h2 className="font-semibold text-primary">Premium Active</h2>
@@ -77,7 +127,7 @@ const Monitoring = () => {
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-primary/20 bg-card p-6 shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)]">
+          <div className="glass-card-glow p-6">
             <div className="flex items-center gap-2 mb-2">
               <Crown className="h-5 w-5 text-primary" />
               <h2 className="font-semibold">Upgrade to Premium</h2>
@@ -96,6 +146,22 @@ const Monitoring = () => {
             </Button>
           </div>
         )}
+      </div>
+
+      {/* Identity Protection Tips */}
+      <div className="mt-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Lightbulb className="h-4 w-4 text-warning" />
+          <h2 className="text-lg font-semibold">Identity Protection Tips</h2>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {protectionTips.map((tip) => (
+            <div key={tip.title} className="glass-card p-5">
+              <h3 className="text-sm font-semibold mb-1">{tip.title}</h3>
+              <p className="text-xs text-muted-foreground">{tip.description}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Alert History */}

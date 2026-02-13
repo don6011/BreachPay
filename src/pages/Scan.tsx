@@ -37,7 +37,6 @@ const Scan = () => {
 
   const reset = () => { setState("idle"); setEmail(""); setPhone(""); };
 
-  // Compute summary stats from mock data
   const eligibleSettlements = mockSettlements.filter(s => s.status === "open" || s.status === "pending");
   const estMin = eligibleSettlements.reduce((sum, s) => sum + (s.payout_min ?? 0), 0);
   const estMax = eligibleSettlements.reduce((sum, s) => sum + (s.payout_max ?? 0), 0);
@@ -51,7 +50,7 @@ const Scan = () => {
 
       {state === "idle" && (
         <div className="mx-auto max-w-lg">
-          <div className="rounded-2xl border bg-card p-8">
+          <div className="glass-card-glow p-8">
             <div className="mb-6 flex items-center justify-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
                 <Shield className="h-8 w-8 text-primary" />
@@ -90,7 +89,7 @@ const Scan = () => {
       {state === "results" && (
         <div>
           {/* Exposure Summary Banner */}
-          <div className="mb-6 rounded-2xl border border-destructive/20 bg-card p-6">
+          <div className="mb-6 glass-card p-6 !border-destructive/20">
             <div className="flex items-center gap-3 mb-4">
               <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-destructive/10">
                 <AlertTriangle className="h-5 w-5 text-destructive" />
@@ -139,9 +138,9 @@ const Scan = () => {
             </div>
           </div>
 
-          {/* Premium Upsell — inline for Free users */}
+          {/* Premium Upsell */}
           {!isPremium && (
-            <div className="mb-6 rounded-2xl border border-primary/20 bg-card p-5 flex items-center justify-between shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)]">
+            <div className="mb-6 glass-card-glow p-5 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Crown className="h-5 w-5 text-primary shrink-0" />
                 <div>
@@ -160,7 +159,7 @@ const Scan = () => {
             {mockBreaches.map((breach) => {
               const settlement = getSettlementForBreach(breach.company);
               return (
-                <div key={breach.id} className="rounded-2xl border bg-card p-6 transition-all hover:border-primary/20 hover:shadow-[0_0_16px_hsl(172_89%_52%/0.05)]">
+                <div key={breach.id} className="glass-card p-6 transition-all hover:border-primary/20">
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <h3 className="font-semibold">{breach.company}</h3>
@@ -208,7 +207,7 @@ const Scan = () => {
 
           {/* Monitoring Upsell Block */}
           {!isPremium && (
-            <div className="mt-8 rounded-2xl border border-primary/20 bg-card p-8 shadow-[0_0_24px_0_hsl(172_89%_52%/0.06)]">
+            <div className="mt-8 glass-card-glow p-8">
               <div className="flex items-center gap-3 mb-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
                   <Shield className="h-5 w-5 text-primary" />
