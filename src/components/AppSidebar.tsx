@@ -19,7 +19,7 @@ export function AppSidebar() {
     <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Logo */}
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-5">
-        <img src={logo} alt="BreachPay" className="h-7" />
+        <img src={logo} alt="BreachPay" className="h-9" />
       </div>
 
       {/* Nav */}

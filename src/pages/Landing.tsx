@@ -24,7 +24,7 @@ const Landing = () => {
       <header className="sticky top-0 z-50 border-b border-white/5 backdrop-blur-xl" style={{ background: 'rgba(5,7,10,0.85)' }}>
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-2">
-            <img src={logo} alt="BreachPay" className="h-8" />
+            <img src={logo} alt="BreachPay" className="h-12" />
           </div>
           <div className="flex items-center gap-3">
             <Button variant="ghost" asChild className="text-white/70 hover:text-white hover:bg-white/5">
@@ -57,6 +57,9 @@ const Landing = () => {
           }}
         />
         <div className="relative mx-auto max-w-4xl px-6 text-center">
+          <div className="mb-8 flex justify-center">
+            <img src={logo} alt="BreachPay" className="h-20 sm:h-24 lg:h-28" />
+          </div>
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl text-white">
             Your Data Was Breached.{" "}
             <span style={{ color: '#14F1D9' }}>You Could Be Owed Money.</span>
