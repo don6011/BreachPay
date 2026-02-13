@@ -286,16 +286,16 @@ const Settlements = () => {
 
                 {/* Actions */}
                 <div className="flex items-center gap-2 mt-1">
-                  {settlement.status === "open" && filingStatus === "not_filed" ? (
-                    <Button
-                      size="sm"
-                      asChild
-                      className="rounded-xl shadow-[0_0_16px_hsl(172_89%_52%/0.2)] hover:shadow-[0_0_24px_hsl(172_89%_52%/0.35)] transition-all duration-300"
-                    >
-                      <Link to="/claims">
-                        File Claim <ArrowRight className="ml-1 h-3 w-3" />
-                      </Link>
-                    </Button>
+                   {settlement.status === "open" && filingStatus === "not_filed" ? (
+                     <Button
+                       size="sm"
+                       asChild
+                       className="rounded-xl shadow-[0_0_16px_hsl(172_89%_52%/0.2)] hover:shadow-[0_0_24px_hsl(172_89%_52%/0.35)] transition-all duration-300"
+                     >
+                       <Link to={`/claims/file?settlement=${settlement.id}`}>
+                         File Claim <ArrowRight className="ml-1 h-3 w-3" />
+                       </Link>
+                     </Button>
                   ) : filingStatus !== "not_filed" && filingStatus !== "paid" ? (
                     <Button size="sm" variant="outline" asChild className="rounded-xl">
                       <Link to="/claims">Track Claim</Link>
