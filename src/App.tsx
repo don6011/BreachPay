@@ -15,6 +15,7 @@ import Dashboard from "./pages/Dashboard";
 import Scan from "./pages/Scan";
 import Settlements from "./pages/Settlements";
 import Claims from "./pages/Claims";
+import ClaimFiling from "./pages/ClaimFiling";
 import Monitoring from "./pages/Monitoring";
 import Settings from "./pages/Settings";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
@@ -45,6 +46,7 @@ const App = () => (
               <Route path="/scan" element={<Scan />} />
               <Route path="/settlements" element={<Settlements />} />
               <Route path="/claims" element={<Claims />} />
+              <Route path="/claims/file" element={<ClaimFiling />} />
               <Route path="/monitoring" element={<Monitoring />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
