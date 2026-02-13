@@ -1,118 +1,113 @@
+/// <reference lib="deno.ns" />
+
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-};
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function norm(s: string) {
+  return s.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+}
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!SUPABASE_URL || !SERVICE_KEY) return jsonResponse({ error: "Missing env vars" }, 500);
 
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const sb = createClient(supabaseUrl, serviceKey);
+  const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
-    const runKey = `matches:${new Date().toISOString().slice(0, 13)}`;
+  // Optional: rebuild for a single settlement_id
+  const url = new URL(req.url);
+  const settlementOverride = url.searchParams.get("settlement_id");
 
-    const { error: idempErr } = await sb.from("automation_runs").insert({
-      job_name: "rebuild_settlement_matches",
-      run_key: runKey,
-      status: "running",
-    });
-    if (idempErr?.code === "23505") {
-      return new Response(JSON.stringify({ message: "Already ran this hour" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+  // Fetch settlements
+  let sQuery = supabase
+    .from("settlements")
+    .select("id, company, breach_year, payout_min, payout_max, status")
+    .in("status", ["open", "pending"]);
 
-    // Get all open settlements
-    const { data: settlements } = await sb.from("settlements").select("*").eq("status", "open");
-    if (!settlements?.length) {
-      await sb.from("automation_runs").update({
-        status: "success", completed_at: new Date().toISOString(),
-        details: { message: "No open settlements" },
-      }).eq("job_name", "rebuild_settlement_matches").eq("run_key", runKey);
+  if (settlementOverride) sQuery = sQuery.eq("id", settlementOverride);
 
-      return new Response(JSON.stringify({ success: true, matches: 0 }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+  const { data: settlements, error: sErr } = await sQuery;
+  if (sErr) return jsonResponse({ error: sErr.message }, 500);
+  if (!settlements?.length) return jsonResponse({ ok: true, created: 0, message: "No settlements to rebuild" });
 
-    // Get all users with breaches (paginate with limit)
-    const { data: breaches } = await sb
+  // Fetch users who have breaches
+  const { data: users, error: uErr } = await supabase
+    .from("breach_events")
+    .select("user_id")
+    .limit(5000);
+
+  if (uErr) return jsonResponse({ error: uErr.message }, 500);
+
+  const userIds = Array.from(new Set((users ?? []).map((r) => r.user_id)));
+  if (!userIds.length) return jsonResponse({ ok: true, created: 0, message: "No users with breach events" });
+
+  let created = 0;
+
+  // Process in chunks
+  const chunkSize = 50;
+  for (let i = 0; i < userIds.length; i += chunkSize) {
+    const chunk = userIds.slice(i, i + chunkSize);
+
+    // Fetch breaches for these users
+    const { data: breaches, error: bErr } = await supabase
       .from("breach_events")
       .select("user_id, source, breach_year")
-      .limit(5000);
+      .in("user_id", chunk);
 
-    // Group breaches by user
-    const userBreaches: Record<string, Array<{ source: string; breach_year: number | null }>> = {};
-    for (const b of breaches || []) {
-      if (!userBreaches[b.user_id]) userBreaches[b.user_id] = [];
-      userBreaches[b.user_id].push({ source: b.source, breach_year: b.breach_year });
+    if (bErr) continue;
+
+    const byUser = new Map<string, { source: string; breach_year: number | null }[]>();
+    for (const b of breaches ?? []) {
+      const uid = b.user_id as string;
+      if (!byUser.has(uid)) byUser.set(uid, []);
+      byUser.get(uid)!.push({ source: String(b.source), breach_year: (b.breach_year as number) ?? null });
     }
 
-    let newMatches = 0;
-    let alertsCreated = 0;
+    const inserts: any[] = [];
+    for (const uid of chunk) {
+      const userBreaches = byUser.get(uid) ?? [];
+      for (const sett of settlements) {
+        const company = norm(String(sett.company || ""));
+        const year = sett.breach_year as number | null;
 
-    for (const [userId, userBreach] of Object.entries(userBreaches)) {
-      for (const s of settlements) {
-        const companyLower = s.company.toLowerCase();
-
-        const matched = userBreach.some((b) => {
-          const srcLower = b.source.toLowerCase();
-          const companyMatch = companyLower.includes(srcLower) || srcLower.includes(companyLower);
-          const yearMatch = !s.breach_year || s.breach_year === b.breach_year;
-          return companyMatch && yearMatch;
+        const hit = userBreaches.find((br) => {
+          const src = norm(br.source);
+          const companyMatch = company.includes(src) || src.includes(company);
+          const yearOk = !year || !br.breach_year || year === br.breach_year;
+          return companyMatch && yearOk;
         });
 
-        if (!matched) continue;
+        if (hit) {
+          const payoutEstimate =
+            sett.payout_min && sett.payout_max ? (Number(sett.payout_min) + Number(sett.payout_max)) / 2 : null;
 
-        const confidence = userBreach.some(b => b.source.toLowerCase() === companyLower && s.breach_year === b.breach_year) ? 90
-          : userBreach.some(b => b.source.toLowerCase() === companyLower) ? 70 : 50;
-        const estimate = s.payout_min ? (Number(s.payout_min) + Number(s.payout_max || s.payout_min)) / 2 : null;
-
-        const { error: matchErr, data: matchData } = await sb.from("settlement_matches").upsert({
-          user_id: userId,
-          settlement_id: s.id,
-          payout_estimate: estimate,
-          match_reason: `Company match (${confidence}% confidence)`,
-          status: "open",
-        }, { onConflict: "user_id,settlement_id", ignoreDuplicates: false }).select("id");
-
-        if (!matchErr && matchData?.length) {
-          newMatches++;
-
-          // Create alert for new matches
-          await sb.from("alerts").insert({
-            user_id: userId,
-            type: "settlement_found",
-            title: `New settlement match: ${s.name}`,
-            body: `You may be eligible for $${estimate?.toLocaleString() || "unknown"} from the ${s.company} settlement.`,
-            severity: "low",
-            related_settlement_id: s.id,
+          inserts.push({
+            user_id: uid,
+            settlement_id: sett.id,
+            match_reason: `Matched via ${hit.source} breach exposure`,
+            status: sett.status,
+            payout_estimate: payoutEstimate,
           });
-          alertsCreated++;
         }
       }
     }
 
-    await sb.from("automation_runs").update({
-      status: "success",
-      completed_at: new Date().toISOString(),
-      details: { new_matches: newMatches, alerts_created: alertsCreated, users_checked: Object.keys(userBreaches).length },
-    }).eq("job_name", "rebuild_settlement_matches").eq("run_key", runKey);
+    if (!inserts.length) continue;
 
-    return new Response(JSON.stringify({
-      success: true,
-      new_matches: newMatches,
-      alerts_created: alertsCreated,
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    const { data: upserted, error: upErr } = await supabase
+      .from("settlement_matches")
+      .upsert(inserts, { onConflict: "user_id,settlement_id" })
+      .select("user_id, settlement_id");
+
+    if (!upErr) created += upserted?.length ?? 0;
   }
+
+  // Optional: create alerts for users (kept minimal to avoid spam). You can add later.
+  return jsonResponse({ ok: true, created });
 });
