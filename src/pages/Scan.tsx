@@ -4,7 +4,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { mockBreaches, mockSettlements } from "@/data/mockData";
-import { Search, Shield, AlertTriangle, Loader2, Crown, Check, Eye, DollarSign, Zap, Bell, Activity } from "lucide-react";
+import { Search, Shield, AlertTriangle, Loader2, Crown, Check, Eye, DollarSign, Zap, Bell, Activity, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
@@ -176,22 +176,31 @@ const Scan = () => {
                       <span key={d} className="rounded-lg bg-muted px-2 py-0.5 text-xs text-muted-foreground">{d}</span>
                     ))}
                   </div>
-                  <div className="flex items-center gap-4 border-t border-border pt-3 text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <Check className={`h-3.5 w-3.5 ${settlement ? "text-primary" : "text-muted-foreground"}`} />
-                      <span className={settlement ? "text-primary font-medium" : "text-muted-foreground"}>
-                        Settlement Eligible: {settlement ? "Yes" : "No"}
-                      </span>
-                    </div>
-                    {settlement && (
-                      <div className="flex items-center gap-1.5">
-                        <DollarSign className="h-3.5 w-3.5 text-primary" />
-                        <span className="text-primary font-medium drop-shadow-[0_0_6px_hsl(172_89%_52%/0.3)]">
-                          Est. Payout: ${settlement.payout_min?.toLocaleString()} – ${settlement.payout_max?.toLocaleString()}
-                        </span>
-                      </div>
-                    )}
-                  </div>
+                   <div className="flex flex-col gap-3 border-t border-border pt-3">
+                     <div className="flex items-center gap-4 text-xs">
+                       <div className="flex items-center gap-1.5">
+                         <Check className={`h-3.5 w-3.5 ${settlement ? "text-primary" : "text-muted-foreground"}`} />
+                         <span className={settlement ? "text-primary font-medium" : "text-muted-foreground"}>
+                           Settlement Eligible: {settlement ? "Yes" : "No"}
+                         </span>
+                       </div>
+                       {settlement && (
+                         <div className="flex items-center gap-1.5">
+                           <DollarSign className="h-3.5 w-3.5 text-primary" />
+                           <span className="text-primary font-medium drop-shadow-[0_0_6px_hsl(172_89%_52%/0.3)]">
+                             Est. Payout: ${settlement.payout_min?.toLocaleString()} – ${settlement.payout_max?.toLocaleString()}
+                           </span>
+                         </div>
+                       )}
+                     </div>
+                     {settlement && (
+                       <Link to={`/claims/file?settlement=${settlement.id}`}>
+                         <Button size="sm" className="w-full bg-primary text-primary-foreground hover:shadow-[0_0_15px_hsl(172_89%_52%/0.3)]">
+                           File Claim <ArrowRight className="ml-1 h-3 w-3" />
+                         </Button>
+                       </Link>
+                     )}
+                   </div>
                 </div>
               );
             })}
