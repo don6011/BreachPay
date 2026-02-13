@@ -1,1 +1,10 @@
 project_id = "zmjikithlaxeldvsmklz"
+
+[functions.run-scheduled-scans]
+verify_jwt = false
+
+[functions.run-deadline-alerts]
+verify_jwt = false
+
+[functions.rebuild-settlement-matches]
+verify_jwt = false

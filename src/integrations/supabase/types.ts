@@ -108,6 +108,36 @@ export type Database = {
           },
         ]
       }
+      automation_runs: {
+        Row: {
+          completed_at: string | null
+          details: Json
+          id: string
+          job_name: string
+          run_key: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          details?: Json
+          id?: string
+          job_name: string
+          run_key: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          details?: Json
+          id?: string
+          job_name?: string
+          run_key?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
       breach_events: {
         Row: {
           breach_year: number | null
@@ -249,6 +279,35 @@ export type Database = {
           },
           {
             foreignKeyName: "claims_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deadline_alerts_sent: {
+        Row: {
+          sent_at: string
+          settlement_id: string
+          threshold_days: number
+          user_id: string
+        }
+        Insert: {
+          sent_at?: string
+          settlement_id: string
+          threshold_days: number
+          user_id: string
+        }
+        Update: {
+          sent_at?: string
+          settlement_id?: string
+          threshold_days?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deadline_alerts_sent_settlement_id_fkey"
             columns: ["settlement_id"]
             isOneToOne: false
             referencedRelation: "settlements"
