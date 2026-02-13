@@ -3,6 +3,8 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/layouts/AppLayout";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import Landing from "./pages/Landing";
@@ -29,32 +31,34 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
 
-          {/* User App */}
-          <Route element={<AppLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/scan" element={<Scan />} />
-            <Route path="/settlements" element={<Settlements />} />
-            <Route path="/claims" element={<Claims />} />
-            <Route path="/monitoring" element={<Monitoring />} />
-            <Route path="/settings" element={<Settings />} />
-          </Route>
+            {/* User App - Protected */}
+            <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/scan" element={<Scan />} />
+              <Route path="/settlements" element={<Settlements />} />
+              <Route path="/claims" element={<Claims />} />
+              <Route path="/monitoring" element={<Monitoring />} />
+              <Route path="/settings" element={<Settings />} />
+            </Route>
 
-          {/* Admin Portal */}
-          <Route element={<AdminLayout />}>
-            <Route path="/admin/analytics" element={<AdminAnalytics />} />
-            <Route path="/admin/users" element={<AdminUsers />} />
-            <Route path="/admin/settlements" element={<AdminSettlements />} />
-            <Route path="/admin/claims" element={<AdminClaims />} />
-            <Route path="/admin/activity-logs" element={<AdminActivityLogs />} />
-          </Route>
+            {/* Admin Portal - Protected */}
+            <Route element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
+              <Route path="/admin/analytics" element={<AdminAnalytics />} />
+              <Route path="/admin/users" element={<AdminUsers />} />
+              <Route path="/admin/settlements" element={<AdminSettlements />} />
+              <Route path="/admin/claims" element={<AdminClaims />} />
+              <Route path="/admin/activity-logs" element={<AdminActivityLogs />} />
+            </Route>
 
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
