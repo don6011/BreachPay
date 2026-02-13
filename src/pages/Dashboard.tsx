@@ -16,7 +16,7 @@ const Dashboard = () => {
 
       <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
         {/* Risk Gauge */}
-        <div className="flex items-center justify-center rounded-2xl border bg-card p-6 lg:row-span-2">
+        <div className="flex items-center justify-center glass-card-glow p-6 lg:row-span-2">
           <RiskGauge score={82} />
         </div>
 
