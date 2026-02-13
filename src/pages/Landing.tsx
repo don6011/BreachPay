@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Database, DollarSign, Users, Radio, ArrowRight, Shield, Search, FileText, Check, Crown } from "lucide-react";
+import { Database, DollarSign, Users, Radio, ArrowRight, Shield, Search, FileText, Check, Crown, Lock, LogOut, Zap } from "lucide-react";
 import { Link } from "react-router-dom";
 import logo from "@/assets/logo.png";
 
@@ -101,6 +101,9 @@ const Landing = () => {
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
             BreachPay scans thousands of breach databases, matches you to eligible settlements, and helps you file claims — all in one place.
           </p>
+          <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground/70">
+            Scanning 12,000+ verified breach databases.
+          </p>
           <div className="mt-8 flex items-center justify-center gap-4">
             <Button
               size="lg"
@@ -112,6 +115,20 @@ const Landing = () => {
             <Button variant="outline" size="lg" asChild className="rounded-xl border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-300">
               <Link to="/signup">Create Account</Link>
             </Button>
+          </div>
+          <div className="mt-8 flex items-center justify-center gap-8 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-primary" />
+              <span>No upfront claim fees</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Lock className="h-4 w-4 text-primary" />
+              <span>Bank-level encryption</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <LogOut className="h-4 w-4 text-primary" />
+              <span>Cancel anytime</span>
+            </div>
           </div>
         </div>
       </section>
