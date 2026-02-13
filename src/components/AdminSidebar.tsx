@@ -1,6 +1,7 @@
-import { BarChart3, Users, Scale, FileText, Activity, ArrowLeft, ShieldAlert } from "lucide-react";
+import { BarChart3, Users, Scale, FileText, Activity, ArrowLeft } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import logo from "@/assets/logo.png";
 
 const adminNav = [
   { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
@@ -16,8 +17,7 @@ export function AdminSidebar() {
   return (
     <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-5">
-        <ShieldAlert className="h-6 w-6 text-primary" />
-        <span className="text-lg font-bold tracking-tight">BreachPay</span>
+        <img src={logo} alt="BreachPay" className="h-7" />
         <span className="ml-auto rounded bg-primary/15 px-2 py-0.5 text-[10px] font-bold text-primary uppercase tracking-wider">Admin</span>
       </div>
 
