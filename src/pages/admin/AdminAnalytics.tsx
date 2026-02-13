@@ -8,6 +8,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
 
 const claimsOverTime = [
   { month: "Sep", claims: 12 }, { month: "Oct", claims: 28 }, { month: "Nov", claims: 45 },
@@ -97,16 +98,42 @@ const AdminAnalytics = () => {
   const handleSendAlerts = async () => {
     setSendingAlerts(true);
     try {
-      const response = await fetch('/functions/v1/run-deadline-alerts', {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/run-deadline-alerts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
         body: JSON.stringify({}),
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
       const data = await response.json();
       if (data.success) {
-        console.log(`Alerts sent: ${data.alerts_sent}`);
+        toast({
+          title: "Success",
+          description: `Sent ${data.alerts_sent} deadline alerts`,
+        });
+      } else if (data.message) {
+        toast({
+          title: "Info",
+          description: data.message,
+        });
+      } else {
+        throw new Error(data.error || "Unknown error");
       }
     } catch (error) {
+      toast({
+        title: "Error",
+        description: `Failed to send alerts: ${error instanceof Error ? error.message : String(error)}`,
+        variant: "destructive",
+      });
       console.error('Failed to send alerts:', error);
     } finally {
       setSendingAlerts(false);

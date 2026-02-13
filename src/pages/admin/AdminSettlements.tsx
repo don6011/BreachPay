@@ -7,6 +7,7 @@ import { mockSettlements } from "@/data/mockData";
 import { Plus, Send } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import type { Settlement } from "@/types";
 
 const AdminSettlements = () => {
@@ -16,19 +17,43 @@ const AdminSettlements = () => {
   const handleSendDeadlineAlerts = async () => {
     setSendingAlerts(true);
     try {
-      const response = await fetch('/functions/v1/run-deadline-alerts', {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/run-deadline-alerts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token || ''}`,
+        },
         body: JSON.stringify({}),
       });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
       const data = await response.json();
       if (data.success) {
-        toast({ title: "Success", description: `Sent ${data.alerts_sent} deadline alerts` });
+        toast({
+          title: "Success",
+          description: `Sent ${data.alerts_sent} deadline alerts`,
+        });
+      } else if (data.message) {
+        toast({
+          title: "Info",
+          description: data.message,
+        });
       } else {
-        toast({ title: "Error", description: data.error || "Failed to send alerts", variant: "destructive" });
+        throw new Error(data.error || "Unknown error");
       }
     } catch (error) {
-      toast({ title: "Error", description: String(error), variant: "destructive" });
+      toast({
+        title: "Error",
+        description: `Failed to send alerts: ${error instanceof Error ? error.message : String(error)}`,
+        variant: "destructive",
+      });
+      console.error('Failed to send alerts:', error);
     } finally {
       setSendingAlerts(false);
     }
