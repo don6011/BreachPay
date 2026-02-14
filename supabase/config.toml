@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.rebuild-settlement-matches]
 verify_jwt = false
+
+[functions.simulate-payout]
+verify_jwt = false

@@ -447,27 +447,36 @@ export type Database = {
           amount: number
           claim_id: string
           created_at: string
+          currency: string
           id: string
           paid_at: string | null
           status: string
+          stripe_ref: string | null
+          updated_at: string
           user_id: string
         }
         Insert: {
           amount?: number
           claim_id: string
           created_at?: string
+          currency?: string
           id?: string
           paid_at?: string | null
           status?: string
+          stripe_ref?: string | null
+          updated_at?: string
           user_id: string
         }
         Update: {
           amount?: number
           claim_id?: string
           created_at?: string
+          currency?: string
           id?: string
           paid_at?: string | null
           status?: string
+          stripe_ref?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
