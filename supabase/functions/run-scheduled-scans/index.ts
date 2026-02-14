@@ -4,11 +4,57 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 type RiskLevel = "low" | "medium" | "high" | "critical";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
+}
+
+// --- Auth helper ---
+async function requireAdmin(req: Request): Promise<{ error?: Response; serviceClient?: ReturnType<typeof createClient> }> {
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+  const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!SUPABASE_URL || !ANON_KEY || !SERVICE_KEY) {
+    return { error: jsonResponse({ error: "Missing env vars" }, 500) };
+  }
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return { error: jsonResponse({ error: "Unauthorized" }, 401) };
+  }
+
+  const token = authHeader.replace("Bearer ", "");
+  const anonClient = createClient(SUPABASE_URL, ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data, error } = await anonClient.auth.getClaims(token);
+  if (error || !data?.claims) {
+    return { error: jsonResponse({ error: "Unauthorized" }, 401) };
+  }
+
+  const userId = data.claims.sub;
+  const serviceClient = createClient(SUPABASE_URL, SERVICE_KEY);
+
+  const { data: roleData } = await serviceClient
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "admin")
+    .maybeSingle();
+
+  if (!roleData) {
+    return { error: jsonResponse({ error: "Forbidden" }, 403) };
+  }
+
+  return { serviceClient };
 }
 
 function hash32(input: string): number {
@@ -74,7 +120,7 @@ function demoBreachesForUser(userId: string) {
   ];
 
   const seed = hash32(userId);
-  const count = 3 + (seed % 5); // 3–7 breaches
+  const count = 3 + (seed % 5);
   return pick(catalog, seed, count).map((b) => ({
     source: b.source,
     breach_year: b.year,
@@ -90,7 +136,6 @@ async function upsertSettlementMatches(
   scanRunId: string,
   breaches: { source: string; breach_year: number | null }[],
 ) {
-  // Pull open settlements
   const { data: settlements, error: sErr } = await supabase
     .from("settlements")
     .select("id, company, breach_year, payout_min, payout_max, status")
@@ -99,7 +144,6 @@ async function upsertSettlementMatches(
   if (sErr) throw sErr;
   if (!settlements?.length) return { created: 0 };
 
-  // Basic matching: company contains breach source or vice versa, optional year match
   const matchesToInsert: any[] = [];
   for (const sett of settlements) {
     const company = String(sett.company || "").toLowerCase();
@@ -128,24 +172,21 @@ async function upsertSettlementMatches(
 
   if (!matchesToInsert.length) return { created: 0 };
 
-  // Upsert on (user_id, settlement_id) unique constraint
   const { data: upserted, error: uErr } = await supabase
     .from("settlement_matches")
     .upsert(matchesToInsert, { onConflict: "user_id,settlement_id" })
     .select("id, settlement_id, user_id, created_at");
 
   if (uErr) throw uErr;
-
-  // Count "new" by comparing against existing? Upsert doesn't tell. For MVP, treat as created if returned rows.
   return { created: upserted?.length ?? 0, settlement_ids: upserted?.map((r) => r.settlement_id) ?? [] };
 }
 
 Deno.serve(async (req) => {
-  const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-  const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!SUPABASE_URL || !SERVICE_KEY) return jsonResponse({ error: "Missing env vars" }, 500);
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+  // Auth + admin check
+  const { error: authError, serviceClient: supabase } = await requireAdmin(req);
+  if (authError || !supabase) return authError!;
 
   // Optional override: run for a single user_id
   const url = new URL(req.url);
@@ -168,7 +209,6 @@ Deno.serve(async (req) => {
     const userId = u.user_id as string;
     const plan = (u.plan as "free" | "premium") ?? "free";
 
-    // Create scan run
     const { data: scanRun, error: srErr } = await supabase
       .from("scan_runs")
       .insert({
@@ -188,10 +228,8 @@ Deno.serve(async (req) => {
     const scanRunId = scanRun.id as string;
 
     try {
-      // Generate demo breaches
       const demoBreaches = demoBreachesForUser(userId);
 
-      // Insert breach_events
       const { error: bErr } = await supabase.from("breach_events").insert(
         demoBreaches.map((b) => ({
           user_id: userId,
@@ -210,14 +248,12 @@ Deno.serve(async (req) => {
       );
       const risk = labelFromScore(riskScore);
 
-      // Insert risk snapshot
       await supabase.from("user_risk_snapshots").insert({
         user_id: userId,
         risk_score: riskScore,
         breaches_detected: demoBreaches.length,
       });
 
-      // Settlement matching
       const matchRes = await upsertSettlementMatches(
         supabase,
         userId,
@@ -225,7 +261,6 @@ Deno.serve(async (req) => {
         demoBreaches.map((b) => ({ source: b.source, breach_year: b.breach_year })),
       );
 
-      // Alerts: scan complete + breach detected + settlement found
       const alertsToInsert: any[] = [
         {
           user_id: userId,
@@ -261,7 +296,6 @@ Deno.serve(async (req) => {
 
       await supabase.from("alerts").insert(alertsToInsert);
 
-      // Complete scan run
       await supabase
         .from("scan_runs")
         .update({
@@ -270,11 +304,10 @@ Deno.serve(async (req) => {
           eligible_settlements: matchRes.created,
           risk_score: riskScore,
           completed_at: new Date().toISOString(),
-          databases_scanned: 12000, // demo display
+          databases_scanned: 12000,
         })
         .eq("id", scanRunId);
 
-      // Update user profile scan schedule
       const next = new Date();
       next.setDate(next.getDate() + daysFromPlan(plan));
 

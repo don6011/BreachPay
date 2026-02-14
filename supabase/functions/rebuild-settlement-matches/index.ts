@@ -2,10 +2,16 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 }
 
@@ -13,12 +19,50 @@ function norm(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
 }
 
-Deno.serve(async (req) => {
+async function requireAdmin(req: Request): Promise<{ error?: Response; serviceClient?: ReturnType<typeof createClient> }> {
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+  const ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
   const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!SUPABASE_URL || !SERVICE_KEY) return jsonResponse({ error: "Missing env vars" }, 500);
+  if (!SUPABASE_URL || !ANON_KEY || !SERVICE_KEY) {
+    return { error: jsonResponse({ error: "Missing env vars" }, 500) };
+  }
 
-  const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    return { error: jsonResponse({ error: "Unauthorized" }, 401) };
+  }
+
+  const token = authHeader.replace("Bearer ", "");
+  const anonClient = createClient(SUPABASE_URL, ANON_KEY, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data, error } = await anonClient.auth.getClaims(token);
+  if (error || !data?.claims) {
+    return { error: jsonResponse({ error: "Unauthorized" }, 401) };
+  }
+
+  const userId = data.claims.sub;
+  const serviceClient = createClient(SUPABASE_URL, SERVICE_KEY);
+
+  const { data: roleData } = await serviceClient
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userId)
+    .eq("role", "admin")
+    .maybeSingle();
+
+  if (!roleData) {
+    return { error: jsonResponse({ error: "Forbidden" }, 403) };
+  }
+
+  return { serviceClient };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const { error: authError, serviceClient: supabase } = await requireAdmin(req);
+  if (authError || !supabase) return authError!;
 
   // Optional: rebuild for a single settlement_id
   const url = new URL(req.url);
@@ -49,12 +93,10 @@ Deno.serve(async (req) => {
 
   let created = 0;
 
-  // Process in chunks
   const chunkSize = 50;
   for (let i = 0; i < userIds.length; i += chunkSize) {
     const chunk = userIds.slice(i, i + chunkSize);
 
-    // Fetch breaches for these users
     const { data: breaches, error: bErr } = await supabase
       .from("breach_events")
       .select("user_id, source, breach_year")
@@ -108,6 +150,5 @@ Deno.serve(async (req) => {
     if (!upErr) created += upserted?.length ?? 0;
   }
 
-  // Optional: create alerts for users (kept minimal to avoid spam). You can add later.
   return jsonResponse({ ok: true, created });
 });
