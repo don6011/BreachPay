@@ -17,6 +17,7 @@ interface PayoutData {
   status: string;
   claim_id: string;
   paid_at: string | null;
+  stripe_ref: string | null;
 }
 
 interface ClaimData {
@@ -197,9 +198,14 @@ const Claims = () => {
                     <p className="text-xs text-muted-foreground">{new Date(payout.paid_at || Date.now()).toLocaleDateString()}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-primary">${Number(payout.amount).toLocaleString()}</p>
-                    <span className="text-xs bg-muted/50 px-2 py-0.5 rounded capitalize">{payout.status}</span>
-                  </div>
+                     <p className="text-sm font-semibold text-primary">${Number(payout.amount).toLocaleString()}</p>
+                     <div className="flex flex-col gap-1 items-end mt-1">
+                       <span className="text-xs bg-muted/50 px-2 py-0.5 rounded capitalize">{payout.status}</span>
+                       {payout.stripe_ref && (
+                         <span className="text-[10px] text-muted-foreground font-mono">{payout.stripe_ref}</span>
+                       )}
+                     </div>
+                   </div>
                 </div>
               );
             })
