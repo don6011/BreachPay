@@ -232,6 +232,38 @@ export type Database = {
           },
         ]
       }
+      claim_partner_notes: {
+        Row: {
+          claim_id: string
+          created_at: string
+          id: string
+          note: string
+          partner_id: string
+        }
+        Insert: {
+          claim_id: string
+          created_at?: string
+          id?: string
+          note: string
+          partner_id: string
+        }
+        Update: {
+          claim_id?: string
+          created_at?: string
+          id?: string
+          note?: string
+          partner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_partner_notes_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       claim_status_history: {
         Row: {
           claim_id: string
@@ -278,6 +310,7 @@ export type Database = {
           flagged: boolean
           id: string
           net_payout: number | null
+          partner_id: string | null
           platform_fee: number | null
           scan_run_id: string | null
           settlement_id: string
@@ -295,6 +328,7 @@ export type Database = {
           flagged?: boolean
           id?: string
           net_payout?: number | null
+          partner_id?: string | null
           platform_fee?: number | null
           scan_run_id?: string | null
           settlement_id: string
@@ -312,6 +346,7 @@ export type Database = {
           flagged?: boolean
           id?: string
           net_payout?: number | null
+          partner_id?: string | null
           platform_fee?: number | null
           scan_run_id?: string | null
           settlement_id?: string
