@@ -194,6 +194,9 @@ export type Database = {
           id: string
           note: string | null
           user_id: string
+          verified: boolean
+          verified_at: string | null
+          verified_by: string | null
         }
         Insert: {
           claim_id: string
@@ -203,6 +206,9 @@ export type Database = {
           id?: string
           note?: string | null
           user_id: string
+          verified?: boolean
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Update: {
           claim_id?: string
@@ -212,6 +218,9 @@ export type Database = {
           id?: string
           note?: string | null
           user_id?: string
+          verified?: boolean
+          verified_at?: string | null
+          verified_by?: string | null
         }
         Relationships: [
           {

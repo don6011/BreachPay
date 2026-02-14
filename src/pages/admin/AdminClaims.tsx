@@ -6,8 +6,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Download, Flag, Edit2 } from "lucide-react";
+import { Download, Flag, Edit2, FileText, CheckCircle, XCircle, ExternalLink, Shield, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+
+type ClaimStatusT = "submitted" | "under_review" | "documentation_required" | "approved" | "rejected" | "paid";
 
 interface ClaimRow {
   id: string;
@@ -20,78 +22,98 @@ interface ClaimRow {
   user_id: string;
 }
 
+interface ClaimDoc {
+  id: string;
+  file_path: string;
+  file_type: string | null;
+  note: string | null;
+  created_at: string;
+  verified: boolean;
+}
+
 const AdminClaims = () => {
   const { user } = useAuth();
   const [claims, setClaims] = useState<ClaimRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Dialog state
   const [selectedClaim, setSelectedClaim] = useState<ClaimRow | null>(null);
-  const [newStatus, setNewStatus] = useState<"submitted" | "under_review" | "documentation_required" | "approved" | "rejected" | "paid">("submitted");
+  const [newStatus, setNewStatus] = useState<ClaimStatusT>("submitted");
   const [note, setNote] = useState("");
   const [updating, setUpdating] = useState(false);
 
+  // Document review state
+  const [docs, setDocs] = useState<ClaimDoc[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+  const [verifyingId, setVerifyingId] = useState<string | null>(null);
+
   useEffect(() => {
     if (!user) return;
-
-    const fetchClaims = async () => {
-      try {
-        const { data } = await supabase
-          .from("claims")
-          .select(`
-            id, status, est_payout, filed_at, updated_at, user_id,
-            settlements(name)
-          `)
-          .order("created_at", { ascending: false })
-          .limit(200);
-
-        if (data) {
-          // Get user emails for display
-          const userIds = [...new Set(data.map((c: any) => c.user_id))];
-          const { data: profiles } = await supabase
-            .from("user_profiles")
-            .select("user_id, email")
-            .in("user_id", userIds);
-
-          const emailMap: Record<string, string> = {};
-          profiles?.forEach((p: any) => { emailMap[p.user_id] = p.email || ""; });
-
-           setClaims(data.map((c: any) => ({
-             id: c.id,
-             settlement_name: c.settlements?.name || "Unknown",
-             status: c.status,
-             est_payout: Number(c.est_payout) || 0,
-             filed_at: c.filed_at,
-             updated_at: c.updated_at,
-             user_email: emailMap[c.user_id] || "—",
-             user_id: c.user_id,
-           })));
-        }
-      } catch (error) {
-        console.error("Error fetching admin claims:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchClaims();
   }, [user]);
 
+  const fetchClaims = async () => {
+    try {
+      const { data } = await supabase
+        .from("claims")
+        .select(`id, status, est_payout, filed_at, updated_at, user_id, settlements(name)`)
+        .order("created_at", { ascending: false })
+        .limit(200);
+
+      if (data) {
+        const userIds = [...new Set(data.map((c: any) => c.user_id))];
+        const { data: profiles } = await supabase
+          .from("user_profiles")
+          .select("user_id, email")
+          .in("user_id", userIds);
+
+        const emailMap: Record<string, string> = {};
+        profiles?.forEach((p: any) => { emailMap[p.user_id] = p.email || ""; });
+
+        setClaims(data.map((c: any) => ({
+          id: c.id,
+          settlement_name: c.settlements?.name || "Unknown",
+          status: c.status,
+          est_payout: Number(c.est_payout) || 0,
+          filed_at: c.filed_at,
+          updated_at: c.updated_at,
+          user_email: emailMap[c.user_id] || "—",
+          user_id: c.user_id,
+        })));
+      }
+    } catch (error) {
+      console.error("Error fetching admin claims:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openClaimDialog = async (claim: ClaimRow) => {
+    setSelectedClaim(claim);
+    setNewStatus(claim.status as ClaimStatusT);
+    setNote("");
+    setLoadingDocs(true);
+
+    const { data } = await supabase
+      .from("claim_documents")
+      .select("id, file_path, file_type, note, created_at, verified")
+      .eq("claim_id", claim.id)
+      .order("created_at", { ascending: true });
+
+    setDocs((data as ClaimDoc[]) || []);
+    setLoadingDocs(false);
+  };
+
   const handleStatusUpdate = async () => {
     if (!selectedClaim || !newStatus) return;
-
     setUpdating(true);
     try {
-      // Update the claim status
       const { error: updateError } = await supabase
         .from("claims")
-        .update({
-          status: newStatus,
-          updated_at: new Date().toISOString(),
-        })
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
         .eq("id", selectedClaim.id);
-
       if (updateError) throw updateError;
 
-      // Log to claim_status_history
       const { error: historyError } = await supabase
         .from("claim_status_history")
         .insert({
@@ -100,26 +122,64 @@ const AdminClaims = () => {
           note: note || null,
           updated_by: user?.email || "admin",
         });
-
       if (historyError) throw historyError;
 
-      toast.success("Claim status updated successfully");
-      
-      // Refresh claims list
-      setClaims(claims.map(c => 
-        c.id === selectedClaim.id 
-          ? { ...c, status: newStatus, updated_at: new Date().toISOString() }
-          : c
+      toast.success("Claim status updated");
+      setClaims(claims.map(c =>
+        c.id === selectedClaim.id ? { ...c, status: newStatus, updated_at: new Date().toISOString() } : c
       ));
-      
       setSelectedClaim(null);
-      setNewStatus("submitted");
-      setNote("");
     } catch (error) {
       console.error("Error updating claim:", error);
       toast.error("Failed to update claim status");
     } finally {
       setUpdating(false);
+    }
+  };
+
+  const handleVerifyDoc = async (docId: string, verified: boolean) => {
+    setVerifyingId(docId);
+    try {
+      const { error } = await supabase
+        .from("claim_documents")
+        .update({
+          verified,
+          verified_by: verified ? user?.id : null,
+          verified_at: verified ? new Date().toISOString() : null,
+        })
+        .eq("id", docId);
+
+      if (error) throw error;
+
+      setDocs(docs.map(d => d.id === docId ? { ...d, verified } : d));
+
+      // Log to history
+      if (selectedClaim) {
+        await supabase.from("claim_status_history").insert({
+          claim_id: selectedClaim.id,
+          status: selectedClaim.status,
+          note: `Document ${verified ? "verified" : "unverified"} by admin`,
+          updated_by: user?.email || "admin",
+        });
+      }
+
+      toast.success(verified ? "Document verified" : "Verification removed");
+    } catch (error) {
+      toast.error("Failed to update document");
+    } finally {
+      setVerifyingId(null);
+    }
+  };
+
+  const handleDownload = async (filePath: string) => {
+    const { data } = await supabase.storage
+      .from("claim-documents")
+      .createSignedUrl(filePath, 60);
+
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, "_blank");
+    } else {
+      toast.error("Failed to generate download link");
     }
   };
 
@@ -158,15 +218,7 @@ const AdminClaims = () => {
                   <td className="px-4 py-3 text-primary">${c.est_payout.toLocaleString()}</td>
                   <td className="px-4 py-3 text-xs">{c.filed_at || "—"}</td>
                   <td className="px-4 py-3">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="rounded-lg"
-                      onClick={() => {
-                        setSelectedClaim(c);
-                        setNewStatus(c.status as any);
-                      }}
-                    >
+                    <Button size="sm" variant="ghost" className="rounded-lg" onClick={() => openClaimDialog(c)}>
                       <Edit2 className="h-3.5 w-3.5" />
                     </Button>
                   </td>
@@ -177,37 +229,130 @@ const AdminClaims = () => {
         </table>
       </div>
 
+      {/* Claim Review Dialog */}
       <Dialog open={!!selectedClaim} onOpenChange={(open) => !open && setSelectedClaim(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Update Claim Status</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-primary" />
+              Review Claim — {selectedClaim?.settlement_name}
+            </DialogTitle>
           </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div>
-              <label className="text-sm font-medium block mb-2">New Status</label>
-              <select
-                value={newStatus}
-                onChange={(e) => setNewStatus(e.target.value as any)}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
-              >
-                <option value="submitted">Submitted</option>
-                <option value="under_review">Under Review</option>
-                <option value="documentation_required">Documentation Required</option>
-                <option value="approved">Approved</option>
-                <option value="rejected">Rejected</option>
-                <option value="paid">Paid</option>
-              </select>
+
+          <div className="space-y-5">
+            {/* Claim Info */}
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="text-xs text-muted-foreground">User</p>
+                <p className="font-medium">{selectedClaim?.user_email}</p>
+              </div>
+              <div className="rounded-lg bg-muted/50 p-3">
+                <p className="text-xs text-muted-foreground">Estimated Payout</p>
+                <p className="font-medium text-primary">${selectedClaim?.est_payout.toLocaleString()}</p>
+              </div>
             </div>
 
+            {/* Documents Section */}
             <div>
-              <label className="text-sm font-medium block mb-2">Note</label>
-              <Textarea
-                placeholder="Add a note for the user (optional)"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                className="resize-none"
-              />
+              <h4 className="text-sm font-semibold mb-3 flex items-center gap-1.5">
+                <FileText className="h-4 w-4" /> Documents ({docs.length})
+              </h4>
+
+              {loadingDocs ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : docs.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-3 bg-muted/30 rounded-lg">
+                  No documents uploaded
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {docs.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className={`flex items-center justify-between rounded-lg border p-3 transition-colors ${
+                        doc.verified ? "border-success/30 bg-success/5" : "border-border"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <FileText className="h-4 w-4 text-primary shrink-0" />
+                        <div className="min-w-0">
+                          <p className="text-sm truncate">{doc.note || doc.file_path.split("/").pop()}</p>
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                            {doc.file_type && (
+                              <span className="bg-muted px-1.5 py-0.5 rounded">{doc.file_type}</span>
+                            )}
+                            <span>{new Date(doc.created_at).toLocaleDateString()}</span>
+                            {doc.verified && (
+                              <span className="text-success flex items-center gap-0.5">
+                                <CheckCircle className="h-3 w-3" /> Verified
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0"
+                          onClick={() => handleDownload(doc.file_path)}
+                          title="Download"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className={`h-7 w-7 p-0 ${doc.verified ? "text-success" : "text-muted-foreground"}`}
+                          disabled={verifyingId === doc.id}
+                          onClick={() => handleVerifyDoc(doc.id, !doc.verified)}
+                          title={doc.verified ? "Remove verification" : "Mark as verified"}
+                        >
+                          {verifyingId === doc.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : doc.verified ? (
+                            <CheckCircle className="h-3.5 w-3.5" />
+                          ) : (
+                            <Shield className="h-3.5 w-3.5" />
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Status Update */}
+            <div className="border-t pt-4 space-y-3">
+              <h4 className="text-sm font-semibold">Update Status</h4>
+              <div>
+                <label className="text-sm font-medium block mb-1.5">New Status</label>
+                <select
+                  value={newStatus}
+                  onChange={(e) => setNewStatus(e.target.value as ClaimStatusT)}
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="submitted">Submitted</option>
+                  <option value="under_review">Under Review</option>
+                  <option value="documentation_required">Documentation Required</option>
+                  <option value="approved">Approved</option>
+                  <option value="rejected">Rejected</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-1.5">Note</label>
+                <Textarea
+                  placeholder="Add a note for the user (optional)"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  className="resize-none"
+                  rows={2}
+                />
+              </div>
             </div>
           </div>
 

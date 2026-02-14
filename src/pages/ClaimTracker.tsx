@@ -56,6 +56,7 @@ interface DocEntry {
   file_type: string | null;
   note: string | null;
   created_at: string;
+  verified: boolean;
 }
 
 const ClaimTracker = () => {
@@ -96,7 +97,7 @@ const ClaimTracker = () => {
         .order("created_at", { ascending: true }),
       supabase
         .from("claim_documents")
-        .select("id, file_path, file_type, note, created_at")
+        .select("id, file_path, file_type, note, created_at, verified")
         .eq("claim_id", claimId)
         .order("created_at", { ascending: true }),
     ]);
@@ -344,7 +345,7 @@ const ClaimTracker = () => {
           {documents.length > 0 && (
             <div className="space-y-2">
               {documents.map(doc => (
-                <div key={doc.id} className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-2.5">
+                <div key={doc.id} className={`flex items-center justify-between rounded-lg px-4 py-2.5 ${doc.verified ? "bg-success/10 border border-success/20" : "bg-muted/50"}`}>
                   <div className="flex items-center gap-2">
                     <FileText className="h-4 w-4 text-primary" />
                     <div>
@@ -353,6 +354,11 @@ const ClaimTracker = () => {
                     </div>
                     {doc.file_type && (
                       <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full">{doc.file_type}</span>
+                    )}
+                    {doc.verified && (
+                      <span className="text-[10px] bg-success/10 text-success px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                        <CheckCircle className="h-2.5 w-2.5" /> Verified
+                      </span>
                     )}
                   </div>
                 </div>
