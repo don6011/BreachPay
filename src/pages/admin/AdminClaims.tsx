@@ -2,9 +2,12 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Download, Flag } from "lucide-react";
+import { Download, Flag, Edit2 } from "lucide-react";
+import { toast } from "sonner";
 
 interface ClaimRow {
   id: string;
@@ -14,12 +17,17 @@ interface ClaimRow {
   filed_at: string | null;
   updated_at: string;
   user_email: string | null;
+  user_id: string;
 }
 
 const AdminClaims = () => {
   const { user } = useAuth();
   const [claims, setClaims] = useState<ClaimRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedClaim, setSelectedClaim] = useState<ClaimRow | null>(null);
+  const [newStatus, setNewStatus] = useState<"submitted" | "under_review" | "documentation_required" | "approved" | "rejected" | "paid">("submitted");
+  const [note, setNote] = useState("");
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -46,15 +54,16 @@ const AdminClaims = () => {
           const emailMap: Record<string, string> = {};
           profiles?.forEach((p: any) => { emailMap[p.user_id] = p.email || ""; });
 
-          setClaims(data.map((c: any) => ({
-            id: c.id,
-            settlement_name: c.settlements?.name || "Unknown",
-            status: c.status,
-            est_payout: Number(c.est_payout) || 0,
-            filed_at: c.filed_at,
-            updated_at: c.updated_at,
-            user_email: emailMap[c.user_id] || "—",
-          })));
+           setClaims(data.map((c: any) => ({
+             id: c.id,
+             settlement_name: c.settlements?.name || "Unknown",
+             status: c.status,
+             est_payout: Number(c.est_payout) || 0,
+             filed_at: c.filed_at,
+             updated_at: c.updated_at,
+             user_email: emailMap[c.user_id] || "—",
+             user_id: c.user_id,
+           })));
         }
       } catch (error) {
         console.error("Error fetching admin claims:", error);
@@ -65,6 +74,54 @@ const AdminClaims = () => {
 
     fetchClaims();
   }, [user]);
+
+  const handleStatusUpdate = async () => {
+    if (!selectedClaim || !newStatus) return;
+
+    setUpdating(true);
+    try {
+      // Update the claim status
+      const { error: updateError } = await supabase
+        .from("claims")
+        .update({
+          status: newStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", selectedClaim.id);
+
+      if (updateError) throw updateError;
+
+      // Log to claim_status_history
+      const { error: historyError } = await supabase
+        .from("claim_status_history")
+        .insert({
+          claim_id: selectedClaim.id,
+          status: newStatus,
+          note: note || null,
+          updated_by: user?.email || "admin",
+        });
+
+      if (historyError) throw historyError;
+
+      toast.success("Claim status updated successfully");
+      
+      // Refresh claims list
+      setClaims(claims.map(c => 
+        c.id === selectedClaim.id 
+          ? { ...c, status: newStatus, updated_at: new Date().toISOString() }
+          : c
+      ));
+      
+      setSelectedClaim(null);
+      setNewStatus("submitted");
+      setNote("");
+    } catch (error) {
+      console.error("Error updating claim:", error);
+      toast.error("Failed to update claim status");
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   return (
     <div>
@@ -83,13 +140,14 @@ const AdminClaims = () => {
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Payout</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Filed</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
             ) : claims.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No claims yet</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No claims yet</td></tr>
             ) : (
               claims.map((c) => (
                 <tr key={c.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
@@ -99,12 +157,68 @@ const AdminClaims = () => {
                   <td className="px-4 py-3"><StatusPill variant={c.status as any} /></td>
                   <td className="px-4 py-3 text-primary">${c.est_payout.toLocaleString()}</td>
                   <td className="px-4 py-3 text-xs">{c.filed_at || "—"}</td>
+                  <td className="px-4 py-3">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="rounded-lg"
+                      onClick={() => {
+                        setSelectedClaim(c);
+                        setNewStatus(c.status as any);
+                      }}
+                    >
+                      <Edit2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+
+      <Dialog open={!!selectedClaim} onOpenChange={(open) => !open && setSelectedClaim(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Update Claim Status</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium block mb-2">New Status</label>
+              <select
+                value={newStatus}
+                onChange={(e) => setNewStatus(e.target.value as any)}
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="submitted">Submitted</option>
+                <option value="under_review">Under Review</option>
+                <option value="documentation_required">Documentation Required</option>
+                <option value="approved">Approved</option>
+                <option value="rejected">Rejected</option>
+                <option value="paid">Paid</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium block mb-2">Note</label>
+              <Textarea
+                placeholder="Add a note for the user (optional)"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                className="resize-none"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSelectedClaim(null)}>Cancel</Button>
+            <Button onClick={handleStatusUpdate} disabled={updating}>
+              {updating ? "Updating..." : "Update Status"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
