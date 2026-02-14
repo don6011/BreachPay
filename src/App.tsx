@@ -29,6 +29,7 @@ import AdminClaims from "./pages/admin/AdminClaims";
 import AdminActivityLogs from "./pages/admin/AdminActivityLogs";
 import AdminAutomationLogs from "./pages/admin/AdminAutomationLogs";
 import AdminPayouts from "./pages/admin/AdminPayouts";
+import AdminPartners from "./pages/admin/AdminPartners";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import PartnerClaims from "./pages/partner/PartnerClaims";
 import PartnerClaimDetail from "./pages/partner/PartnerClaimDetail";
@@ -71,6 +72,7 @@ const App = () => (
               <Route path="/admin/activity-logs" element={<AdminActivityLogs />} />
               <Route path="/admin/automation-logs" element={<AdminAutomationLogs />} />
               <Route path="/admin/payouts" element={<AdminPayouts />} />
+              <Route path="/admin/partners" element={<AdminPartners />} />
             </Route>
 
             {/* Partner Portal - Protected */}

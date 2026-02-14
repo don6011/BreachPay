@@ -6,6 +6,7 @@ import logo from "@/assets/logo.png";
 const adminNav = [
   { title: "Analytics", url: "/admin/analytics", icon: BarChart3 },
   { title: "Users", url: "/admin/users", icon: Users },
+  { title: "Partners", url: "/admin/partners", icon: Users },
   { title: "Settlements", url: "/admin/settlements", icon: Scale },
   { title: "Claims", url: "/admin/claims", icon: FileText },
   { title: "Payouts", url: "/admin/payouts", icon: DollarSign },
