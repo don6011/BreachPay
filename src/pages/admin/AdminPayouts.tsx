@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
+import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { DollarSign, TrendingUp, CreditCard, Loader2, Receipt } from "lucide-react";
+import { DollarSign, TrendingUp, CreditCard, Loader2, Receipt, Download } from "lucide-react";
 
 interface PayoutRow {
   id: string;
@@ -20,9 +21,38 @@ interface PayoutRow {
 }
 
 const AdminPayouts = () => {
-  const { user } = useAuth();
-  const [payouts, setPayouts] = useState<PayoutRow[]>([]);
-  const [loading, setLoading] = useState(true);
+   const { user } = useAuth();
+   const [payouts, setPayouts] = useState<PayoutRow[]>([]);
+   const [loading, setLoading] = useState(true);
+
+   const exportToCSV = () => {
+     const headers = ["User Email", "Settlement", "Amount", "Currency", "Status", "Stripe Ref", "Paid At", "Created At"];
+     const rows = payouts.map(p => [
+       p.user_email,
+       p.settlement_name,
+       p.amount,
+       p.currency,
+       p.status,
+       p.stripe_ref || "",
+       p.paid_at ? new Date(p.paid_at).toLocaleDateString() : "",
+       new Date(p.created_at).toLocaleDateString(),
+     ]);
+
+     const csvContent = [
+       headers.join(","),
+       ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(",")),
+     ].join("\n");
+
+     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+     const link = document.createElement("a");
+     const url = URL.createObjectURL(blob);
+     link.setAttribute("href", url);
+     link.setAttribute("download", `payouts-${new Date().toISOString().split('T')[0]}.csv`);
+     link.style.visibility = "hidden";
+     document.body.appendChild(link);
+     link.click();
+     document.body.removeChild(link);
+   };
 
   useEffect(() => {
     if (!user) return;
@@ -75,7 +105,9 @@ const AdminPayouts = () => {
 
   return (
     <div>
-      <PageHeader title="Payout Management" subtitle="All payouts across users with revenue tracking" />
+      <PageHeader title="Payout Management" subtitle="All payouts across users with revenue tracking">
+        <Button variant="outline" size="sm" className="rounded-xl" onClick={exportToCSV}><Download className="mr-1 h-3 w-3" />Export CSV</Button>
+      </PageHeader>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-8">
         <StatCard icon={DollarSign} label="Total Paid Out" value={`$${totalPaid.toLocaleString()}`} variant="teal" />
