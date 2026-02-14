@@ -24,6 +24,7 @@ import AdminUsers from "./pages/admin/AdminUsers";
 import AdminSettlements from "./pages/admin/AdminSettlements";
 import AdminClaims from "./pages/admin/AdminClaims";
 import AdminActivityLogs from "./pages/admin/AdminActivityLogs";
+import AdminAutomationLogs from "./pages/admin/AdminAutomationLogs";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -59,6 +60,7 @@ const App = () => (
               <Route path="/admin/settlements" element={<AdminSettlements />} />
               <Route path="/admin/claims" element={<AdminClaims />} />
               <Route path="/admin/activity-logs" element={<AdminActivityLogs />} />
+              <Route path="/admin/automation-logs" element={<AdminAutomationLogs />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
