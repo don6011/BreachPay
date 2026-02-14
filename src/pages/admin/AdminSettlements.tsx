@@ -4,7 +4,7 @@ import { StatusPill } from "@/components/StatusPill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { mockSettlements } from "@/data/mockData";
-import { Plus, Send } from "lucide-react";
+import { Plus, Send, Zap, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,14 +13,20 @@ import type { Settlement } from "@/types";
 const AdminSettlements = () => {
   const [settlements] = useState<Settlement[]>(mockSettlements);
   const [sendingAlerts, setSendingAlerts] = useState(false);
+  const [rebuildingMatches, setRebuildingMatches] = useState(false);
+  const [runningScan, setRunningScan] = useState(false);
 
-  const handleSendDeadlineAlerts = async () => {
-    setSendingAlerts(true);
+  const callEdgeFunction = async (
+    functionName: string,
+    loadingState: [boolean, (v: boolean) => void]
+  ) => {
+    const [, setLoading] = loadingState;
+    setLoading(true);
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const { data: { session } } = await supabase.auth.getSession();
       
-      const response = await fetch(`${supabaseUrl}/functions/v1/run-deadline-alerts`, {
+      const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -34,29 +40,47 @@ const AdminSettlements = () => {
       }
 
       const data = await response.json();
-      if (data.success) {
-        toast({
-          title: "Success",
-          description: `Sent ${data.alerts_sent} deadline alerts`,
-        });
-      } else if (data.message) {
-        toast({
-          title: "Info",
-          description: data.message,
-        });
-      } else {
-        throw new Error(data.error || "Unknown error");
+      let title = "Success";
+      let description = "";
+
+      if (functionName === "run-deadline-alerts") {
+        description = data.alerts_sent ? `Sent ${data.alerts_sent} deadline alerts` : data.message || "Alerts sent";
+      } else if (functionName === "rebuild-settlement-matches") {
+        description = data.created ? `Created ${data.created} settlement matches` : data.message || "Rebuild completed";
+      } else if (functionName === "run-scheduled-scans") {
+        description = data.scans_initiated ? `Initiated ${data.scans_initiated} scans` : data.message || "Scans initiated";
       }
+
+      if (data.message && !data.success && !data.created && !data.alerts_sent && !data.scans_initiated) {
+        title = "Info";
+      }
+
+      toast({
+        title,
+        description,
+      });
     } catch (error) {
       toast({
         title: "Error",
-        description: `Failed to send alerts: ${error instanceof Error ? error.message : String(error)}`,
+        description: `Failed to trigger ${functionName}: ${error instanceof Error ? error.message : String(error)}`,
         variant: "destructive",
       });
-      console.error('Failed to send alerts:', error);
+      console.error(`Failed to call ${functionName}:`, error);
     } finally {
-      setSendingAlerts(false);
+      setLoading(false);
     }
+  };
+
+  const handleSendDeadlineAlerts = () => {
+    callEdgeFunction("run-deadline-alerts", [sendingAlerts, setSendingAlerts]);
+  };
+
+  const handleRebuildMatches = () => {
+    callEdgeFunction("rebuild-settlement-matches", [rebuildingMatches, setRebuildingMatches]);
+  };
+
+  const handleRunScans = () => {
+    callEdgeFunction("run-scheduled-scans", [runningScan, setRunningScan]);
   };
 
   return (
@@ -83,9 +107,11 @@ const AdminSettlements = () => {
              <Input placeholder="Description" className="rounded-xl" />
              <Button className="w-full rounded-xl bg-primary text-primary-foreground">Add Settlement</Button>
            </div>
-         </DialogContent>
-       </Dialog>
-       <Button size="sm" variant="outline" className="rounded-xl" onClick={handleSendDeadlineAlerts} disabled={sendingAlerts}><Send className="mr-1 h-3 w-3" />{sendingAlerts ? "Sending..." : "Send Deadline Alerts"}</Button>
+       </DialogContent>
+        </Dialog>
+        <Button size="sm" variant="outline" className="rounded-xl" onClick={handleSendDeadlineAlerts} disabled={sendingAlerts}><Send className="mr-1 h-3 w-3" />{sendingAlerts ? "Sending..." : "Send Alerts"}</Button>
+        <Button size="sm" variant="outline" className="rounded-xl" onClick={handleRebuildMatches} disabled={rebuildingMatches}><RefreshCw className="mr-1 h-3 w-3" />{rebuildingMatches ? "Rebuilding..." : "Rebuild Matches"}</Button>
+        <Button size="sm" variant="outline" className="rounded-xl" onClick={handleRunScans} disabled={runningScan}><Zap className="mr-1 h-3 w-3" />{runningScan ? "Scanning..." : "Run Scans"}</Button>
       </PageHeader>
 
       <div className="rounded-2xl border bg-card overflow-hidden">
