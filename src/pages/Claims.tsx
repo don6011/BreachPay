@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
 import { StatusPill } from "@/components/StatusPill";
-import { Wallet, Clock, CheckCircle, DollarSign, CreditCard, Crown, TrendingUp } from "lucide-react";
+import { Wallet, Clock, CheckCircle, DollarSign, CreditCard, Crown, TrendingUp, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,6 +24,9 @@ interface ClaimData {
   settlement_id: string;
   status: string;
   est_payout: number;
+  final_payout: number | null;
+  net_payout: number | null;
+  platform_fee: number | null;
   filed_at: string | null;
   updated_at: string;
   settlement_name?: string;
@@ -34,6 +37,7 @@ const Claims = () => {
   const { user } = useAuth();
   const [claims, setClaims] = useState<ClaimData[]>([]);
   const [payouts, setPayouts] = useState<PayoutData[]>([]);
+  const [matchEstimate, setMatchEstimate] = useState(0);
   const [loading, setLoading] = useState(true);
   const isPremium = false;
 
@@ -42,38 +46,37 @@ const Claims = () => {
 
     const fetchData = async () => {
       try {
-        // Fetch claims with settlement names
-        const { data: claimsData } = await supabase
-          .from("claims")
-          .select(`
-            id,
-            settlement_id,
-            status,
-            est_payout,
-            filed_at,
-            updated_at,
-            settlements(name)
-          `)
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
+        const [claimsRes, payoutsRes, matchesRes] = await Promise.all([
+          supabase
+            .from("claims")
+            .select(`id, settlement_id, status, est_payout, final_payout, net_payout, platform_fee, filed_at, updated_at, settlements(name)`)
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("payouts")
+            .select("*")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("settlement_matches")
+            .select("payout_estimate")
+            .eq("user_id", user.id),
+        ]);
 
-        if (claimsData) {
-          const formattedClaims = claimsData.map(c => ({
+        if (claimsRes.data) {
+          setClaims(claimsRes.data.map((c: any) => ({
             ...c,
-            settlement_name: (c.settlements as any)?.name || "Unknown Settlement",
+            settlement_name: c.settlements?.name || "Unknown Settlement",
             estimated_payout: Number(c.est_payout) || 0,
-          }));
-          setClaims(formattedClaims);
+            final_payout: c.final_payout ? Number(c.final_payout) : null,
+            net_payout: c.net_payout ? Number(c.net_payout) : null,
+            platform_fee: c.platform_fee ? Number(c.platform_fee) : null,
+          })));
         }
-
-        // Fetch payouts
-        const { data: payoutsData } = await supabase
-          .from("payouts")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("created_at", { ascending: false });
-
-        if (payoutsData) setPayouts(payoutsData);
+        if (payoutsRes.data) setPayouts(payoutsRes.data);
+        if (matchesRes.data) {
+          setMatchEstimate(matchesRes.data.reduce((a: number, m: any) => a + (Number(m.payout_estimate) || 0), 0));
+        }
       } catch (error) {
         console.error("Error fetching data:", error);
       } finally {
@@ -87,11 +90,12 @@ const Claims = () => {
   const totalRecovered = payouts
     .filter(p => p.status === "paid")
     .reduce((a, p) => a + (Number(p.amount) || 0), 0);
-  const pendingPayouts = payouts
-    .filter(p => p.status === "pending" || p.status === "processing")
-    .reduce((a, p) => a + (Number(p.amount) || 0), 0);
-  const approvedCount = claims.filter(c => c.status === "approved" || c.status === "paid").length;
-  const lifetimeEarnings = totalRecovered;
+  const pendingPayouts = claims
+    .filter(c => c.status === "approved")
+    .reduce((a, c) => a + (Number(c.net_payout) || Number(c.est_payout) || 0), 0);
+  const approvedTotal = claims
+    .filter(c => c.status === "approved" || c.status === "paid")
+    .reduce((a, c) => a + (Number(c.net_payout) || Number(c.est_payout) || 0), 0);
 
   return (
     <div>
@@ -101,8 +105,8 @@ const Claims = () => {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-8">
         <StatCard icon={Wallet} label="Total Recovered" value={`$${totalRecovered.toLocaleString()}`} variant="teal" />
         <StatCard icon={Clock} label="Pending Payouts" value={`$${pendingPayouts.toLocaleString()}`} />
-        <StatCard icon={CheckCircle} label="Approved" value={approvedCount} />
-        <StatCard icon={TrendingUp} label="Lifetime Earnings" value={`$${lifetimeEarnings.toLocaleString()}`} variant="teal" />
+        <StatCard icon={CheckCircle} label="Approved Value" value={`$${approvedTotal.toLocaleString()}`} variant="teal" />
+        <StatCard icon={Scale} label="Estimated Eligible" value={`$${matchEstimate.toLocaleString()}`} />
       </div>
 
       {/* Premium Auto-Filing Upsell */}
@@ -131,6 +135,7 @@ const Claims = () => {
             ) : (
               claims.map((claim) => {
                 const currentIndex = statusSteps.indexOf(claim.status as any);
+                const displayPayout = claim.net_payout || claim.estimated_payout || 0;
                 return (
                   <Link key={claim.id} to={`/claims/${claim.id}`} className="glass-card p-6 block hover:border-primary/25 transition-colors">
                     <div className="flex items-start justify-between mb-3">
@@ -140,10 +145,12 @@ const Claims = () => {
                       </div>
                       <div className="text-right">
                         <StatusPill variant={claim.status as ClaimStatus} />
-                        <p className="mt-1 text-sm font-semibold text-primary">${claim.estimated_payout?.toLocaleString()}</p>
+                        <p className="mt-1 text-sm font-semibold text-primary">${displayPayout.toLocaleString()}</p>
+                        {claim.platform_fee && (
+                          <p className="text-[10px] text-muted-foreground">Fee: ${claim.platform_fee.toLocaleString()}</p>
+                        )}
                       </div>
                     </div>
-                    {/* Timeline */}
                     <div className="flex items-center gap-1">
                       {statusSteps.map((step, i) => {
                         const isComplete = i <= currentIndex;

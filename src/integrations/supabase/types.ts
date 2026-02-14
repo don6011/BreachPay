@@ -277,6 +277,8 @@ export type Database = {
           flag_reason: string | null
           flagged: boolean
           id: string
+          net_payout: number | null
+          platform_fee: number | null
           scan_run_id: string | null
           settlement_id: string
           status: Database["public"]["Enums"]["claim_status_t"]
@@ -292,6 +294,8 @@ export type Database = {
           flag_reason?: string | null
           flagged?: boolean
           id?: string
+          net_payout?: number | null
+          platform_fee?: number | null
           scan_run_id?: string | null
           settlement_id: string
           status?: Database["public"]["Enums"]["claim_status_t"]
@@ -307,6 +311,8 @@ export type Database = {
           flag_reason?: string | null
           flagged?: boolean
           id?: string
+          net_payout?: number | null
+          platform_fee?: number | null
           scan_run_id?: string | null
           settlement_id?: string
           status?: Database["public"]["Enums"]["claim_status_t"]
