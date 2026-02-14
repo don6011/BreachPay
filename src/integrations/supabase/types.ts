@@ -812,7 +812,9 @@ export type Database = {
         Args: { p_job: string; p_path: string }
         Returns: Json
       }
-      is_admin: { Args: { p_user: string }; Returns: boolean }
+      is_admin:
+        | { Args: never; Returns: boolean }
+        | { Args: { p_user: string }; Returns: boolean }
     }
     Enums: {
       alert_type_t:
