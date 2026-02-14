@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -13,10 +13,17 @@ import { toast } from "@/hooks/use-toast";
 import {
   Shield, Lock, ChevronRight, ChevronLeft, Upload, FileText,
   Clock, AlertTriangle, CheckCircle, DollarSign, Camera, X,
-  Bookmark, Eye, Send, Sparkles, ArrowRight
+  Bookmark, Eye, Send, Sparkles, ArrowRight, Loader2
 } from "lucide-react";
 
 const STEPS = ["Overview", "Identity", "Eligibility", "Documents", "Review"];
+
+const DOC_TYPES = [
+  { label: "ID Verification", accept: "image/*,.pdf" },
+  { label: "Address Proof", accept: "image/*,.pdf" },
+  { label: "Breach Notice", accept: "image/*,.pdf" },
+  { label: "Expense Proof", accept: "image/*,.pdf" },
+];
 
 interface SettlementData {
   id: string;
@@ -30,17 +37,29 @@ interface SettlementData {
   status: string;
 }
 
+interface UploadedDoc {
+  name: string;
+  size: string;
+  type: string;
+  file: File;
+  uploading?: boolean;
+  uploaded?: boolean;
+  url?: string;
+}
+
 const ClaimFiling = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const settlementId = searchParams.get("settlement") || "";
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [settlement, setSettlement] = useState<SettlementData | null>(null);
   const [loadingSettlement, setLoadingSettlement] = useState(true);
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [createdClaimId, setCreatedClaimId] = useState<string | null>(null);
 
   // Form state
   const [identity, setIdentity] = useState({ fullName: "", email: "", phone: "", address: "" });
@@ -48,15 +67,13 @@ const ClaimFiling = () => {
     breachImpact: false, financialLoss: false, monitoringPurchase: false,
     lossAmount: "", monitoringCost: "", description: "",
   });
-  const [documents, setDocuments] = useState<{ name: string; size: string }[]>([]);
+  const [documents, setDocuments] = useState<UploadedDoc[]>([]);
   const [consent, setConsent] = useState(false);
+  const [selectedDocType, setSelectedDocType] = useState(DOC_TYPES[0].label);
 
   // Load settlement from DB
   useEffect(() => {
-    if (!settlementId) {
-      setLoadingSettlement(false);
-      return;
-    }
+    if (!settlementId) { setLoadingSettlement(false); return; }
     const fetchSettlement = async () => {
       const { data } = await supabase
         .from("settlements")
@@ -91,18 +108,21 @@ const ClaimFiling = () => {
 
   const deadlineColor = deadlineDays <= 30 ? "text-destructive" : deadlineDays <= 60 ? "text-warning" : "text-success";
 
-  const handleFileAdd = useCallback(() => {
-    const mockFiles = [
-      { name: "bank_statement_2024.pdf", size: "2.4 MB" },
-      { name: "fraud_report.pdf", size: "1.1 MB" },
-      { name: "receipt_monitoring.jpg", size: "845 KB" },
-    ];
-    const next = mockFiles[documents.length % mockFiles.length];
-    setDocuments((prev) => [...prev, next]);
-  }, [documents.length]);
+  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+    const newDocs: UploadedDoc[] = Array.from(files).map(file => ({
+      name: file.name,
+      size: file.size > 1024 * 1024 ? `${(file.size / (1024 * 1024)).toFixed(1)} MB` : `${(file.size / 1024).toFixed(0)} KB`,
+      type: selectedDocType,
+      file,
+    }));
+    setDocuments(prev => [...prev, ...newDocs]);
+    e.target.value = "";
+  }, [selectedDocType]);
 
   const removeFile = useCallback((index: number) => {
-    setDocuments((prev) => prev.filter((_, i) => i !== index));
+    setDocuments(prev => prev.filter((_, i) => i !== index));
   }, []);
 
   const progressPercent = submitted ? 100 : ((step + 1) / STEPS.length) * 100;
@@ -116,6 +136,44 @@ const ClaimFiling = () => {
     return true;
   }, [step, identity, eligibility, consent]);
 
+  const uploadDocuments = async (claimId: string) => {
+    if (!user || documents.length === 0) return;
+
+    for (let i = 0; i < documents.length; i++) {
+      const doc = documents[i];
+      setDocuments(prev => prev.map((d, idx) => idx === i ? { ...d, uploading: true } : d));
+
+      const filePath = `${user.id}/${claimId}/${Date.now()}_${doc.file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("claim-documents")
+        .upload(filePath, doc.file);
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        continue;
+      }
+
+      // Insert record into claim_documents
+      await supabase.from("claim_documents").insert({
+        claim_id: claimId,
+        user_id: user.id,
+        file_path: filePath,
+        file_type: doc.type,
+        note: doc.name,
+      });
+
+      setDocuments(prev => prev.map((d, idx) => idx === i ? { ...d, uploading: false, uploaded: true, url: filePath } : d));
+    }
+
+    // Log document upload in history
+    await supabase.from("claim_status_history").insert({
+      claim_id: claimId,
+      status: "submitted",
+      note: `${documents.length} document(s) uploaded`,
+      updated_by: "user",
+    });
+  };
+
   const handleSubmit = async () => {
     if (!user || !settlement) return;
     setSubmitting(true);
@@ -123,15 +181,31 @@ const ClaimFiling = () => {
     try {
       const estPayout = (settlement.payout_min + settlement.payout_max) / 2;
 
-      const { error } = await supabase.from("claims").insert({
+      const { data: claimData, error } = await supabase.from("claims").insert({
         user_id: user.id,
         settlement_id: settlement.id,
         est_payout: estPayout,
         filed_at: new Date().toISOString().split("T")[0],
         status: "submitted",
-      });
+      }).select("id").single();
 
       if (error) throw error;
+
+      const claimId = claimData.id;
+      setCreatedClaimId(claimId);
+
+      // Insert initial status history
+      await supabase.from("claim_status_history").insert({
+        claim_id: claimId,
+        status: "submitted",
+        note: `Claim filed for ${settlement.name}`,
+        updated_by: "user",
+      });
+
+      // Upload documents if any
+      if (documents.length > 0) {
+        await uploadDocuments(claimId);
+      }
 
       setSubmitted(true);
       toast({ title: "Claim Filed!", description: `Your claim for ${settlement.name} has been submitted.` });
@@ -201,9 +275,11 @@ const ClaimFiling = () => {
             </div>
 
             <div className="flex gap-3">
-              <Button variant="outline" className="flex-1" onClick={() => navigate("/claims")}>
-                <Eye className="h-4 w-4 mr-1" /> View Claims
-              </Button>
+              {createdClaimId && (
+                <Button variant="outline" className="flex-1" onClick={() => navigate(`/claims/${createdClaimId}`)}>
+                  <Eye className="h-4 w-4 mr-1" /> Track Claim
+                </Button>
+              )}
               <Button className="flex-1" onClick={() => navigate("/settlements")}>
                 <ArrowRight className="h-4 w-4 mr-1" /> More Settlements
               </Button>
@@ -302,10 +378,6 @@ const ClaimFiling = () => {
                 <span className="flex items-center gap-1"><Shield className="h-3 w-3 text-primary" /> Bank-level security</span>
                 <span className="flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-primary" /> Data never sold</span>
               </div>
-              <div className="rounded-xl border border-dashed bg-muted/30 p-4 text-center">
-                <Upload className="mx-auto h-5 w-5 text-muted-foreground mb-1" />
-                <p className="text-xs text-muted-foreground">Optional: Upload government ID for faster verification</p>
-              </div>
             </div>
           </div>
         )}
@@ -370,33 +442,74 @@ const ClaimFiling = () => {
             <div className="rounded-2xl border bg-card p-6 space-y-5">
               <div>
                 <h2 className="text-lg font-bold mb-1">Supporting Documents</h2>
-                <p className="text-sm text-muted-foreground">Upload any evidence to strengthen your claim (optional).</p>
+                <p className="text-sm text-muted-foreground">Upload evidence to strengthen your claim (optional).</p>
               </div>
+
+              {/* Document type selector */}
+              <div className="flex flex-wrap gap-2">
+                {DOC_TYPES.map(dt => (
+                  <button
+                    key={dt.label}
+                    onClick={() => setSelectedDocType(dt.label)}
+                    className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-colors ${
+                      selectedDocType === dt.label
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-muted text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    {dt.label}
+                  </button>
+                ))}
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="hidden"
+                accept="image/*,.pdf"
+                multiple
+                onChange={handleFileSelect}
+              />
+
               <button
-                onClick={handleFileAdd}
+                onClick={() => fileInputRef.current?.click()}
                 className="w-full rounded-xl border-2 border-dashed border-border hover:border-primary/50 bg-muted/30 p-8 text-center transition-colors group cursor-pointer"
               >
                 <Upload className="mx-auto h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors mb-2" />
-                <p className="text-sm font-medium">Drag & drop files or click to browse</p>
-                <p className="text-xs text-muted-foreground mt-1">Bank statements, fraud reports, receipts, screenshots</p>
+                <p className="text-sm font-medium">Click to browse or drag & drop</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Uploading as: <span className="text-primary font-medium">{selectedDocType}</span>
+                </p>
                 <div className="flex justify-center gap-4 mt-3 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1"><FileText className="h-3 w-3" /> PDF, JPG, PNG</span>
                   <span className="flex items-center gap-1"><Camera className="h-3 w-3" /> Camera capture</span>
                 </div>
               </button>
+
               {documents.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">{documents.length} file(s) uploaded</p>
+                  <p className="text-xs font-medium text-muted-foreground">{documents.length} file(s) selected</p>
                   {documents.map((doc, i) => (
                     <div key={i} className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-2.5">
                       <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-primary" />
-                        <span className="text-sm">{doc.name}</span>
-                        <span className="text-xs text-muted-foreground">{doc.size}</span>
+                        {doc.uploading ? (
+                          <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                        ) : doc.uploaded ? (
+                          <CheckCircle className="h-4 w-4 text-success" />
+                        ) : (
+                          <FileText className="h-4 w-4 text-primary" />
+                        )}
+                        <div>
+                          <span className="text-sm">{doc.name}</span>
+                          <span className="text-xs text-muted-foreground ml-2">{doc.size}</span>
+                        </div>
+                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full ml-2">{doc.type}</span>
                       </div>
-                      <button onClick={() => removeFile(i)} className="text-muted-foreground hover:text-destructive transition-colors">
-                        <X className="h-4 w-4" />
-                      </button>
+                      {!doc.uploading && !doc.uploaded && (
+                        <button onClick={() => removeFile(i)} className="text-muted-foreground hover:text-destructive transition-colors">
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -421,6 +534,17 @@ const ClaimFiling = () => {
                   <p className="text-sm">{identity.fullName}</p>
                   <p className="text-sm text-muted-foreground">{identity.email}</p>
                 </div>
+                {documents.length > 0 && (
+                  <div className="rounded-xl bg-muted/50 p-4 space-y-2">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Documents</p>
+                    <p className="text-sm">{documents.length} file(s) will be uploaded</p>
+                    <div className="flex flex-wrap gap-1">
+                      {[...new Set(documents.map(d => d.type))].map(t => (
+                        <span key={t} className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full">{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 <div className="rounded-xl bg-primary/5 border border-primary/20 p-4">
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-muted-foreground">Estimated Payout</span>
@@ -455,7 +579,8 @@ const ClaimFiling = () => {
               </Button>
             ) : (
               <Button className="flex-1" disabled={!canProceed || submitting} onClick={handleSubmit}>
-                <Send className="h-4 w-4 mr-1" /> {submitting ? "Submitting..." : "Submit Claim"}
+                {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
+                {submitting ? "Submitting..." : "Submit Claim"}
               </Button>
             )}
           </div>

@@ -3,7 +3,7 @@ import { StatCard } from "@/components/StatCard";
 import { StatusPill } from "@/components/StatusPill";
 import { Wallet, Clock, CheckCircle, DollarSign, CreditCard, Crown, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
@@ -132,7 +132,7 @@ const Claims = () => {
               claims.map((claim) => {
                 const currentIndex = statusSteps.indexOf(claim.status as any);
                 return (
-                  <div key={claim.id} className="glass-card p-6">
+                  <Link key={claim.id} to={`/claims/${claim.id}`} className="glass-card p-6 block hover:border-primary/25 transition-colors">
                     <div className="flex items-start justify-between mb-3">
                       <div>
                         <h3 className="font-semibold">{claim.settlement_name}</h3>
@@ -163,7 +163,7 @@ const Claims = () => {
                         );
                       })}
                     </div>
-                  </div>
+                  </Link>
                 );
               })
             )}

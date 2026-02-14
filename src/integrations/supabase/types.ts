@@ -223,6 +223,41 @@ export type Database = {
           },
         ]
       }
+      claim_status_history: {
+        Row: {
+          claim_id: string
+          created_at: string
+          id: string
+          note: string | null
+          status: string
+          updated_by: string | null
+        }
+        Insert: {
+          claim_id: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          status: string
+          updated_by?: string | null
+        }
+        Update: {
+          claim_id?: string
+          created_at?: string
+          id?: string
+          note?: string | null
+          status?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_status_history_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       claims: {
         Row: {
           created_at: string
