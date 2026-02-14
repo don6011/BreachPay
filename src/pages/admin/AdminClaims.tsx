@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Download, Flag, Edit2, FileText, CheckCircle, ExternalLink, Shield, Loader2, DollarSign, Filter, User, Building, Calendar } from "lucide-react";
+import { Download, Flag, Edit2, FileText, CheckCircle, ExternalLink, Shield, Loader2, DollarSign, Filter, User, Building, Calendar, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 
 type ClaimStatusT = "submitted" | "under_review" | "documentation_required" | "approved" | "rejected" | "paid";
@@ -38,6 +38,12 @@ interface ClaimRow {
   user_joined: string | null;
   doc_count: number;
   exposed_fields: string[];
+  partner_id: string | null;
+}
+
+interface PartnerOption {
+  user_id: string;
+  email: string;
 }
 
 interface ClaimDoc {
@@ -68,16 +74,28 @@ const AdminClaims = () => {
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
 
+  const [partnerOptions, setPartnerOptions] = useState<PartnerOption[]>([]);
+  const [assigningPartner, setAssigningPartner] = useState(false);
+
   useEffect(() => {
     if (!user) return;
     fetchClaims();
+    fetchPartners();
   }, [user]);
+
+  const fetchPartners = async () => {
+    const { data: roles } = await supabase.from("user_roles").select("user_id").eq("role", "partner");
+    if (!roles || roles.length === 0) return;
+    const ids = roles.map((r) => r.user_id);
+    const { data: profiles } = await supabase.from("user_profiles").select("user_id, email").in("user_id", ids);
+    setPartnerOptions((profiles || []).map((p) => ({ user_id: p.user_id, email: p.email || p.user_id })));
+  };
 
   const fetchClaims = async () => {
     try {
       const { data } = await supabase
         .from("claims")
-        .select(`id, status, est_payout, filed_at, updated_at, user_id, settlement_id, settlements(name, company, breach_year)`)
+        .select(`id, status, est_payout, filed_at, updated_at, user_id, settlement_id, partner_id, settlements(name, company, breach_year)`)
         .order("created_at", { ascending: false })
         .limit(200);
 
@@ -123,6 +141,7 @@ const AdminClaims = () => {
           user_joined: emailMap[c.user_id]?.joined || null,
           doc_count: docCountMap[c.id] || 0,
           exposed_fields: exposureMap[c.user_id] ? Array.from(exposureMap[c.user_id]) : [],
+          partner_id: c.partner_id || null,
         })));
       }
     } catch (error) {
@@ -339,6 +358,7 @@ const AdminClaims = () => {
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Settlement</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Payout</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Partner</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Filed</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Docs</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Actions</th>
@@ -346,9 +366,9 @@ const AdminClaims = () => {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto" /></td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto" /></td></tr>
             ) : filteredClaims.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No claims found</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">No claims found</td></tr>
             ) : (
               filteredClaims.map((c) => (
                 <tr key={c.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => openClaimDialog(c)}>
@@ -356,6 +376,7 @@ const AdminClaims = () => {
                   <td className="px-4 py-3 font-medium">{c.settlement_name}</td>
                   <td className="px-4 py-3"><StatusPill variant={c.status as any} /></td>
                   <td className="px-4 py-3 text-primary">${c.est_payout.toLocaleString()}</td>
+                  <td className="px-4 py-3 text-xs">{c.partner_id ? (partnerOptions.find(p => p.user_id === c.partner_id)?.email || "Assigned") : <span className="text-muted-foreground">—</span>}</td>
                   <td className="px-4 py-3 text-xs">{c.filed_at || "—"}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center gap-1 text-xs ${c.doc_count > 0 ? "text-primary" : "text-muted-foreground"}`}>
@@ -433,7 +454,55 @@ const AdminClaims = () => {
               )}
             </div>
 
-            {/* Documents */}
+            {/* Partner Assignment */}
+            <div>
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                <UserCheck className="h-4 w-4" /> Assign Partner
+              </h4>
+              <div className="flex items-center gap-2">
+                <select
+                  value={selectedClaim?.partner_id || ""}
+                  onChange={async (e) => {
+                    const partnerId = e.target.value || null;
+                    setAssigningPartner(true);
+                    try {
+                      const { error } = await supabase
+                        .from("claims")
+                        .update({ partner_id: partnerId, updated_at: new Date().toISOString() })
+                        .eq("id", selectedClaim!.id);
+                      if (error) throw error;
+
+                      await supabase.from("admin_activity_logs").insert({
+                        admin_user_id: user?.id,
+                        action: partnerId ? "assign_partner" : "unassign_partner",
+                        entity_type: "claim",
+                        entity_id: selectedClaim!.id,
+                        meta: { partner_id: partnerId },
+                      });
+
+                      setClaims((prev) =>
+                        prev.map((c) => c.id === selectedClaim!.id ? { ...c, partner_id: partnerId } : c)
+                      );
+                      setSelectedClaim((prev) => prev ? { ...prev, partner_id: partnerId } : prev);
+                      toast.success(partnerId ? "Partner assigned" : "Partner removed");
+                    } catch (err) {
+                      toast.error("Failed to assign partner");
+                    } finally {
+                      setAssigningPartner(false);
+                    }
+                  }}
+                  disabled={assigningPartner}
+                  className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">— No partner —</option>
+                  {partnerOptions.map((p) => (
+                    <option key={p.user_id} value={p.user_id}>{p.email}</option>
+                  ))}
+                </select>
+                {assigningPartner && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+              </div>
+            </div>
+
             <div>
               <h4 className="text-sm font-semibold mb-3 flex items-center gap-1.5">
                 <FileText className="h-4 w-4" /> Documents ({docs.length})
