@@ -155,6 +155,46 @@ const AdminClaims = () => {
     if (!selectedClaim || !newStatus) return;
     setUpdating(true);
     try {
+      // If marking as paid, use the simulate-payout edge function
+      if (newStatus === "paid") {
+        // First update payout amounts if provided
+        if (payoutActual) {
+          const actual = parseFloat(payoutActual);
+          if (!isNaN(actual) && actual > 0) {
+            const fee = Math.round(actual * (FEE_PERCENT / 100) * 100) / 100;
+            const net = Math.round((actual - fee) * 100) / 100;
+            await supabase.from("claims").update({
+              final_payout: actual,
+              platform_fee: fee,
+              net_payout: net,
+              updated_at: new Date().toISOString(),
+            }).eq("id", selectedClaim.id);
+          }
+        }
+
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const { data: { session } } = await supabase.auth.getSession();
+        const response = await fetch(`${supabaseUrl}/functions/v1/simulate-payout`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session?.access_token || ""}`,
+          },
+          body: JSON.stringify({ claim_id: selectedClaim.id }),
+        });
+
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Payout failed");
+
+        toast.success(`Payout processed — Ref: ${result.stripe_ref}`);
+        setClaims(claims.map(c =>
+          c.id === selectedClaim.id ? { ...c, status: "paid", updated_at: new Date().toISOString() } : c
+        ));
+        setSelectedClaim(null);
+        return;
+      }
+
+      // For all other statuses, use inline update
       const updatePayload: Record<string, any> = {
         status: newStatus,
         updated_at: new Date().toISOString(),
@@ -164,7 +204,7 @@ const AdminClaims = () => {
         updatePayload.flag_reason = note;
       }
 
-      if ((newStatus === "approved" || newStatus === "paid") && payoutActual) {
+      if (newStatus === "approved" && payoutActual) {
         const actual = parseFloat(payoutActual);
         if (!isNaN(actual) && actual > 0) {
           const fee = Math.round(actual * (FEE_PERCENT / 100) * 100) / 100;
@@ -173,20 +213,6 @@ const AdminClaims = () => {
           updatePayload.platform_fee = fee;
           updatePayload.net_payout = net;
         }
-      }
-
-      if (newStatus === "paid" && payoutActual) {
-        const actual = parseFloat(payoutActual);
-        const fee = Math.round(actual * (FEE_PERCENT / 100) * 100) / 100;
-        const net = Math.round((actual - fee) * 100) / 100;
-
-        await supabase.from("payouts").insert({
-          claim_id: selectedClaim.id,
-          user_id: selectedClaim.user_id,
-          amount: net,
-          status: "paid",
-          paid_at: new Date().toISOString(),
-        });
       }
 
       const { error: updateError } = await supabase
@@ -208,19 +234,15 @@ const AdminClaims = () => {
         ? "Your claim has been approved!"
         : newStatus === "rejected"
         ? "Your claim has been rejected"
-        : newStatus === "paid"
-        ? "Your payout has been processed!"
         : `Claim status updated to ${newStatus.replace("_", " ")}`;
 
       const alertBody = newStatus === "rejected" && note
         ? `Reason: ${note}`
-        : newStatus === "paid" && payoutActual
-        ? `You will receive $${(parseFloat(payoutActual) - Math.round(parseFloat(payoutActual) * (FEE_PERCENT / 100) * 100) / 100).toLocaleString()} for the ${selectedClaim.settlement_name} settlement.`
         : newStatus === "approved" && payoutActual
         ? `Estimated payout: $${parseFloat(payoutActual).toLocaleString()} for the ${selectedClaim.settlement_name} settlement.`
         : `Your claim for ${selectedClaim.settlement_name} has been updated.`;
 
-      const alertSeverity = newStatus === "rejected" ? "high" : newStatus === "paid" ? "low" : "medium";
+      const alertSeverity = newStatus === "rejected" ? "high" : "medium";
 
       await supabase.from("alerts").insert({
         user_id: selectedClaim.user_id,
@@ -247,7 +269,7 @@ const AdminClaims = () => {
       setSelectedClaim(null);
     } catch (error) {
       console.error("Error updating claim:", error);
-      toast.error("Failed to update claim status");
+      toast.error(`Failed: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setUpdating(false);
     }
