@@ -1,14 +1,90 @@
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
 import { RiskGauge } from "@/components/RiskGauge";
 import { AlertRow } from "@/components/AlertRow";
 import { Button } from "@/components/ui/button";
-import { mockAlerts, mockBreaches, mockSettlements, mockClaims } from "@/data/mockData";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { ShieldAlert, Scale, DollarSign, FileText, Activity, Search, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Dashboard = () => {
-  const totalEstimated = mockSettlements.filter(s => s.status === "open").reduce((a, s) => a + s.payout_max, 0);
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [riskScore, setRiskScore] = useState(0);
+  const [breachCount, setBreachCount] = useState(0);
+  const [eligibleCount, setEligibleCount] = useState(0);
+  const [totalEstimated, setTotalEstimated] = useState(0);
+  const [claimsCount, setClaimsCount] = useState(0);
+  const [alerts, setAlerts] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchDashboard = async () => {
+      try {
+        // Latest risk snapshot
+        const { data: snapshot } = await supabase
+          .from("user_risk_snapshots")
+          .select("risk_score, breaches_detected")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (snapshot) {
+          setRiskScore(snapshot.risk_score);
+          setBreachCount(snapshot.breaches_detected);
+        }
+
+        // Settlement matches with settlement details
+        const { data: matches } = await supabase
+          .from("settlement_matches")
+          .select("settlement_id, payout_estimate, settlements(status, payout_max)")
+          .eq("user_id", user.id);
+
+        if (matches) {
+          const open = matches.filter((m: any) => m.settlements?.status === "open");
+          setEligibleCount(open.length);
+          setTotalEstimated(open.reduce((a: number, m: any) => a + (m.settlements?.payout_max || 0), 0));
+        }
+
+        // Claims count
+        const { count } = await supabase
+          .from("claims")
+          .select("*", { count: "exact", head: true })
+          .eq("user_id", user.id);
+        setClaimsCount(count || 0);
+
+        // Recent alerts
+        const { data: alertsData } = await supabase
+          .from("alerts")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(5);
+
+        if (alertsData) {
+          setAlerts(alertsData.map(a => ({
+            id: a.id,
+            title: a.title,
+            description: a.body || "",
+            category: a.type,
+            severity: a.severity,
+            created_at: a.created_at,
+            read: a.is_read,
+          })));
+        }
+      } catch (error) {
+        console.error("Dashboard fetch error:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboard();
+  }, [user]);
 
   return (
     <div>
@@ -17,15 +93,15 @@ const Dashboard = () => {
       <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
         {/* Risk Gauge */}
         <div className="flex items-center justify-center glass-card-glow p-6 lg:row-span-2">
-          <RiskGauge score={82} />
+          <RiskGauge score={riskScore} />
         </div>
 
         {/* Stat Cards */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard icon={ShieldAlert} label="Breaches Detected" value={mockBreaches.length} variant="teal" />
-          <StatCard icon={Scale} label="Eligible Settlements" value={mockSettlements.filter(s => s.status === "open").length} />
-          <StatCard icon={DollarSign} label="Estimated Value" value={`$${totalEstimated.toLocaleString()}`} variant="teal" />
-          <StatCard icon={FileText} label="Claims Filed" value={mockClaims.length} />
+          <StatCard icon={ShieldAlert} label="Breaches Detected" value={loading ? "—" : breachCount} variant="teal" />
+          <StatCard icon={Scale} label="Eligible Settlements" value={loading ? "—" : eligibleCount} />
+          <StatCard icon={DollarSign} label="Estimated Value" value={loading ? "—" : `$${totalEstimated.toLocaleString()}`} variant="teal" />
+          <StatCard icon={FileText} label="Claims Filed" value={loading ? "—" : claimsCount} />
         </div>
 
         {/* Action Buttons */}
@@ -49,9 +125,15 @@ const Dashboard = () => {
           <h2 className="text-lg font-semibold">Recent Alerts</h2>
         </div>
         <div className="space-y-2">
-          {mockAlerts.slice(0, 5).map((alert) => (
-            <AlertRow key={alert.id} alert={alert} />
-          ))}
+          {loading ? (
+            <p className="text-sm text-muted-foreground text-center py-4">Loading...</p>
+          ) : alerts.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-4">No alerts yet. Run a scan to get started.</p>
+          ) : (
+            alerts.map((alert) => (
+              <AlertRow key={alert.id} alert={alert} />
+            ))
+          )}
         </div>
       </div>
 

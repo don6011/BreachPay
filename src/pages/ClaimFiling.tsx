@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { mockSettlements } from "@/data/mockData";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
 import {
   Shield, Lock, ChevronRight, ChevronLeft, Upload, FileText,
   Clock, AlertTriangle, CheckCircle, DollarSign, Camera, X,
@@ -16,46 +18,76 @@ import {
 
 const STEPS = ["Overview", "Identity", "Eligibility", "Documents", "Review"];
 
-const difficultyMap: Record<string, { label: string; color: string }> = {
-  s1: { label: "Moderate", color: "text-warning" },
-  s2: { label: "Easy", color: "text-success" },
-  s3: { label: "Advanced", color: "text-destructive" },
-  s4: { label: "Easy", color: "text-success" },
-  s5: { label: "Easy", color: "text-success" },
-};
+interface SettlementData {
+  id: string;
+  name: string;
+  company: string;
+  breach_year: number | null;
+  description: string | null;
+  payout_min: number;
+  payout_max: number;
+  deadline: string;
+  status: string;
+}
 
 const ClaimFiling = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const settlementId = searchParams.get("settlement") || "s1";
-  const settlement = mockSettlements.find((s) => s.id === settlementId) || mockSettlements[0];
-  const difficulty = difficultyMap[settlement.id] || { label: "Moderate", color: "text-warning" };
+  const { user } = useAuth();
+  const settlementId = searchParams.get("settlement") || "";
 
+  const [settlement, setSettlement] = useState<SettlementData | null>(null);
+  const [loadingSettlement, setLoadingSettlement] = useState(true);
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Form state
-  const [identity, setIdentity] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    address: "",
-  });
+  const [identity, setIdentity] = useState({ fullName: "", email: "", phone: "", address: "" });
   const [eligibility, setEligibility] = useState({
-    breachImpact: false,
-    financialLoss: false,
-    monitoringPurchase: false,
-    lossAmount: "",
-    monitoringCost: "",
-    description: "",
+    breachImpact: false, financialLoss: false, monitoringPurchase: false,
+    lossAmount: "", monitoringCost: "", description: "",
   });
   const [documents, setDocuments] = useState<{ name: string; size: string }[]>([]);
   const [consent, setConsent] = useState(false);
 
+  // Load settlement from DB
+  useEffect(() => {
+    if (!settlementId) {
+      setLoadingSettlement(false);
+      return;
+    }
+    const fetchSettlement = async () => {
+      const { data } = await supabase
+        .from("settlements")
+        .select("id, name, company, breach_year, description, payout_min, payout_max, deadline, status")
+        .eq("id", settlementId)
+        .maybeSingle();
+      if (data) {
+        setSettlement({
+          ...data,
+          payout_min: Number(data.payout_min) || 0,
+          payout_max: Number(data.payout_max) || 0,
+          deadline: data.deadline || "",
+        });
+      }
+      setLoadingSettlement(false);
+    };
+    fetchSettlement();
+  }, [settlementId]);
+
+  // Pre-fill email from auth
+  useEffect(() => {
+    if (user?.email && !identity.email) {
+      setIdentity(prev => ({ ...prev, email: user.email! }));
+    }
+  }, [user]);
+
   const deadlineDays = useMemo(() => {
+    if (!settlement?.deadline) return 0;
     const diff = new Date(settlement.deadline).getTime() - Date.now();
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-  }, [settlement.deadline]);
+  }, [settlement?.deadline]);
 
   const deadlineColor = deadlineDays <= 30 ? "text-destructive" : deadlineDays <= 60 ? "text-warning" : "text-success";
 
@@ -83,6 +115,50 @@ const ClaimFiling = () => {
     if (step === 4) return consent;
     return true;
   }, [step, identity, eligibility, consent]);
+
+  const handleSubmit = async () => {
+    if (!user || !settlement) return;
+    setSubmitting(true);
+
+    try {
+      const estPayout = (settlement.payout_min + settlement.payout_max) / 2;
+
+      const { error } = await supabase.from("claims").insert({
+        user_id: user.id,
+        settlement_id: settlement.id,
+        est_payout: estPayout,
+        filed_at: new Date().toISOString().split("T")[0],
+        status: "submitted",
+      });
+
+      if (error) throw error;
+
+      setSubmitted(true);
+      toast({ title: "Claim Filed!", description: `Your claim for ${settlement.name} has been submitted.` });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to file claim. Please try again.", variant: "destructive" });
+      console.error("Claim filing error:", error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loadingSettlement) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+    );
+  }
+
+  if (!settlement) {
+    return (
+      <div>
+        <PageHeader title="Settlement Not Found" subtitle="The requested settlement could not be found" />
+        <Button onClick={() => navigate("/settlements")}>Back to Settlements</Button>
+      </div>
+    );
+  }
 
   if (submitted) {
     return (
@@ -112,7 +188,6 @@ const ClaimFiling = () => {
               </div>
             </div>
 
-            {/* Mini status tracker */}
             <div className="flex items-center gap-1 mb-6">
               {["Submitted", "Under Review", "Approved", "Paid"].map((s, i) => (
                 <div key={s} className="flex flex-1 items-center">
@@ -163,11 +238,8 @@ const ClaimFiling = () => {
                   <h2 className="text-lg font-bold">{settlement.name}</h2>
                   <p className="text-sm text-muted-foreground">{settlement.company} · {settlement.breach_year} Breach</p>
                 </div>
-                <span className={`text-xs font-medium px-2.5 py-1 rounded-full bg-muted ${difficulty.color}`}>
-                  {difficulty.label}
-                </span>
               </div>
-              <p className="text-sm text-muted-foreground">{settlement.description}</p>
+              {settlement.description && <p className="text-sm text-muted-foreground">{settlement.description}</p>}
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-muted/50 p-4">
@@ -205,7 +277,6 @@ const ClaimFiling = () => {
                 <h2 className="text-lg font-bold mb-1">Identity Verification</h2>
                 <p className="text-sm text-muted-foreground">Provide your details to verify eligibility.</p>
               </div>
-
               <div className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="fullName">Full Legal Name</Label>
@@ -226,15 +297,11 @@ const ClaimFiling = () => {
                   </div>
                 </div>
               </div>
-
-              {/* Trust indicators */}
               <div className="flex flex-wrap gap-4 text-[11px] text-muted-foreground pt-2 border-t border-border">
                 <span className="flex items-center gap-1"><Lock className="h-3 w-3 text-primary" /> Encrypted submission</span>
                 <span className="flex items-center gap-1"><Shield className="h-3 w-3 text-primary" /> Bank-level security</span>
                 <span className="flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-primary" /> Data never sold</span>
               </div>
-
-              {/* Optional ID upload */}
               <div className="rounded-xl border border-dashed bg-muted/30 p-4 text-center">
                 <Upload className="mx-auto h-5 w-5 text-muted-foreground mb-1" />
                 <p className="text-xs text-muted-foreground">Optional: Upload government ID for faster verification</p>
@@ -251,7 +318,6 @@ const ClaimFiling = () => {
                 <h2 className="text-lg font-bold mb-1">Eligibility Questions</h2>
                 <p className="text-sm text-muted-foreground">Answer a few questions to confirm your eligibility.</p>
               </div>
-
               <div className="space-y-4">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <Checkbox checked={eligibility.breachImpact} onCheckedChange={(v) => setEligibility((p) => ({ ...p, breachImpact: !!v }))} className="mt-0.5" />
@@ -260,7 +326,6 @@ const ClaimFiling = () => {
                     <p className="text-xs text-muted-foreground">Your data was found in our scan results for this breach.</p>
                   </div>
                 </label>
-
                 <label className="flex items-start gap-3 cursor-pointer">
                   <Checkbox checked={eligibility.financialLoss} onCheckedChange={(v) => setEligibility((p) => ({ ...p, financialLoss: !!v }))} className="mt-0.5" />
                   <div>
@@ -268,14 +333,12 @@ const ClaimFiling = () => {
                     <p className="text-xs text-muted-foreground">Unauthorized charges, identity theft costs, etc.</p>
                   </div>
                 </label>
-
                 {eligibility.financialLoss && (
                   <div className="ml-8 space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
                     <Label htmlFor="lossAmount">Estimated Loss Amount</Label>
                     <Input id="lossAmount" placeholder="$0.00" value={eligibility.lossAmount} onChange={(e) => setEligibility((p) => ({ ...p, lossAmount: e.target.value }))} />
                   </div>
                 )}
-
                 <label className="flex items-start gap-3 cursor-pointer">
                   <Checkbox checked={eligibility.monitoringPurchase} onCheckedChange={(v) => setEligibility((p) => ({ ...p, monitoringPurchase: !!v }))} className="mt-0.5" />
                   <div>
@@ -283,20 +346,17 @@ const ClaimFiling = () => {
                     <p className="text-xs text-muted-foreground">As a result of this breach.</p>
                   </div>
                 </label>
-
                 {eligibility.monitoringPurchase && (
                   <div className="ml-8 space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
                     <Label htmlFor="monitoringCost">Monitoring Cost</Label>
                     <Input id="monitoringCost" placeholder="$0.00" value={eligibility.monitoringCost} onChange={(e) => setEligibility((p) => ({ ...p, monitoringCost: e.target.value }))} />
                   </div>
                 )}
-
                 <div className="space-y-1.5">
                   <Label htmlFor="desc">Additional Details (optional)</Label>
                   <Textarea id="desc" placeholder="Describe any additional impact..." value={eligibility.description} onChange={(e) => setEligibility((p) => ({ ...p, description: e.target.value }))} rows={3} />
                 </div>
               </div>
-
               <p className="text-[11px] text-muted-foreground flex items-center gap-1">
                 <Sparkles className="h-3 w-3 text-primary" /> Responses auto-saved as you type.
               </p>
@@ -312,8 +372,6 @@ const ClaimFiling = () => {
                 <h2 className="text-lg font-bold mb-1">Supporting Documents</h2>
                 <p className="text-sm text-muted-foreground">Upload any evidence to strengthen your claim (optional).</p>
               </div>
-
-              {/* Drop zone */}
               <button
                 onClick={handleFileAdd}
                 className="w-full rounded-xl border-2 border-dashed border-border hover:border-primary/50 bg-muted/30 p-8 text-center transition-colors group cursor-pointer"
@@ -326,8 +384,6 @@ const ClaimFiling = () => {
                   <span className="flex items-center gap-1"><Camera className="h-3 w-3" /> Camera capture</span>
                 </div>
               </button>
-
-              {/* Uploaded files */}
               {documents.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground">{documents.length} file(s) uploaded</p>
@@ -354,60 +410,34 @@ const ClaimFiling = () => {
           <div className="space-y-4">
             <div className="rounded-2xl border bg-card p-6 space-y-5">
               <h2 className="text-lg font-bold">Review & Submit</h2>
-
-              {/* Claim summary */}
               <div className="space-y-3">
                 <div className="rounded-xl bg-muted/50 p-4 space-y-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Settlement</p>
                   <p className="font-semibold">{settlement.name}</p>
                   <p className="text-sm text-muted-foreground">{settlement.company} · {settlement.breach_year}</p>
-                  <p className="text-primary font-bold drop-shadow-[0_0_8px_hsl(172_89%_52%/0.4)]">
-                    ${settlement.payout_min} – ${settlement.payout_max}
-                  </p>
                 </div>
-
                 <div className="rounded-xl bg-muted/50 p-4 space-y-2">
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Your Information</p>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div><span className="text-muted-foreground">Name:</span> {identity.fullName || "—"}</div>
-                    <div><span className="text-muted-foreground">Email:</span> {identity.email || "—"}</div>
-                    <div><span className="text-muted-foreground">Phone:</span> {identity.phone || "—"}</div>
-                    <div><span className="text-muted-foreground">Address:</span> {identity.address || "—"}</div>
-                  </div>
+                  <p className="text-sm">{identity.fullName}</p>
+                  <p className="text-sm text-muted-foreground">{identity.email}</p>
                 </div>
-
-                <div className="rounded-xl bg-muted/50 p-4 space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Eligibility</p>
-                  <div className="space-y-1 text-sm">
-                    <p>Breach Impact: {eligibility.breachImpact ? "✓ Confirmed" : "—"}</p>
-                    <p>Financial Loss: {eligibility.financialLoss ? `✓ ${eligibility.lossAmount || "Yes"}` : "No"}</p>
-                    <p>Monitoring: {eligibility.monitoringPurchase ? `✓ ${eligibility.monitoringCost || "Yes"}` : "No"}</p>
+                <div className="rounded-xl bg-primary/5 border border-primary/20 p-4">
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-muted-foreground">Estimated Payout</span>
+                    <span className="font-bold text-primary">${settlement.payout_min} – ${settlement.payout_max}</span>
                   </div>
-                </div>
-
-                {documents.length > 0 && (
-                  <div className="rounded-xl bg-muted/50 p-4 space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Documents ({documents.length})</p>
-                    {documents.map((d, i) => (
-                      <p key={i} className="text-sm flex items-center gap-2"><FileText className="h-3 w-3 text-primary" /> {d.name}</p>
-                    ))}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Service Fee</span>
+                    <span className="text-muted-foreground">15% (only if paid)</span>
                   </div>
-                )}
-              </div>
-
-              {/* Fee disclosure */}
-              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 flex items-start gap-3">
-                <DollarSign className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold">Service Fee: 15% only if payout issued</p>
-                  <p className="text-xs text-muted-foreground">You pay nothing upfront. BreachPay only earns when you do.</p>
                 </div>
               </div>
 
-              {/* Consent */}
-              <label className="flex items-start gap-3 cursor-pointer">
+              <label className="flex items-start gap-3 cursor-pointer pt-2">
                 <Checkbox checked={consent} onCheckedChange={(v) => setConsent(!!v)} className="mt-0.5" />
-                <p className="text-sm">I authorize BreachPay to file this claim on my behalf and agree to the <span className="text-primary underline cursor-pointer">terms of service</span>.</p>
+                <p className="text-sm text-muted-foreground leading-tight">
+                  I certify that the above information is accurate and I authorize BreachPay to file this claim on my behalf. I agree to the <span className="text-primary cursor-pointer">Terms of Service</span> and a 15% contingency fee on any payout received.
+                </p>
               </label>
             </div>
           </div>
@@ -415,17 +445,17 @@ const ClaimFiling = () => {
 
         {/* Navigation */}
         {step > 0 && (
-          <div className="flex gap-3 mt-4">
-            <Button variant="outline" onClick={() => setStep((s) => s - 1)} className="flex-1">
+          <div className="flex gap-3 mt-6">
+            <Button variant="outline" className="flex-1" onClick={() => setStep(step - 1)}>
               <ChevronLeft className="h-4 w-4 mr-1" /> Back
             </Button>
             {step < STEPS.length - 1 ? (
-              <Button onClick={() => setStep((s) => s + 1)} disabled={!canProceed} className="flex-1">
-                Continue <ChevronRight className="h-4 w-4 ml-1" />
+              <Button className="flex-1" disabled={!canProceed} onClick={() => setStep(step + 1)}>
+                Next <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             ) : (
-              <Button onClick={() => setSubmitted(true)} disabled={!canProceed} className="flex-1 shadow-[0_0_20px_hsl(172_89%_52%/0.3)]">
-                <Send className="h-4 w-4 mr-1" /> Submit Claim
+              <Button className="flex-1" disabled={!canProceed || submitting} onClick={handleSubmit}>
+                <Send className="h-4 w-4 mr-1" /> {submitting ? "Submitting..." : "Submit Claim"}
               </Button>
             )}
           </div>

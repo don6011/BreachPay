@@ -1,31 +1,96 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { mockSettlements } from "@/data/mockData";
 import { Plus, Send, Zap, RefreshCw } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import type { Settlement } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
+
+interface Settlement {
+  id: string;
+  name: string;
+  company: string;
+  breach_year: number | null;
+  status: string;
+  payout_min: number | null;
+  payout_max: number | null;
+  deadline: string | null;
+  description: string | null;
+}
 
 const AdminSettlements = () => {
-  const [settlements] = useState<Settlement[]>(mockSettlements);
+  const { user } = useAuth();
+  const [settlements, setSettlements] = useState<Settlement[]>([]);
+  const [loading, setLoading] = useState(true);
   const [sendingAlerts, setSendingAlerts] = useState(false);
   const [rebuildingMatches, setRebuildingMatches] = useState(false);
   const [runningScan, setRunningScan] = useState(false);
+
+  // Add settlement form state
+  const [newName, setNewName] = useState("");
+  const [newCompany, setNewCompany] = useState("");
+  const [newYear, setNewYear] = useState("");
+  const [newStatus, setNewStatus] = useState("open");
+  const [newPayoutMin, setNewPayoutMin] = useState("");
+  const [newPayoutMax, setNewPayoutMax] = useState("");
+  const [newDeadline, setNewDeadline] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [addingSettlement, setAddingSettlement] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  const fetchSettlements = async () => {
+    const { data } = await supabase
+      .from("settlements")
+      .select("id, name, company, breach_year, status, payout_min, payout_max, deadline, description")
+      .order("created_at", { ascending: false });
+    if (data) setSettlements(data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (user) fetchSettlements();
+  }, [user]);
+
+  const handleAddSettlement = async () => {
+    if (!newName || !newCompany) return;
+    setAddingSettlement(true);
+    try {
+      const { error } = await supabase.from("settlements").insert({
+        name: newName,
+        company: newCompany,
+        breach_year: newYear ? parseInt(newYear) : null,
+        status: newStatus as any,
+        payout_min: newPayoutMin ? parseFloat(newPayoutMin) : null,
+        payout_max: newPayoutMax ? parseFloat(newPayoutMax) : null,
+        deadline: newDeadline || null,
+        description: newDescription || null,
+        created_by: user?.id,
+      });
+      if (error) throw error;
+      toast({ title: "Success", description: "Settlement added" });
+      setDialogOpen(false);
+      setNewName(""); setNewCompany(""); setNewYear(""); setNewPayoutMin(""); setNewPayoutMax(""); setNewDeadline(""); setNewDescription("");
+      fetchSettlements();
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to add settlement", variant: "destructive" });
+    } finally {
+      setAddingSettlement(false);
+    }
+  };
 
   const callEdgeFunction = async (
     functionName: string,
     loadingState: [boolean, (v: boolean) => void]
   ) => {
-    const [, setLoading] = loadingState;
-    setLoading(true);
+    const [, setLoadingState] = loadingState;
+    setLoadingState(true);
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const { data: { session } } = await supabase.auth.getSession();
-      
+
       const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
         method: 'POST',
         headers: {
@@ -35,9 +100,7 @@ const AdminSettlements = () => {
         body: JSON.stringify({}),
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
       const data = await response.json();
       let title = "Success";
@@ -55,63 +118,55 @@ const AdminSettlements = () => {
         title = "Info";
       }
 
-      toast({
-        title,
-        description,
-      });
+      toast({ title, description });
     } catch (error) {
       toast({
         title: "Error",
         description: `Failed to trigger ${functionName}: ${error instanceof Error ? error.message : String(error)}`,
         variant: "destructive",
       });
-      console.error(`Failed to call ${functionName}:`, error);
     } finally {
-      setLoading(false);
+      setLoadingState(false);
     }
-  };
-
-  const handleSendDeadlineAlerts = () => {
-    callEdgeFunction("run-deadline-alerts", [sendingAlerts, setSendingAlerts]);
-  };
-
-  const handleRebuildMatches = () => {
-    callEdgeFunction("rebuild-settlement-matches", [rebuildingMatches, setRebuildingMatches]);
-  };
-
-  const handleRunScans = () => {
-    callEdgeFunction("run-scheduled-scans", [runningScan, setRunningScan]);
   };
 
   return (
     <div>
       <PageHeader title="Settlement Management" subtitle="Manage settlement records">
-        <Dialog>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
             <Button size="sm" className="rounded-xl"><Plus className="mr-1 h-3 w-3" />Add Settlement</Button>
           </DialogTrigger>
           <DialogContent className="bg-card rounded-2xl">
-           <DialogHeader><DialogTitle>Add Settlement</DialogTitle></DialogHeader>
-           <div className="space-y-3">
-             <Input placeholder="Settlement Name" className="rounded-xl" />
-             <Input placeholder="Company" className="rounded-xl" />
-             <div className="grid grid-cols-2 gap-3">
-               <Input placeholder="Breach Year" type="number" className="rounded-xl" />
-               <Input placeholder="Status" className="rounded-xl" />
-             </div>
-             <div className="grid grid-cols-2 gap-3">
-               <Input placeholder="Payout Min ($)" type="number" className="rounded-xl" />
-               <Input placeholder="Payout Max ($)" type="number" className="rounded-xl" />
-             </div>
-             <Input placeholder="Deadline" type="date" className="rounded-xl" />
-             <Input placeholder="Description" className="rounded-xl" />
-             <Button className="w-full rounded-xl bg-primary text-primary-foreground">Add Settlement</Button>
-           </div>
-       </DialogContent>
+            <DialogHeader><DialogTitle>Add Settlement</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <Input placeholder="Settlement Name" className="rounded-xl" value={newName} onChange={(e) => setNewName(e.target.value)} />
+              <Input placeholder="Company" className="rounded-xl" value={newCompany} onChange={(e) => setNewCompany(e.target.value)} />
+              <div className="grid grid-cols-2 gap-3">
+                <Input placeholder="Breach Year" type="number" className="rounded-xl" value={newYear} onChange={(e) => setNewYear(e.target.value)} />
+                <Input placeholder="Status (open/pending/closed)" className="rounded-xl" value={newStatus} onChange={(e) => setNewStatus(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input placeholder="Payout Min ($)" type="number" className="rounded-xl" value={newPayoutMin} onChange={(e) => setNewPayoutMin(e.target.value)} />
+                <Input placeholder="Payout Max ($)" type="number" className="rounded-xl" value={newPayoutMax} onChange={(e) => setNewPayoutMax(e.target.value)} />
+              </div>
+              <Input placeholder="Deadline" type="date" className="rounded-xl" value={newDeadline} onChange={(e) => setNewDeadline(e.target.value)} />
+              <Input placeholder="Description" className="rounded-xl" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} />
+              <Button className="w-full rounded-xl bg-primary text-primary-foreground" onClick={handleAddSettlement} disabled={addingSettlement || !newName || !newCompany}>
+                {addingSettlement ? "Adding..." : "Add Settlement"}
+              </Button>
+            </div>
+          </DialogContent>
         </Dialog>
-        <Button size="sm" variant="outline" className="rounded-xl" onClick={handleSendDeadlineAlerts} disabled={sendingAlerts}><Send className="mr-1 h-3 w-3" />{sendingAlerts ? "Sending..." : "Send Alerts"}</Button>
-        <Button size="sm" variant="outline" className="rounded-xl" onClick={handleRebuildMatches} disabled={rebuildingMatches}><RefreshCw className="mr-1 h-3 w-3" />{rebuildingMatches ? "Rebuilding..." : "Rebuild Matches"}</Button>
-        <Button size="sm" variant="outline" className="rounded-xl" onClick={handleRunScans} disabled={runningScan}><Zap className="mr-1 h-3 w-3" />{runningScan ? "Scanning..." : "Run Scans"}</Button>
+        <Button size="sm" variant="outline" className="rounded-xl" onClick={() => callEdgeFunction("run-deadline-alerts", [sendingAlerts, setSendingAlerts])} disabled={sendingAlerts}>
+          <Send className="mr-1 h-3 w-3" />{sendingAlerts ? "Sending..." : "Send Alerts"}
+        </Button>
+        <Button size="sm" variant="outline" className="rounded-xl" onClick={() => callEdgeFunction("rebuild-settlement-matches", [rebuildingMatches, setRebuildingMatches])} disabled={rebuildingMatches}>
+          <RefreshCw className="mr-1 h-3 w-3" />{rebuildingMatches ? "Rebuilding..." : "Rebuild Matches"}
+        </Button>
+        <Button size="sm" variant="outline" className="rounded-xl" onClick={() => callEdgeFunction("run-scheduled-scans", [runningScan, setRunningScan])} disabled={runningScan}>
+          <Zap className="mr-1 h-3 w-3" />{runningScan ? "Scanning..." : "Run Scans"}
+        </Button>
       </PageHeader>
 
       <div className="rounded-2xl border bg-card overflow-hidden">
@@ -127,16 +182,22 @@ const AdminSettlements = () => {
             </tr>
           </thead>
           <tbody>
-            {settlements.map((s) => (
-              <tr key={s.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                <td className="px-4 py-3 font-medium">{s.name}</td>
-                <td className="px-4 py-3">{s.company}</td>
-                <td className="px-4 py-3">{s.breach_year}</td>
-                <td className="px-4 py-3 text-primary">${s.payout_min}–${s.payout_max.toLocaleString()}</td>
-                <td className="px-4 py-3">{s.deadline}</td>
-                <td className="px-4 py-3"><StatusPill variant={s.status} /></td>
-              </tr>
-            ))}
+            {loading ? (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
+            ) : settlements.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No settlements yet</td></tr>
+            ) : (
+              settlements.map((s) => (
+                <tr key={s.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3 font-medium">{s.name}</td>
+                  <td className="px-4 py-3">{s.company}</td>
+                  <td className="px-4 py-3">{s.breach_year || "—"}</td>
+                  <td className="px-4 py-3 text-primary">${s.payout_min || 0}–${(s.payout_max || 0).toLocaleString()}</td>
+                  <td className="px-4 py-3">{s.deadline || "—"}</td>
+                  <td className="px-4 py-3"><StatusPill variant={s.status as any} /></td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

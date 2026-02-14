@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
-import { StatusPill } from "@/components/StatusPill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { mockBreaches, mockSettlements } from "@/data/mockData";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { Search, Shield, AlertTriangle, Loader2, Crown, Check, Eye, DollarSign, Zap, Bell, Activity, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "@/hooks/use-toast";
 
 type ScanState = "idle" | "scanning" | "results";
 
@@ -17,32 +18,175 @@ const severityColor: Record<string, string> = {
   critical: "text-destructive bg-destructive/10 border-destructive/20",
 };
 
+interface BreachResult {
+  id: string;
+  source: string;
+  breach_year: number | null;
+  risk_level: string;
+  exposed_fields: string[];
+  record_count_estimate: number | null;
+  details: any;
+}
+
+interface MatchResult {
+  id: string;
+  settlement_id: string;
+  payout_estimate: number | null;
+  settlement: {
+    id: string;
+    name: string;
+    company: string;
+    payout_min: number | null;
+    payout_max: number | null;
+    status: string;
+  } | null;
+}
+
 const Scan = () => {
+  const { user } = useAuth();
   const [state, setState] = useState<ScanState>("idle");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const isPremium = false;
+  const [breaches, setBreaches] = useState<BreachResult[]>([]);
+  const [matches, setMatches] = useState<MatchResult[]>([]);
+  const [riskScore, setRiskScore] = useState(0);
+  const [scanRunId, setScanRunId] = useState<string | null>(null);
+  const [isPremium, setIsPremium] = useState(false);
 
+  // Load user profile for premium status
   useEffect(() => {
-    if (state === "scanning") {
-      const timer = setTimeout(() => setState("results"), 3500);
-      return () => clearTimeout(timer);
-    }
-  }, [state]);
+    if (!user) return;
+    supabase
+      .from("user_profiles")
+      .select("plan")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data) setIsPremium(data.plan === "premium");
+      });
+  }, [user]);
 
-  const handleScan = (e: React.FormEvent) => {
+  // Poll for scan completion
+  useEffect(() => {
+    if (state !== "scanning" || !scanRunId) return;
+
+    const interval = setInterval(async () => {
+      const { data: scan } = await supabase
+        .from("scan_runs")
+        .select("status, risk_score, breaches_detected, eligible_settlements")
+        .eq("id", scanRunId)
+        .maybeSingle();
+
+      if (scan && (scan.status === "completed" || scan.status === "failed")) {
+        clearInterval(interval);
+        if (scan.status === "failed") {
+          toast({ title: "Scan Failed", description: "Something went wrong. Please try again.", variant: "destructive" });
+          setState("idle");
+          return;
+        }
+
+        setRiskScore(scan.risk_score);
+
+        // Fetch breaches for this scan
+        const { data: breachData } = await supabase
+          .from("breach_events")
+          .select("*")
+          .eq("scan_run_id", scanRunId);
+        if (breachData) setBreaches(breachData);
+
+        // Fetch settlement matches for this user
+        const { data: matchData } = await supabase
+          .from("settlement_matches")
+          .select("id, settlement_id, payout_estimate, settlements(id, name, company, payout_min, payout_max, status)")
+          .eq("user_id", user!.id);
+
+        if (matchData) {
+          setMatches(matchData.map((m: any) => ({
+            ...m,
+            settlement: m.settlements,
+          })));
+        }
+
+        setState("results");
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [state, scanRunId, user]);
+
+  const handleScan = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) return;
+
     setState("scanning");
+
+    // Enable monitoring + trigger scan via edge function
+    await supabase
+      .from("user_profiles")
+      .update({ monitoring_enabled: true, next_scan_at: new Date().toISOString() })
+      .eq("user_id", user.id);
+
+    // Call the run-scheduled-scans edge function
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const { data: { session } } = await supabase.auth.getSession();
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/run-scheduled-scans`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session?.access_token || ""}`,
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+      // Find the scan run that was just created
+      const { data: latestScan } = await supabase
+        .from("scan_runs")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestScan) {
+        setScanRunId(latestScan.id);
+      } else {
+        // Fallback: wait and retry
+        setTimeout(async () => {
+          const { data: retryScan } = await supabase
+            .from("scan_runs")
+            .select("id")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (retryScan) setScanRunId(retryScan.id);
+        }, 3000);
+      }
+    } catch (error) {
+      toast({ title: "Scan Error", description: "Failed to start scan. Please try again.", variant: "destructive" });
+      setState("idle");
+    }
   };
 
-  const reset = () => { setState("idle"); setEmail(""); setPhone(""); };
+  const reset = () => {
+    setState("idle");
+    setEmail("");
+    setPhone("");
+    setBreaches([]);
+    setMatches([]);
+    setScanRunId(null);
+  };
 
-  const eligibleSettlements = mockSettlements.filter(s => s.status === "open" || s.status === "pending");
-  const estMin = eligibleSettlements.reduce((sum, s) => sum + (s.payout_min ?? 0), 0);
-  const estMax = eligibleSettlements.reduce((sum, s) => sum + (s.payout_max ?? 0), 0);
+  const eligibleMatches = matches.filter(m => m.settlement && (m.settlement.status === "open" || m.settlement.status === "pending"));
+  const estMin = eligibleMatches.reduce((sum, m) => sum + (m.settlement?.payout_min || 0), 0);
+  const estMax = eligibleMatches.reduce((sum, m) => sum + (m.settlement?.payout_max || 0), 0);
 
-  const getSettlementForBreach = (company: string) =>
-    mockSettlements.find(s => s.company === company && s.status !== "closed");
+  const getSettlementForBreach = (source: string) =>
+    matches.find(m => m.settlement && m.settlement.company.toLowerCase().includes(source.toLowerCase()) && m.settlement.status !== "closed");
 
   return (
     <div>
@@ -95,31 +239,32 @@ const Scan = () => {
                 <AlertTriangle className="h-5 w-5 text-destructive" />
               </div>
               <div>
-                <h2 className="text-lg font-bold">You've Been Exposed in Multiple Breaches</h2>
-                <span className="rounded-xl bg-warning/15 px-2 py-0.5 text-xs font-medium text-warning">Demo Mode</span>
+                <h2 className="text-lg font-bold">
+                  {breaches.length > 0 ? "You've Been Exposed in Multiple Breaches" : "No Breaches Found"}
+                </h2>
               </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="rounded-xl border bg-background/50 p-4 text-center">
-                <p className="text-2xl font-bold">{mockBreaches.length}</p>
+                <p className="text-2xl font-bold">{breaches.length}</p>
                 <p className="text-xs text-muted-foreground mt-1">Breaches Found</p>
               </div>
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div className="rounded-xl border bg-background/50 p-4 text-center cursor-help">
-                      <p className="text-2xl font-bold text-destructive">82<span className="text-sm font-normal text-muted-foreground">/100</span></p>
+                      <p className="text-2xl font-bold text-destructive">{riskScore}<span className="text-sm font-normal text-muted-foreground">/100</span></p>
                       <p className="text-xs text-muted-foreground mt-1">Identity Risk Score</p>
                     </div>
                   </TooltipTrigger>
                   <TooltipContent className="max-w-[220px]">
-                    <p className="text-xs">Your risk score reflects breach severity, data sensitivity, and recency. Higher scores indicate greater exposure.</p>
+                    <p className="text-xs">Your risk score reflects breach severity, data sensitivity, and recency.</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
               <div className="rounded-xl border bg-background/50 p-4 text-center">
-                <p className="text-2xl font-bold text-primary">{eligibleSettlements.length}</p>
+                <p className="text-2xl font-bold text-primary">{eligibleMatches.length}</p>
                 <p className="text-xs text-muted-foreground mt-1">Settlements Matched</p>
               </div>
               <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-center">
@@ -156,50 +301,53 @@ const Scan = () => {
 
           {/* Breach Cards */}
           <div className="space-y-3">
-            {mockBreaches.map((breach) => {
-              const settlement = getSettlementForBreach(breach.company);
+            {breaches.map((breach) => {
+              const match = getSettlementForBreach(breach.source);
+              const settlement = match?.settlement;
               return (
                 <div key={breach.id} className="glass-card p-6 transition-all hover:border-primary/20">
                   <div className="flex items-start justify-between mb-2">
                     <div>
-                      <h3 className="font-semibold">{breach.company}</h3>
-                      <p className="text-xs text-muted-foreground">Breach Year: {breach.breach_year} · {breach.records_affected.toLocaleString()} records</p>
+                      <h3 className="font-semibold">{breach.source}</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Breach Year: {breach.breach_year || "Unknown"}
+                        {breach.record_count_estimate ? ` · ${breach.record_count_estimate.toLocaleString()} records` : ""}
+                      </p>
                     </div>
-                    <span className={`rounded-lg border px-2 py-0.5 text-xs font-semibold capitalize ${severityColor[breach.severity] ?? ""}`}>
-                      {breach.severity}
+                    <span className={`rounded-lg border px-2 py-0.5 text-xs font-semibold capitalize ${severityColor[breach.risk_level] ?? ""}`}>
+                      {breach.risk_level}
                     </span>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-3">{breach.description}</p>
                   <div className="flex flex-wrap gap-1.5 mb-3">
-                    {breach.exposed_data.map((d) => (
+                    {breach.exposed_fields.map((d) => (
                       <span key={d} className="rounded-lg bg-muted px-2 py-0.5 text-xs text-muted-foreground">{d}</span>
                     ))}
                   </div>
-                   <div className="flex flex-col gap-3 border-t border-border pt-3">
-                     <div className="flex items-center gap-4 text-xs">
-                       <div className="flex items-center gap-1.5">
-                         <Check className={`h-3.5 w-3.5 ${settlement ? "text-primary" : "text-muted-foreground"}`} />
-                         <span className={settlement ? "text-primary font-medium" : "text-muted-foreground"}>
-                           Settlement Eligible: {settlement ? "Yes" : "No"}
-                         </span>
-                       </div>
-                       {settlement && (
-                         <div className="flex items-center gap-1.5">
-                           <DollarSign className="h-3.5 w-3.5 text-primary" />
-                           <span className="text-primary font-medium drop-shadow-[0_0_6px_hsl(172_89%_52%/0.3)]">
-                             Est. Payout: ${settlement.payout_min?.toLocaleString()} – ${settlement.payout_max?.toLocaleString()}
-                           </span>
-                         </div>
-                       )}
-                     </div>
-                     {settlement && (
-                       <Link to={`/claims/file?settlement=${settlement.id}`}>
-                         <Button size="sm" className="w-full bg-primary text-primary-foreground hover:shadow-[0_0_15px_hsl(172_89%_52%/0.3)]">
-                           File Claim <ArrowRight className="ml-1 h-3 w-3" />
-                         </Button>
-                       </Link>
-                     )}
-                   </div>
+                  <div className="flex flex-col gap-3 border-t border-border pt-3">
+                    <div className="flex items-center gap-4 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <Check className={`h-3.5 w-3.5 ${settlement ? "text-primary" : "text-muted-foreground"}`} />
+                        <span className={settlement ? "text-primary font-medium" : "text-muted-foreground"}>
+                          Settlement Eligible: {settlement ? "Yes" : "No"}
+                        </span>
+                      </div>
+                      {settlement && (
+                        <div className="flex items-center gap-1.5">
+                          <DollarSign className="h-3.5 w-3.5 text-primary" />
+                          <span className="text-primary font-medium drop-shadow-[0_0_6px_hsl(172_89%_52%/0.3)]">
+                            Est. Payout: ${settlement.payout_min?.toLocaleString()} – ${settlement.payout_max?.toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    {settlement && (
+                      <Link to={`/claims/file?settlement=${settlement.id}`}>
+                        <Button size="sm" className="w-full bg-primary text-primary-foreground hover:shadow-[0_0_15px_hsl(172_89%_52%/0.3)]">
+                          File Claim <ArrowRight className="ml-1 h-3 w-3" />
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
                 </div>
               );
             })}
