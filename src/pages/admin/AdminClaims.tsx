@@ -8,20 +8,36 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Download, Flag, Edit2, FileText, CheckCircle, ExternalLink, Shield, Loader2, DollarSign } from "lucide-react";
+import { Download, Flag, Edit2, FileText, CheckCircle, ExternalLink, Shield, Loader2, DollarSign, Filter, User, Building, Calendar } from "lucide-react";
 import { toast } from "sonner";
 
 type ClaimStatusT = "submitted" | "under_review" | "documentation_required" | "approved" | "rejected" | "paid";
 
+const STATUS_OPTIONS: { value: ClaimStatusT | "all"; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "submitted", label: "Submitted" },
+  { value: "under_review", label: "Under Review" },
+  { value: "documentation_required", label: "Docs Required" },
+  { value: "approved", label: "Approved" },
+  { value: "rejected", label: "Rejected" },
+  { value: "paid", label: "Paid" },
+];
+
 interface ClaimRow {
   id: string;
+  settlement_id: string;
   settlement_name: string;
+  settlement_company: string;
+  settlement_breach_year: number | null;
   status: string;
   est_payout: number;
   filed_at: string | null;
   updated_at: string;
   user_email: string | null;
   user_id: string;
+  user_joined: string | null;
+  doc_count: number;
+  exposed_fields: string[];
 }
 
 interface ClaimDoc {
@@ -39,16 +55,15 @@ const AdminClaims = () => {
   const { user } = useAuth();
   const [claims, setClaims] = useState<ClaimRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<ClaimStatusT | "all">("all");
 
   const [selectedClaim, setSelectedClaim] = useState<ClaimRow | null>(null);
   const [newStatus, setNewStatus] = useState<ClaimStatusT>("submitted");
   const [note, setNote] = useState("");
   const [updating, setUpdating] = useState(false);
 
-  // Payout fields
   const [payoutActual, setPayoutActual] = useState("");
 
-  // Document review
   const [docs, setDocs] = useState<ClaimDoc[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
@@ -62,29 +77,52 @@ const AdminClaims = () => {
     try {
       const { data } = await supabase
         .from("claims")
-        .select(`id, status, est_payout, filed_at, updated_at, user_id, settlements(name)`)
+        .select(`id, status, est_payout, filed_at, updated_at, user_id, settlement_id, settlements(name, company, breach_year)`)
         .order("created_at", { ascending: false })
         .limit(200);
 
       if (data) {
         const userIds = [...new Set(data.map((c: any) => c.user_id))];
-        const { data: profiles } = await supabase
-          .from("user_profiles")
-          .select("user_id, email")
-          .in("user_id", userIds);
 
-        const emailMap: Record<string, string> = {};
-        profiles?.forEach((p: any) => { emailMap[p.user_id] = p.email || ""; });
+        // Fetch profiles and doc counts in parallel
+        const [profilesRes, docsRes, breachesRes] = await Promise.all([
+          supabase.from("user_profiles").select("user_id, email, created_at").in("user_id", userIds),
+          supabase.from("claim_documents").select("claim_id").in("claim_id", data.map((c: any) => c.id)),
+          supabase.from("breach_events").select("user_id, exposed_fields").in("user_id", userIds),
+        ]);
+
+        const emailMap: Record<string, { email: string; joined: string }> = {};
+        profilesRes.data?.forEach((p: any) => {
+          emailMap[p.user_id] = { email: p.email || "", joined: p.created_at };
+        });
+
+        const docCountMap: Record<string, number> = {};
+        docsRes.data?.forEach((d: any) => {
+          docCountMap[d.claim_id] = (docCountMap[d.claim_id] || 0) + 1;
+        });
+
+        // Aggregate exposed fields per user
+        const exposureMap: Record<string, Set<string>> = {};
+        breachesRes.data?.forEach((b: any) => {
+          if (!exposureMap[b.user_id]) exposureMap[b.user_id] = new Set();
+          (b.exposed_fields || []).forEach((f: string) => exposureMap[b.user_id].add(f));
+        });
 
         setClaims(data.map((c: any) => ({
           id: c.id,
+          settlement_id: c.settlement_id,
           settlement_name: c.settlements?.name || "Unknown",
+          settlement_company: c.settlements?.company || "Unknown",
+          settlement_breach_year: c.settlements?.breach_year || null,
           status: c.status,
           est_payout: Number(c.est_payout) || 0,
           filed_at: c.filed_at,
           updated_at: c.updated_at,
-          user_email: emailMap[c.user_id] || "—",
+          user_email: emailMap[c.user_id]?.email || "—",
           user_id: c.user_id,
+          user_joined: emailMap[c.user_id]?.joined || null,
+          doc_count: docCountMap[c.id] || 0,
+          exposed_fields: exposureMap[c.user_id] ? Array.from(exposureMap[c.user_id]) : [],
         })));
       }
     } catch (error) {
@@ -93,6 +131,8 @@ const AdminClaims = () => {
       setLoading(false);
     }
   };
+
+  const filteredClaims = statusFilter === "all" ? claims : claims.filter(c => c.status === statusFilter);
 
   const openClaimDialog = async (claim: ClaimRow) => {
     setSelectedClaim(claim);
@@ -120,7 +160,10 @@ const AdminClaims = () => {
         updated_at: new Date().toISOString(),
       };
 
-      // When approving or paying, calculate payout breakdown
+      if (newStatus === "rejected" && note) {
+        updatePayload.flag_reason = note;
+      }
+
       if ((newStatus === "approved" || newStatus === "paid") && payoutActual) {
         const actual = parseFloat(payoutActual);
         if (!isNaN(actual) && actual > 0) {
@@ -132,7 +175,6 @@ const AdminClaims = () => {
         }
       }
 
-      // If paying, also create payout record
       if (newStatus === "paid" && payoutActual) {
         const actual = parseFloat(payoutActual);
         const fee = Math.round(actual * (FEE_PERCENT / 100) * 100) / 100;
@@ -153,6 +195,7 @@ const AdminClaims = () => {
         .eq("id", selectedClaim.id);
       if (updateError) throw updateError;
 
+      // Insert claim_status_history
       await supabase.from("claim_status_history").insert({
         claim_id: selectedClaim.id,
         status: newStatus,
@@ -160,7 +203,44 @@ const AdminClaims = () => {
         updated_by: user?.email || "admin",
       });
 
-      toast.success("Claim status updated");
+      // Trigger user alert
+      const alertTitle = newStatus === "approved"
+        ? "Your claim has been approved!"
+        : newStatus === "rejected"
+        ? "Your claim has been rejected"
+        : newStatus === "paid"
+        ? "Your payout has been processed!"
+        : `Claim status updated to ${newStatus.replace("_", " ")}`;
+
+      const alertBody = newStatus === "rejected" && note
+        ? `Reason: ${note}`
+        : newStatus === "paid" && payoutActual
+        ? `You will receive $${(parseFloat(payoutActual) - Math.round(parseFloat(payoutActual) * (FEE_PERCENT / 100) * 100) / 100).toLocaleString()} for the ${selectedClaim.settlement_name} settlement.`
+        : newStatus === "approved" && payoutActual
+        ? `Estimated payout: $${parseFloat(payoutActual).toLocaleString()} for the ${selectedClaim.settlement_name} settlement.`
+        : `Your claim for ${selectedClaim.settlement_name} has been updated.`;
+
+      const alertSeverity = newStatus === "rejected" ? "high" : newStatus === "paid" ? "low" : "medium";
+
+      await supabase.from("alerts").insert({
+        user_id: selectedClaim.user_id,
+        type: "claim_update" as const,
+        title: alertTitle,
+        body: alertBody,
+        severity: alertSeverity as any,
+        related_claim_id: selectedClaim.id,
+      });
+
+      // Admin activity log
+      await supabase.from("admin_activity_logs").insert({
+        admin_user_id: user?.id,
+        action: `claim_${newStatus}`,
+        entity_type: "claim",
+        entity_id: selectedClaim.id,
+        meta: { note, payout: payoutActual || null },
+      });
+
+      toast.success("Claim status updated & user notified");
       setClaims(claims.map(c =>
         c.id === selectedClaim.id ? { ...c, status: newStatus, updated_at: new Date().toISOString() } : c
       ));
@@ -210,35 +290,58 @@ const AdminClaims = () => {
         <Button size="sm" variant="outline" className="rounded-xl"><Flag className="mr-1 h-3 w-3" />Flag Suspicious</Button>
       </PageHeader>
 
+      {/* Status Filters */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <Filter className="h-4 w-4 text-muted-foreground" />
+        {STATUS_OPTIONS.map((opt) => {
+          const count = opt.value === "all" ? claims.length : claims.filter(c => c.status === opt.value).length;
+          return (
+            <Button
+              key={opt.value}
+              size="sm"
+              variant={statusFilter === opt.value ? "default" : "outline"}
+              className="rounded-full text-xs"
+              onClick={() => setStatusFilter(opt.value)}
+            >
+              {opt.label} ({count})
+            </Button>
+          );
+        })}
+      </div>
+
       <div className="rounded-2xl border bg-card overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b bg-muted/50">
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">ID</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">User</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Settlement</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Payout</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Filed</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Docs</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
-            ) : claims.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No claims yet</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto" /></td></tr>
+            ) : filteredClaims.length === 0 ? (
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No claims found</td></tr>
             ) : (
-              claims.map((c) => (
-                <tr key={c.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs">{c.id.slice(0, 8)}</td>
+              filteredClaims.map((c) => (
+                <tr key={c.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => openClaimDialog(c)}>
                   <td className="px-4 py-3 text-xs">{c.user_email}</td>
                   <td className="px-4 py-3 font-medium">{c.settlement_name}</td>
                   <td className="px-4 py-3"><StatusPill variant={c.status as any} /></td>
                   <td className="px-4 py-3 text-primary">${c.est_payout.toLocaleString()}</td>
                   <td className="px-4 py-3 text-xs">{c.filed_at || "—"}</td>
                   <td className="px-4 py-3">
-                    <Button size="sm" variant="ghost" className="rounded-lg" onClick={() => openClaimDialog(c)}>
+                    <span className={`inline-flex items-center gap-1 text-xs ${c.doc_count > 0 ? "text-primary" : "text-muted-foreground"}`}>
+                      <FileText className="h-3 w-3" /> {c.doc_count}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <Button size="sm" variant="ghost" className="rounded-lg" onClick={(e) => { e.stopPropagation(); openClaimDialog(c); }}>
                       <Edit2 className="h-3.5 w-3.5" />
                     </Button>
                   </td>
@@ -249,6 +352,7 @@ const AdminClaims = () => {
         </table>
       </div>
 
+      {/* Claim Detail Dialog */}
       <Dialog open={!!selectedClaim} onOpenChange={(open) => !open && setSelectedClaim(null)}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -259,16 +363,52 @@ const AdminClaims = () => {
           </DialogHeader>
 
           <div className="space-y-5">
-            {/* Claim Info */}
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <div className="rounded-lg bg-muted/50 p-3">
-                <p className="text-xs text-muted-foreground">User</p>
-                <p className="font-medium">{selectedClaim?.user_email}</p>
+            {/* User Info */}
+            <div>
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                <User className="h-4 w-4" /> User Info
+              </h4>
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Email</p>
+                  <p className="font-medium truncate">{selectedClaim?.user_email}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Joined</p>
+                  <p className="font-medium">{selectedClaim?.user_joined ? new Date(selectedClaim.user_joined).toLocaleDateString() : "—"}</p>
+                </div>
               </div>
-              <div className="rounded-lg bg-muted/50 p-3">
-                <p className="text-xs text-muted-foreground">Estimated Payout</p>
-                <p className="font-medium text-primary">${selectedClaim?.est_payout.toLocaleString()}</p>
+            </div>
+
+            {/* Settlement Info */}
+            <div>
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                <Building className="h-4 w-4" /> Settlement Info
+              </h4>
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Company</p>
+                  <p className="font-medium">{selectedClaim?.settlement_company}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Breach Year</p>
+                  <p className="font-medium">{selectedClaim?.settlement_breach_year || "—"}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-3">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider">Est. Payout</p>
+                  <p className="font-medium text-primary">${selectedClaim?.est_payout.toLocaleString()}</p>
+                </div>
               </div>
+              {selectedClaim && selectedClaim.exposed_fields.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Exposure Types</p>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedClaim.exposed_fields.map((f) => (
+                      <span key={f} className="text-[10px] px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">{f}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Documents */}
@@ -326,7 +466,6 @@ const AdminClaims = () => {
                 </select>
               </div>
 
-              {/* Payout fields for approve/paid */}
               {showPayoutFields && (
                 <div className="rounded-lg border border-primary/20 bg-primary/5 p-4 space-y-3">
                   <div className="flex items-center gap-2 text-sm font-semibold">
@@ -357,16 +496,26 @@ const AdminClaims = () => {
               )}
 
               <div>
-                <Label className="mb-1.5">Note</Label>
-                <Textarea placeholder="Add a note for the user (optional)" value={note} onChange={(e) => setNote(e.target.value)} className="resize-none" rows={2} />
+                <Label className="mb-1.5">{newStatus === "rejected" ? "Rejection Reason" : "Note"}</Label>
+                <Textarea
+                  placeholder={newStatus === "rejected" ? "Enter rejection reason (required)" : "Add a note for the user (optional)"}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  className="resize-none"
+                  rows={2}
+                />
               </div>
             </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelectedClaim(null)}>Cancel</Button>
-            <Button onClick={handleStatusUpdate} disabled={updating}>
-              {updating ? "Updating..." : "Update Status"}
+            <Button
+              onClick={handleStatusUpdate}
+              disabled={updating || (newStatus === "rejected" && !note)}
+              variant={newStatus === "rejected" ? "destructive" : "default"}
+            >
+              {updating ? "Updating..." : newStatus === "rejected" ? "Reject Claim" : newStatus === "approved" ? "Approve Claim" : newStatus === "paid" ? "Mark as Paid" : "Update Status"}
             </Button>
           </DialogFooter>
         </DialogContent>
