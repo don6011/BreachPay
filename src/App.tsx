@@ -6,8 +6,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
+import { PartnerRoute } from "@/components/PartnerRoute";
 import { AppLayout } from "@/layouts/AppLayout";
 import { AdminLayout } from "@/layouts/AdminLayout";
+import { PartnerLayout } from "@/layouts/PartnerLayout";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -27,6 +29,10 @@ import AdminClaims from "./pages/admin/AdminClaims";
 import AdminActivityLogs from "./pages/admin/AdminActivityLogs";
 import AdminAutomationLogs from "./pages/admin/AdminAutomationLogs";
 import AdminPayouts from "./pages/admin/AdminPayouts";
+import PartnerDashboard from "./pages/partner/PartnerDashboard";
+import PartnerClaims from "./pages/partner/PartnerClaims";
+import PartnerClaimDetail from "./pages/partner/PartnerClaimDetail";
+import PartnerSettings from "./pages/partner/PartnerSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,6 +71,14 @@ const App = () => (
               <Route path="/admin/activity-logs" element={<AdminActivityLogs />} />
               <Route path="/admin/automation-logs" element={<AdminAutomationLogs />} />
               <Route path="/admin/payouts" element={<AdminPayouts />} />
+            </Route>
+
+            {/* Partner Portal - Protected */}
+            <Route element={<PartnerRoute><PartnerLayout /></PartnerRoute>}>
+              <Route path="/partner" element={<PartnerDashboard />} />
+              <Route path="/partner/claims" element={<PartnerClaims />} />
+              <Route path="/partner/claims/:id" element={<PartnerClaimDetail />} />
+              <Route path="/partner/settings" element={<PartnerSettings />} />
             </Route>
 
             <Route path="*" element={<NotFound />} />
