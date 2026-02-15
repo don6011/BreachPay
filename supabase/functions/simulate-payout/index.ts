@@ -1,6 +1,7 @@
 /// <reference lib="deno.ns" />
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import Stripe from "https://esm.sh/stripe@18.5.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -72,9 +73,31 @@ Deno.serve(async (req) => {
     return json({ error: "Claim already paid" }, 400);
   }
 
-  // Generate a simulated Stripe reference for audit trail
-  const stripeRef = `sim_${claim.id.slice(0, 8)}_${Date.now()}`;
+  // Create a Stripe PaymentIntent in test mode for audit trail
   const payoutAmount = claim.net_payout ?? 0;
+  let stripeRef = `sim_${claim.id.slice(0, 8)}_${Date.now()}`;
+
+  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+  if (stripeKey) {
+    try {
+      const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+      const pi = await stripe.paymentIntents.create({
+        amount: Math.round(payoutAmount * 100), // cents
+        currency: "usd",
+        metadata: {
+          claim_id: claim.id,
+          user_id: claim.user_id,
+          type: "payout_simulation",
+        },
+        description: `BreachPay payout for claim ${claim.id.slice(0, 8)}`,
+        confirm: false,
+      });
+      stripeRef = pi.id;
+      console.log("Stripe PaymentIntent created:", pi.id);
+    } catch (stripeErr) {
+      console.warn("Stripe PI creation failed, using sim ref:", stripeErr);
+    }
+  }
 
   // Insert payout record
   const { error: payoutErr } = await supabase.from("payouts").insert({
