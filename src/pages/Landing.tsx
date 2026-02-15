@@ -140,14 +140,9 @@ const Landing = () => {
           }}
         />
         <div className="relative mx-auto max-w-4xl px-6 text-center">
-          {/* Pulsing Shield */}
-          <div className="mb-6 flex justify-center">
-            <div className="relative">
-              <div className="absolute inset-0 rounded-full bg-primary/20 animate-[pulse_3s_cubic-bezier(0.4,0,0.6,1)_infinite]" />
-              <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-primary/30 bg-primary/10">
-                <Shield className="h-7 w-7 text-primary" />
-              </div>
-            </div>
+          {/* Logo */}
+          <div className="mb-8 flex justify-center">
+            <img src={logo} alt="BreachPay" className="h-24 sm:h-28 lg:h-32 w-auto drop-shadow-[0_0_30px_hsl(172_89%_52%/0.25)]" />
           </div>
 
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
