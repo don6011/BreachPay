@@ -6,7 +6,7 @@ import { AlertRow } from "@/components/AlertRow";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { ShieldAlert, Scale, DollarSign, FileText, Activity, Search, ArrowRight } from "lucide-react";
+import { ShieldAlert, Scale, DollarSign, FileText, Activity, Search, ArrowRight, Wallet, Clock, CheckCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Dashboard = () => {
@@ -18,6 +18,9 @@ const Dashboard = () => {
   const [totalEstimated, setTotalEstimated] = useState(0);
   const [claimsCount, setClaimsCount] = useState(0);
   const [alerts, setAlerts] = useState<any[]>([]);
+  const [totalRecovered, setTotalRecovered] = useState(0);
+  const [pendingPayouts, setPendingPayouts] = useState(0);
+  const [approvedValue, setApprovedValue] = useState(0);
 
   useEffect(() => {
     if (!user) return;
@@ -56,6 +59,38 @@ const Dashboard = () => {
           .select("*", { count: "exact", head: true })
           .eq("user_id", user.id);
         setClaimsCount(count || 0);
+
+        // Payout wallet data
+        const [payoutsRes, claimsFullRes] = await Promise.all([
+          supabase
+            .from("payouts")
+            .select("amount, status")
+            .eq("user_id", user.id),
+          supabase
+            .from("claims")
+            .select("status, net_payout, est_payout")
+            .eq("user_id", user.id),
+        ]);
+
+        if (payoutsRes.data) {
+          setTotalRecovered(
+            payoutsRes.data
+              .filter((p: any) => p.status === "paid")
+              .reduce((a: number, p: any) => a + (Number(p.amount) || 0), 0)
+          );
+        }
+        if (claimsFullRes.data) {
+          setPendingPayouts(
+            claimsFullRes.data
+              .filter((c: any) => c.status === "approved")
+              .reduce((a: number, c: any) => a + (Number(c.net_payout) || Number(c.est_payout) || 0), 0)
+          );
+          setApprovedValue(
+            claimsFullRes.data
+              .filter((c: any) => c.status === "approved" || c.status === "paid")
+              .reduce((a: number, c: any) => a + (Number(c.net_payout) || Number(c.est_payout) || 0), 0)
+          );
+        }
 
         // Recent alerts
         const { data: alertsData } = await supabase
@@ -115,7 +150,25 @@ const Dashboard = () => {
           <Button variant="outline" asChild className="rounded-xl">
             <Link to="/claims">Track Claims <ArrowRight className="ml-2 h-4 w-4" /></Link>
           </Button>
+      </div>
+
+      {/* Compensation Wallet */}
+      <div className="mt-8">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Wallet className="h-4 w-4 text-primary" />
+            <h2 className="text-lg font-semibold">Compensation Wallet</h2>
+          </div>
+          <Button variant="ghost" size="sm" asChild className="rounded-xl text-xs">
+            <Link to="/claims">View All <ArrowRight className="ml-1 h-3 w-3" /></Link>
+          </Button>
         </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatCard icon={Wallet} label="Total Recovered" value={loading ? "—" : `$${totalRecovered.toLocaleString()}`} variant="teal" />
+          <StatCard icon={Clock} label="Pending Payouts" value={loading ? "—" : `$${pendingPayouts.toLocaleString()}`} />
+          <StatCard icon={CheckCircle} label="Approved Value" value={loading ? "—" : `$${approvedValue.toLocaleString()}`} variant="teal" />
+        </div>
+      </div>
       </div>
 
       {/* Recent Alerts */}
