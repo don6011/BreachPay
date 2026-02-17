@@ -23,6 +23,17 @@ const STATUS_OPTIONS: { value: ClaimStatusT | "all"; label: string }[] = [
   { value: "paid", label: "Paid" },
 ];
 
+interface BreachEvidence {
+  source: string;
+  breach_year: number | null;
+  risk_level: string;
+  exposed_fields: string[];
+  catalog_verified: boolean;
+  source_type: string | null;
+  source_name: string | null;
+  source_url: string | null;
+}
+
 interface ClaimRow {
   id: string;
   settlement_id: string;
@@ -76,6 +87,8 @@ const AdminClaims = () => {
 
   const [partnerOptions, setPartnerOptions] = useState<PartnerOption[]>([]);
   const [assigningPartner, setAssigningPartner] = useState(false);
+  const [breachEvidence, setBreachEvidence] = useState<BreachEvidence[]>([]);
+  const [loadingEvidence, setLoadingEvidence] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -159,15 +172,38 @@ const AdminClaims = () => {
     setNote("");
     setPayoutActual("");
     setLoadingDocs(true);
+    setLoadingEvidence(true);
+    setBreachEvidence([]);
 
-    const { data } = await supabase
-      .from("claim_documents")
-      .select("id, file_path, file_type, note, created_at, verified")
-      .eq("claim_id", claim.id)
-      .order("created_at", { ascending: true });
+    const [docsRes, evidenceRes] = await Promise.all([
+      supabase
+        .from("claim_documents")
+        .select("id, file_path, file_type, note, created_at, verified")
+        .eq("claim_id", claim.id)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("breach_events")
+        .select("source, breach_year, risk_level, exposed_fields, breach_catalog(verified, source_type, source_name, source_url)")
+        .eq("user_id", claim.user_id)
+        .limit(10),
+    ]);
 
-    setDocs((data as ClaimDoc[]) || []);
+    setDocs((docsRes.data as ClaimDoc[]) || []);
     setLoadingDocs(false);
+
+    if (evidenceRes.data) {
+      setBreachEvidence(evidenceRes.data.map((b: any) => ({
+        source: b.source,
+        breach_year: b.breach_year,
+        risk_level: b.risk_level,
+        exposed_fields: b.exposed_fields || [],
+        catalog_verified: b.breach_catalog?.verified || false,
+        source_type: b.breach_catalog?.source_type || null,
+        source_name: b.breach_catalog?.source_name || null,
+        source_url: b.breach_catalog?.source_url || null,
+      })));
+    }
+    setLoadingEvidence(false);
   };
 
   const handleStatusUpdate = async () => {
@@ -450,6 +486,57 @@ const AdminClaims = () => {
                       <span key={f} className="text-[10px] px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">{f}</span>
                     ))}
                   </div>
+                </div>
+              )}
+            </div>
+
+            {/* Breach Evidence Summary */}
+            <div>
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                <Shield className="h-4 w-4" /> Breach Evidence
+              </h4>
+              {loadingEvidence ? (
+                <div className="flex justify-center py-3"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+              ) : breachEvidence.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-3 bg-muted/30 rounded-lg">No breach evidence found</p>
+              ) : (
+                <div className="space-y-2">
+                  {breachEvidence.map((ev, idx) => (
+                    <div key={idx} className="rounded-lg border p-3 text-sm space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{ev.source}</span>
+                          {ev.breach_year && <span className="text-xs text-muted-foreground">({ev.breach_year})</span>}
+                          {ev.catalog_verified && (
+                            <span className="text-[10px] bg-success/10 text-success px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                              <CheckCircle className="h-2.5 w-2.5" /> Verified
+                            </span>
+                          )}
+                        </div>
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
+                          ev.risk_level === "critical" ? "bg-destructive/10 text-destructive" :
+                          ev.risk_level === "high" ? "bg-destructive/10 text-destructive" :
+                          ev.risk_level === "medium" ? "bg-warning/10 text-warning" :
+                          "bg-muted text-muted-foreground"
+                        }`}>{ev.risk_level}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {ev.exposed_fields.map(f => (
+                          <span key={f} className="text-[10px] px-1.5 py-0.5 rounded-full bg-destructive/10 text-destructive">{f}</span>
+                        ))}
+                      </div>
+                      {(ev.source_type || ev.source_name) && (
+                        <p className="text-[10px] text-muted-foreground">
+                          Source: {ev.source_type}{ev.source_name ? `: ${ev.source_name}` : ""}
+                          {ev.source_url && (
+                            <a href={ev.source_url} target="_blank" rel="noopener noreferrer" className="ml-1 text-primary hover:underline inline-flex items-center gap-0.5">
+                              View <ExternalLink className="h-2.5 w-2.5" />
+                            </a>
+                          )}
+                        </p>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

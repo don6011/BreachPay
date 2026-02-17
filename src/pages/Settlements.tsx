@@ -10,8 +10,9 @@ import {
   Zap, ChevronDown, Sparkles, TrendingUp, CheckCircle2, Target,
 } from "lucide-react";
 import type { SettlementStatus } from "@/types";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "@/hooks/use-toast";
 
 type FilterTab = "all" | SettlementStatus | "filed";
 type SortOption = "payout" | "deadline" | "newest";
@@ -53,12 +54,14 @@ interface ClaimData {
 
 const Settlements = () => {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<FilterTab>("all");
   const [sort, setSort] = useState<SortOption>("payout");
   const [showSort, setShowSort] = useState(false);
   const [settlements, setSettlements] = useState<SettlementData[]>([]);
   const [claims, setClaims] = useState<ClaimData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filingId, setFilingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -139,6 +142,56 @@ const Settlements = () => {
     const claim = claimMap[settlementId];
     if (!claim) return "not_filed";
     return claim.status;
+  };
+
+  const handleFileClaim = async (settlement: SettlementData) => {
+    if (!user || filingId) return;
+    setFilingId(settlement.id);
+    try {
+      // Check for existing claim
+      const { data: existing } = await supabase
+        .from("claims")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("settlement_id", settlement.id)
+        .maybeSingle();
+
+      if (existing) {
+        navigate(`/claims/${existing.id}`);
+        return;
+      }
+
+      const estPayout = (settlement.payout_min + settlement.payout_max) / 2;
+
+      const { data: claimData, error } = await supabase
+        .from("claims")
+        .insert({
+          user_id: user.id,
+          settlement_id: settlement.id,
+          est_payout: estPayout,
+          filed_at: new Date().toISOString().split("T")[0],
+          status: "submitted",
+        })
+        .select("id")
+        .single();
+
+      if (error) throw error;
+
+      await supabase.from("claim_status_history").insert({
+        claim_id: claimData.id,
+        status: "submitted",
+        note: "Claim submitted",
+        updated_by: "user",
+      });
+
+      toast({ title: "Claim Filed", description: `Your claim for ${settlement.name} has been submitted for review.` });
+      navigate(`/claims/${claimData.id}`);
+    } catch (err) {
+      console.error("File claim error:", err);
+      toast({ title: "Error", description: "Failed to file claim. Please try again.", variant: "destructive" });
+    } finally {
+      setFilingId(null);
+    }
   };
 
   if (loading) {
@@ -352,12 +405,21 @@ const Settlements = () => {
                   {/* Actions */}
                   <div className="flex items-center gap-2 mt-1">
                     {settlement.status === "open" && filingStatus === "not_filed" ? (
-                      <Button size="sm" asChild className="rounded-xl shadow-[0_0_16px_hsl(172_89%_52%/0.2)] hover:shadow-[0_0_24px_hsl(172_89%_52%/0.35)] transition-all duration-300">
-                        <Link to={`/claims/file?settlement=${settlement.id}`}>File Claim <ArrowRight className="ml-1 h-3 w-3" /></Link>
+                      <Button
+                        size="sm"
+                        className="rounded-xl shadow-[0_0_16px_hsl(172_89%_52%/0.2)] hover:shadow-[0_0_24px_hsl(172_89%_52%/0.35)] transition-all duration-300"
+                        disabled={filingId === settlement.id}
+                        onClick={() => handleFileClaim(settlement)}
+                      >
+                        {filingId === settlement.id ? (
+                          <><span className="h-3 w-3 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent mr-1" /> Filing...</>
+                        ) : (
+                          <>File Claim <ArrowRight className="ml-1 h-3 w-3" /></>
+                        )}
                       </Button>
                     ) : filingStatus !== "not_filed" && filingStatus !== "paid" ? (
                       <Button size="sm" variant="outline" asChild className="rounded-xl">
-                        <Link to="/claims">Track Claim</Link>
+                        <Link to={`/claims/${claimMap[settlement.id]?.id}`}>Track Claim</Link>
                       </Button>
                     ) : null}
                     {settlement.match_reason && (
