@@ -8,8 +8,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowLeft, FileText, Upload, CheckCircle, Clock, DollarSign,
-  AlertTriangle, Shield, Loader2, X, ExternalLink, MessageSquare,
+  AlertTriangle, Shield, Loader2, X, ExternalLink, MessageSquare, Info,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
 import { useRef } from "react";
 
@@ -207,13 +208,44 @@ const ClaimTracker = () => {
             <StatusPill variant={claim.status as any} />
           </div>
 
+          {/* Deadline Countdown */}
+          {claim.settlement?.deadline && (() => {
+            const daysLeft = Math.max(0, Math.ceil((new Date(claim.settlement.deadline).getTime() - Date.now()) / 86400000));
+            const isUrgent = daysLeft <= 30;
+            return (
+              <div className={`flex items-center gap-2 rounded-xl p-3 ${isUrgent ? "bg-destructive/10 border border-destructive/20" : "bg-muted/50"}`}>
+                {isUrgent ? <AlertTriangle className="h-4 w-4 text-destructive shrink-0" /> : <Clock className="h-4 w-4 text-muted-foreground shrink-0" />}
+                <div className="flex-1">
+                  <p className={`text-sm font-semibold ${isUrgent ? "text-destructive" : ""}`}>
+                    {daysLeft} days until deadline
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Settlement deadline: {new Date(claim.settlement.deadline).toLocaleDateString()}
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="rounded-xl bg-muted/50 p-3">
               <p className="text-xs text-muted-foreground mb-1">Filing Date</p>
               <p className="text-sm font-semibold">{claim.filed_at ? new Date(claim.filed_at).toLocaleDateString() : "—"}</p>
             </div>
             <div className="rounded-xl bg-muted/50 p-3">
-              <p className="text-xs text-muted-foreground mb-1">Estimated Payout</p>
+              <div className="flex items-center gap-1 mb-1">
+                <p className="text-xs text-muted-foreground">Estimated Payout</p>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-3 w-3 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-[240px] bg-card border text-sm">
+                      Estimates are based on settlement terms, verification status, and historical payout ranges. Final amounts depend on administrator review and settlement rules.
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
               <p className="text-sm font-semibold text-primary">${claim.est_payout.toLocaleString()}</p>
             </div>
             <div className="rounded-xl bg-muted/50 p-3">
@@ -398,6 +430,11 @@ const ClaimTracker = () => {
             </div>
           )}
         </div>
+
+        {/* Legal Disclaimer */}
+        <p className="text-xs text-muted-foreground text-center pt-2 pb-4">
+          BreachPay is not a law firm and does not provide legal advice. Estimated payouts are pending review and subject to settlement terms. Service fee of 15% applies only upon successful payout.
+        </p>
       </div>
     </div>
   );
