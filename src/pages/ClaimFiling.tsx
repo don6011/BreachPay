@@ -2,6 +2,8 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { DeadlineBadge, isDeadlinePassed } from "@/components/DeadlineBadge";
+import { PayoutRange } from "@/components/PayoutRange";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import {
   Shield, Lock, ChevronRight, ChevronLeft, Upload, FileText,
-  Clock, AlertTriangle, CheckCircle, DollarSign, Camera, X,
+  Clock, AlertTriangle, CheckCircle, DollarSign, Camera, X, XCircle,
   Bookmark, Eye, Send, Sparkles, ArrowRight, Loader2, ExternalLink,
 } from "lucide-react";
 
@@ -243,6 +245,27 @@ const ClaimFiling = () => {
       </div>
     );
   }
+  const deadlinePassed = isDeadlinePassed(effectiveDeadline);
+
+  if (deadlinePassed) {
+    return (
+      <div>
+        <PageHeader title="Filing Closed" subtitle="The deadline for this settlement has passed" />
+        <div className="mx-auto max-w-lg text-center space-y-4">
+          <div className="rounded-2xl border bg-card p-8">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
+              <XCircle className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h2 className="text-xl font-bold mb-2">Deadline Passed</h2>
+            <p className="text-sm text-muted-foreground mb-4">
+              The filing deadline for <span className="font-semibold text-foreground">{settlement.name}</span> was {effectiveDeadline}. Claims can no longer be submitted.
+            </p>
+            <Button onClick={() => navigate("/settlements")}>View Other Settlements</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (submitted) {
     return (
@@ -260,7 +283,7 @@ const ClaimFiling = () => {
             <div className="rounded-xl bg-muted/50 p-4 mb-6 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Estimated Payout</span>
-                <span className="font-semibold text-primary">${settlement.payout_min} – ${settlement.payout_max}</span>
+                <span className="font-semibold text-primary">{settlement.payout_min > 0 && settlement.payout_max > 0 && settlement.payout_min !== settlement.payout_max ? `$${settlement.payout_min.toLocaleString()} – $${settlement.payout_max.toLocaleString()}` : `Up to $${Math.max(settlement.payout_min, settlement.payout_max).toLocaleString()}`}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Service Fee</span>
@@ -351,9 +374,8 @@ const ClaimFiling = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-muted/50 p-4">
                   <p className="text-xs text-muted-foreground mb-1">Estimated Payout</p>
-                  <p className="text-lg font-bold text-primary drop-shadow-[0_0_8px_hsl(172_89%_52%/0.4)]">
-                    ${settlement.payout_min} – ${settlement.payout_max}
-                  </p>
+                  <PayoutRange min={settlement.payout_min} max={settlement.payout_max} size="md" />
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Subject to administrator review</p>
                   <p className="text-[10px] text-muted-foreground mt-0.5">Subject to administrator review</p>
                 </div>
                 <div className="rounded-xl bg-muted/50 p-4">
