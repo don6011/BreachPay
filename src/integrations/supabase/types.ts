@@ -846,52 +846,79 @@ export type Database = {
       }
       settlements: {
         Row: {
+          administrator_name: string | null
           breach_year: number | null
+          case_number: string | null
+          claim_deadline: string | null
+          claims_filing_url: string | null
           company: string
           created_at: string
           created_by: string | null
           deadline: string | null
           description: string | null
           id: string
+          jurisdiction: string | null
           name: string
+          notes_internal: string | null
+          official_source_url: string | null
           payout_max: number | null
           payout_min: number | null
           status: Database["public"]["Enums"]["settlement_status_t"]
           tags: string[]
           updated_at: string
           url: string | null
+          verification_level: string
+          verified: boolean
         }
         Insert: {
+          administrator_name?: string | null
           breach_year?: number | null
+          case_number?: string | null
+          claim_deadline?: string | null
+          claims_filing_url?: string | null
           company: string
           created_at?: string
           created_by?: string | null
           deadline?: string | null
           description?: string | null
           id?: string
+          jurisdiction?: string | null
           name: string
+          notes_internal?: string | null
+          official_source_url?: string | null
           payout_max?: number | null
           payout_min?: number | null
           status?: Database["public"]["Enums"]["settlement_status_t"]
           tags?: string[]
           updated_at?: string
           url?: string | null
+          verification_level?: string
+          verified?: boolean
         }
         Update: {
+          administrator_name?: string | null
           breach_year?: number | null
+          case_number?: string | null
+          claim_deadline?: string | null
+          claims_filing_url?: string | null
           company?: string
           created_at?: string
           created_by?: string | null
           deadline?: string | null
           description?: string | null
           id?: string
+          jurisdiction?: string | null
           name?: string
+          notes_internal?: string | null
+          official_source_url?: string | null
           payout_max?: number | null
           payout_min?: number | null
           status?: Database["public"]["Enums"]["settlement_status_t"]
           tags?: string[]
           updated_at?: string
           url?: string | null
+          verification_level?: string
+          verified?: boolean
         }
         Relationships: []
       }
