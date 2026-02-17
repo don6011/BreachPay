@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
+import { VerificationBadge } from "@/components/VerificationBadge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
@@ -9,7 +10,6 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowLeft, FileText, Upload, CheckCircle, Clock, DollarSign,
   AlertTriangle, Shield, Loader2, X, ExternalLink, MessageSquare, Info,
-  ShieldCheck,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
@@ -23,12 +23,6 @@ const PROGRESS_STEPS = [
 ];
 
 const DOC_TYPES = ["ID Verification", "Address Proof", "Breach Notice", "Expense Proof"];
-
-const VERIFICATION_LABELS: Record<string, string> = {
-  source_linked: "Source linked",
-  court_verified: "Court verified",
-  administrator_confirmed: "Administrator confirmed",
-};
 
 interface ClaimDetail {
   id: string;
@@ -53,6 +47,7 @@ interface ClaimDetail {
     official_source_url: string | null;
     claims_filing_url: string | null;
     administrator_name: string | null;
+    source_url: string | null;
   } | null;
 }
 
@@ -100,7 +95,7 @@ const ClaimTracker = () => {
         .from("claims")
         .select(`
           id, status, est_payout, filed_at, updated_at, fee_percent, final_payout, flag_reason,
-          settlements(id, name, company, breach_year, deadline, payout_min, payout_max, verified, verification_level, claim_deadline, official_source_url, claims_filing_url, administrator_name)
+          settlements(id, name, company, breach_year, deadline, payout_min, payout_max, verified, verification_level, claim_deadline, official_source_url, claims_filing_url, administrator_name, source_url)
         `)
         .eq("id", claimId)
         .maybeSingle(),
@@ -133,6 +128,7 @@ const ClaimTracker = () => {
           official_source_url: c.settlements.official_source_url || null,
           claims_filing_url: c.settlements.claims_filing_url || null,
           administrator_name: c.settlements.administrator_name || null,
+          source_url: c.settlements.source_url || null,
         } : null,
       });
     }
@@ -219,28 +215,17 @@ const ClaimTracker = () => {
 
         {/* Verified Settlement Callout */}
         {claim.settlement?.verified && (
-          <div className="rounded-xl border border-green-200 dark:border-green-800/40 bg-green-50 dark:bg-green-900/10 p-3 flex items-start gap-3">
-            <ShieldCheck className="h-4 w-4 text-green-700 dark:text-green-400 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-green-800 dark:text-green-300">Verified settlement</p>
-              <p className="text-xs text-green-700/80 dark:text-green-400/70">
-                {VERIFICATION_LABELS[claim.settlement.verification_level] || "Verified"}
-                {claim.settlement.administrator_name && ` by ${claim.settlement.administrator_name}`}.
-                Eligibility depends on settlement administrator review.
-              </p>
-              <div className="flex gap-2 mt-1">
-                {claim.settlement.official_source_url && (
-                  <a href={claim.settlement.official_source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline">
-                    <ExternalLink className="h-2.5 w-2.5" /> Official source
-                  </a>
-                )}
-                {claim.settlement.claims_filing_url && (
-                  <a href={claim.settlement.claims_filing_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline">
-                    <ExternalLink className="h-2.5 w-2.5" /> Claims filing site
-                  </a>
-                )}
-              </div>
-            </div>
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+            <VerificationBadge
+              level={claim.settlement.verification_level}
+              verified={claim.settlement.verified}
+              sourceUrl={claim.settlement.official_source_url || claim.settlement.source_url}
+            />
+            {claim.settlement.claims_filing_url && (
+              <a href={claim.settlement.claims_filing_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-2 ml-6.5">
+                <ExternalLink className="h-3 w-3" /> Claims filing site
+              </a>
+            )}
           </div>
         )}
 
@@ -424,69 +409,48 @@ const ClaimTracker = () => {
 
           {documents.length > 0 && (
             <div className="space-y-2">
-              {documents.map(doc => (
-                <div key={doc.id} className={`flex items-center justify-between rounded-lg px-4 py-2.5 ${doc.verified ? "bg-success/10 border border-success/20" : "bg-muted/50"}`}>
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <FileText className="h-4 w-4 text-primary shrink-0" />
-                    <div className="min-w-0">
-                      <p className="text-sm truncate">{doc.note || doc.file_path.split("/").pop()}</p>
-                      <p className="text-[10px] text-muted-foreground">{new Date(doc.created_at).toLocaleString()}</p>
-                    </div>
-                    {doc.file_type && (
-                      <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full shrink-0">{doc.file_type}</span>
-                    )}
-                    {doc.verified && (
-                      <span className="text-[10px] bg-success/10 text-success px-2 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">
-                        <CheckCircle className="h-2.5 w-2.5" /> Verified
-                      </span>
-                    )}
+              {documents.map((doc) => (
+                <div key={doc.id} className="flex items-center gap-3 rounded-xl bg-muted/30 p-3">
+                  <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{doc.note || doc.file_path.split("/").pop()}</p>
+                    <p className="text-xs text-muted-foreground">{doc.file_type} · {new Date(doc.created_at).toLocaleDateString()}</p>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-7 px-2 shrink-0 ml-2"
-                    onClick={async () => {
-                      const { data } = await supabase.storage
-                        .from("claim-documents")
-                        .createSignedUrl(doc.file_path, 600);
-                      if (data?.signedUrl) window.open(data.signedUrl, "_blank");
-                      else toast({ title: "Failed to generate download link", variant: "destructive" });
-                    }}
-                  >
-                    <ExternalLink className="h-3.5 w-3.5 mr-1" />
-                    <span className="text-xs">Download</span>
-                  </Button>
+                  {doc.verified ? (
+                    <span className="inline-flex items-center gap-1 text-[10px] text-success font-medium">
+                      <CheckCircle className="h-3 w-3" /> Verified
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground">Pending review</span>
+                  )}
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Activity Timeline */}
+        {/* Status History */}
         <div className="rounded-2xl border bg-card p-6 space-y-4">
           <h3 className="text-sm font-semibold">Activity Timeline</h3>
           {history.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">No activity yet</p>
+            <p className="text-sm text-muted-foreground">No activity yet.</p>
           ) : (
-            <div className="space-y-0">
+            <div className="space-y-3">
               {history.map((entry, i) => (
-                <div key={entry.id} className="flex gap-3">
-                  {/* Timeline line */}
+                <div key={entry.id} className="flex items-start gap-3">
                   <div className="flex flex-col items-center">
-                    <div className={`h-3 w-3 rounded-full mt-1 ${
-                      i === history.length - 1 ? "bg-primary ring-2 ring-primary/30" : "bg-muted"
-                    }`} />
-                    {i < history.length - 1 && <div className="w-0.5 flex-1 bg-border my-1" />}
+                    <div className={`h-2.5 w-2.5 rounded-full ${i === history.length - 1 ? "bg-primary ring-2 ring-primary/30" : "bg-muted-foreground/30"}`} />
+                    {i < history.length - 1 && <div className="w-0.5 flex-1 bg-border mt-1" />}
                   </div>
-                  <div className="pb-4">
+                  <div className="flex-1 pb-3">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">{entry.note || `Status: ${entry.status}`}</p>
-                      <StatusPill variant={entry.status as any} className="text-[9px] px-1.5 py-0" />
+                      <StatusPill variant={entry.status as any} />
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(entry.created_at).toLocaleDateString()} {new Date(entry.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {new Date(entry.created_at).toLocaleString()}
-                      {entry.updated_by && ` · by ${entry.updated_by}`}
-                    </p>
+                    {entry.note && <p className="text-sm text-muted-foreground mt-1">{entry.note}</p>}
+                    {entry.updated_by && <p className="text-[10px] text-muted-foreground mt-0.5">By: {entry.updated_by}</p>}
                   </div>
                 </div>
               ))}
@@ -494,9 +458,8 @@ const ClaimTracker = () => {
           )}
         </div>
 
-        {/* Legal Disclaimer */}
-        <p className="text-xs text-muted-foreground text-center pt-2 pb-4">
-          BreachPay is not a law firm and does not provide legal advice. Estimated payouts are pending review and subject to settlement terms. Service fee of 15% applies only upon successful payout. Filing deadline is enforced by the settlement administrator.
+        <p className="text-[11px] text-muted-foreground text-center">
+          Eligibility depends on settlement administrator review. Estimated payouts are subject to settlement terms.
         </p>
       </div>
     </div>

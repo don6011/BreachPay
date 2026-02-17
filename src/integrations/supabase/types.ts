@@ -858,16 +858,21 @@ export type Database = {
           description: string | null
           id: string
           jurisdiction: string | null
+          last_verified_at: string | null
           name: string
           notes_internal: string | null
           official_source_url: string | null
           payout_max: number | null
           payout_min: number | null
+          source_name: string | null
+          source_type: string | null
+          source_url: string | null
           status: Database["public"]["Enums"]["settlement_status_t"]
           tags: string[]
           updated_at: string
           url: string | null
           verification_level: string
+          verification_notes: string | null
           verified: boolean
         }
         Insert: {
@@ -883,16 +888,21 @@ export type Database = {
           description?: string | null
           id?: string
           jurisdiction?: string | null
+          last_verified_at?: string | null
           name: string
           notes_internal?: string | null
           official_source_url?: string | null
           payout_max?: number | null
           payout_min?: number | null
+          source_name?: string | null
+          source_type?: string | null
+          source_url?: string | null
           status?: Database["public"]["Enums"]["settlement_status_t"]
           tags?: string[]
           updated_at?: string
           url?: string | null
           verification_level?: string
+          verification_notes?: string | null
           verified?: boolean
         }
         Update: {
@@ -908,16 +918,21 @@ export type Database = {
           description?: string | null
           id?: string
           jurisdiction?: string | null
+          last_verified_at?: string | null
           name?: string
           notes_internal?: string | null
           official_source_url?: string | null
           payout_max?: number | null
           payout_min?: number | null
+          source_name?: string | null
+          source_type?: string | null
+          source_url?: string | null
           status?: Database["public"]["Enums"]["settlement_status_t"]
           tags?: string[]
           updated_at?: string
           url?: string | null
           verification_level?: string
+          verification_notes?: string | null
           verified?: boolean
         }
         Relationships: []

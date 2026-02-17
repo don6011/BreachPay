@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
+import { VerificationBadge } from "@/components/VerificationBadge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Scale, DollarSign, Clock, ArrowRight, Shield, AlertTriangle, FileCheck,
   Zap, ChevronDown, Sparkles, TrendingUp, CheckCircle2, Target,
-  ShieldCheck, ExternalLink, Gavel, Building,
+  ExternalLink,
 } from "lucide-react";
 import type { SettlementStatus } from "@/types";
 import { Link, useNavigate } from "react-router-dom";
@@ -45,7 +46,6 @@ interface SettlementData {
   description: string | null;
   match_reason: string | null;
   payout_estimate: number | null;
-  // Verification fields
   verified: boolean;
   verification_level: string;
   jurisdiction: string | null;
@@ -54,6 +54,7 @@ interface SettlementData {
   official_source_url: string | null;
   claims_filing_url: string | null;
   claim_deadline: string | null;
+  source_url: string | null;
 }
 
 interface ClaimData {
@@ -62,12 +63,6 @@ interface ClaimData {
   status: string;
   est_payout: number | null;
 }
-
-const VERIFICATION_LABELS: Record<string, string> = {
-  source_linked: "Source linked",
-  court_verified: "Court verified",
-  administrator_confirmed: "Administrator confirmed",
-};
 
 const Settlements = () => {
   const { user } = useAuth();
@@ -88,7 +83,7 @@ const Settlements = () => {
       try {
         const { data: matchData } = await supabase
           .from("settlement_matches")
-          .select("settlement_id, match_reason, payout_estimate, settlements(id, name, company, breach_year, status, payout_min, payout_max, deadline, description, verified, verification_level, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, claim_deadline)")
+          .select("settlement_id, match_reason, payout_estimate, settlements(id, name, company, breach_year, status, payout_min, payout_max, deadline, description, verified, verification_level, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, claim_deadline, source_url)")
           .eq("user_id", user.id);
 
         if (matchData) {
@@ -112,6 +107,7 @@ const Settlements = () => {
             official_source_url: m.settlements?.official_source_url,
             claims_filing_url: m.settlements?.claims_filing_url,
             claim_deadline: m.settlements?.claim_deadline,
+            source_url: m.settlements?.source_url,
           })));
         }
 
@@ -370,20 +366,13 @@ const Settlements = () => {
                             <CheckCircle2 className="h-2.5 w-2.5" /> ELIGIBLE
                           </span>
                         )}
-                        {settlement.verified && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-[10px] font-semibold text-green-800 dark:text-green-400">
-                            <ShieldCheck className="h-2.5 w-2.5" /> Verified
-                          </span>
-                        )}
+                        <VerificationBadge
+                          level={settlement.verification_level}
+                          verified={settlement.verified}
+                          compact
+                        />
                       </div>
                       <p className="text-xs text-muted-foreground">{settlement.company} · {settlement.breach_year}</p>
-                      {/* Credibility line */}
-                      {settlement.verified && settlement.verification_level !== "unverified" && (
-                        <p className="text-[10px] text-muted-foreground mt-0.5">
-                          {VERIFICATION_LABELS[settlement.verification_level] || settlement.verification_level}
-                          {settlement.administrator_name && ` · ${settlement.administrator_name}`}
-                        </p>
-                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       {filingStatus !== "not_filed" && <StatusPill variant={filingStatus as any} />}
@@ -409,9 +398,9 @@ const Settlements = () => {
                         <span className={isUrgent ? "font-semibold" : ""}>{daysLeft} days left</span>
                       </div>
                     )}
-                    {settlement.official_source_url && (
-                      <a href={settlement.official_source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] font-medium text-primary hover:underline">
-                        <ExternalLink className="h-2.5 w-2.5" /> View official source
+                    {(settlement.official_source_url || settlement.source_url) && (
+                      <a href={settlement.official_source_url || settlement.source_url!} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] font-medium text-primary hover:underline">
+                        <ExternalLink className="h-2.5 w-2.5" /> View source
                       </a>
                     )}
                     {settlement.status === "open" && filingStatus === "not_filed" && (
@@ -454,7 +443,6 @@ const Settlements = () => {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 mt-1">
-                    {/* Detail button */}
                     <Button size="sm" variant="ghost" className="rounded-xl text-xs" onClick={() => setDetailSettlement(settlement)}>
                       Details
                     </Button>
@@ -513,54 +501,34 @@ const Settlements = () => {
 
               {/* Verification & Source Panel */}
               <div className="rounded-xl border p-4 space-y-3">
-                <h4 className="text-sm font-semibold flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4" /> Verification & Source
-                </h4>
-                {detailSettlement.verified ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/30 px-2.5 py-1 text-xs font-semibold text-green-800 dark:text-green-400">
-                        <ShieldCheck className="h-3 w-3" /> Verified
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {VERIFICATION_LABELS[detailSettlement.verification_level] || detailSettlement.verification_level}
-                      </span>
-                    </div>
-                    {detailSettlement.jurisdiction && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Gavel className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-muted-foreground">Jurisdiction:</span>
-                        <span>{detailSettlement.jurisdiction}</span>
-                      </div>
-                    )}
-                    {detailSettlement.case_number && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="text-muted-foreground ml-5">Case:</span>
-                        <span>{detailSettlement.case_number}</span>
-                      </div>
-                    )}
-                    {detailSettlement.administrator_name && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <Building className="h-3.5 w-3.5 text-muted-foreground" />
-                        <span className="text-muted-foreground">Administrator:</span>
-                        <span>{detailSettlement.administrator_name}</span>
-                      </div>
-                    )}
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {detailSettlement.official_source_url && (
-                        <a href={detailSettlement.official_source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline rounded-lg bg-primary/5 px-2.5 py-1.5">
-                          <ExternalLink className="h-3 w-3" /> Official source
-                        </a>
-                      )}
-                      {detailSettlement.claims_filing_url && (
-                        <a href={detailSettlement.claims_filing_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline rounded-lg bg-primary/5 px-2.5 py-1.5">
-                          <ExternalLink className="h-3 w-3" /> Claims filing site
-                        </a>
-                      )}
-                    </div>
+                <h4 className="text-sm font-semibold">Verification & Source</h4>
+                <VerificationBadge
+                  level={detailSettlement.verification_level}
+                  verified={detailSettlement.verified}
+                  sourceUrl={detailSettlement.official_source_url || detailSettlement.source_url}
+                />
+                {detailSettlement.jurisdiction && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Jurisdiction:</span>
+                    <span>{detailSettlement.jurisdiction}</span>
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">This settlement has not yet been independently verified.</p>
+                )}
+                {detailSettlement.case_number && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Case:</span>
+                    <span>{detailSettlement.case_number}</span>
+                  </div>
+                )}
+                {detailSettlement.administrator_name && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Administrator:</span>
+                    <span>{detailSettlement.administrator_name}</span>
+                  </div>
+                )}
+                {detailSettlement.claims_filing_url && (
+                  <a href={detailSettlement.claims_filing_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline rounded-lg bg-primary/5 px-2.5 py-1.5">
+                    <ExternalLink className="h-3 w-3" /> Claims filing site
+                  </a>
                 )}
               </div>
 
