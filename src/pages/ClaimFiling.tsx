@@ -173,9 +173,13 @@ const ClaimFiling = () => {
         claim_id: claimId,
         user_id: user.id,
         file_path: filePath,
+        file_name: doc.name,
+        file_size: doc.file.size,
+        mime_type: doc.file.type,
+        doc_type: doc.type,
         file_type: doc.type,
         note: doc.name,
-      });
+      } as any);
 
       setDocuments(prev => prev.map((d, idx) => idx === i ? { ...d, uploading: false, uploaded: true, url: filePath } : d));
     }

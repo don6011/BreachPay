@@ -3,17 +3,17 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { VerificationBadge } from "@/components/VerificationBadge";
+import { EvidenceVault, type DocRow } from "@/components/EvidenceVault";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
-  ArrowLeft, FileText, Upload, CheckCircle, Clock, DollarSign,
-  AlertTriangle, Shield, Loader2, X, ExternalLink, MessageSquare, Info,
+  ArrowLeft, FileText, Clock, DollarSign,
+  AlertTriangle, Shield, Loader2, ExternalLink, MessageSquare, Info,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
-import { useRef } from "react";
 
 const PROGRESS_STEPS = [
   { key: "submitted", label: "Submitted" },
@@ -22,7 +22,7 @@ const PROGRESS_STEPS = [
   { key: "paid", label: "Paid" },
 ];
 
-const DOC_TYPES = ["ID Verification", "Address Proof", "Breach Notice", "Expense Proof"];
+
 
 interface ClaimDetail {
   id: string;
@@ -59,27 +59,17 @@ interface HistoryEntry {
   created_at: string;
 }
 
-interface DocEntry {
-  id: string;
-  file_path: string;
-  file_type: string | null;
-  note: string | null;
-  created_at: string;
-  verified: boolean;
-}
+// DocEntry replaced by DocRow from EvidenceVault
 
 const ClaimTracker = () => {
   const { claimId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [claim, setClaim] = useState<ClaimDetail | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
-  const [documents, setDocuments] = useState<DocEntry[]>([]);
+  const [documents, setDocuments] = useState<DocRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
-  const [selectedDocType, setSelectedDocType] = useState(DOC_TYPES[0]);
 
   useEffect(() => {
     if (!user || !claimId) return;
@@ -106,7 +96,7 @@ const ClaimTracker = () => {
         .order("created_at", { ascending: true }),
       supabase
         .from("claim_documents")
-        .select("id, file_path, file_type, note, created_at, verified")
+        .select("id, claim_id, file_path, file_name, file_size, mime_type, doc_type, status, user_notes, admin_notes, created_at, verified")
         .eq("claim_id", claimId)
         .order("created_at", { ascending: true }),
     ]);
@@ -138,44 +128,6 @@ const ClaimTracker = () => {
     setLoading(false);
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || !user || !claimId) return;
-    setUploading(true);
-
-    for (const file of Array.from(files)) {
-      const docTypeSlug = selectedDocType.toLowerCase().replace(/\s+/g, "_");
-      const filePath = `${user.id}/${claimId}/${docTypeSlug}/${Date.now()}_${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from("claim-documents")
-        .upload(filePath, file);
-
-      if (uploadError) {
-        toast({ title: "Upload failed", description: uploadError.message, variant: "destructive" });
-        continue;
-      }
-
-      await supabase.from("claim_documents").insert({
-        claim_id: claimId,
-        user_id: user.id,
-        file_path: filePath,
-        file_type: selectedDocType,
-        note: file.name,
-      });
-
-      await supabase.from("claim_status_history").insert({
-        claim_id: claimId,
-        status: claim?.status || "submitted",
-        note: `Document uploaded: ${selectedDocType}`,
-        updated_by: "user",
-      });
-    }
-
-    e.target.value = "";
-    setUploading(false);
-    toast({ title: "Documents uploaded" });
-    fetchAll();
-  };
 
   if (loading) {
     return (
@@ -359,75 +311,15 @@ const ClaimTracker = () => {
           )}
         </div>
 
-        {/* Document Upload */}
-        <div className="rounded-2xl border bg-card p-6 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-semibold">Documents</h3>
-            <span className="text-xs text-muted-foreground">{documents.length} uploaded</span>
-          </div>
-
-          <div className="flex flex-wrap gap-2 mb-2">
-            {DOC_TYPES.map(dt => (
-              <button
-                key={dt}
-                onClick={() => setSelectedDocType(dt)}
-                className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-colors ${
-                  selectedDocType === dt
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {dt}
-              </button>
-            ))}
-          </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            className="hidden"
-            accept="image/*,.pdf"
-            multiple
-            onChange={handleFileUpload}
+        {/* Evidence Vault */}
+        {claimId && (
+          <EvidenceVault
+            claimId={claimId}
+            documents={documents as any}
+            onRefresh={fetchAll}
+            claimStatus={claim.status}
           />
-
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="w-full rounded-xl border-2 border-dashed border-border hover:border-primary/50 bg-muted/30 p-6 text-center transition-colors group cursor-pointer disabled:opacity-50"
-          >
-            {uploading ? (
-              <Loader2 className="mx-auto h-6 w-6 text-primary animate-spin mb-1" />
-            ) : (
-              <Upload className="mx-auto h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors mb-1" />
-            )}
-            <p className="text-sm font-medium">{uploading ? "Uploading..." : "Upload documents"}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Type: <span className="text-primary">{selectedDocType}</span>
-            </p>
-          </button>
-
-          {documents.length > 0 && (
-            <div className="space-y-2">
-              {documents.map((doc) => (
-                <div key={doc.id} className="flex items-center gap-3 rounded-xl bg-muted/30 p-3">
-                  <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{doc.note || doc.file_path.split("/").pop()}</p>
-                    <p className="text-xs text-muted-foreground">{doc.file_type} · {new Date(doc.created_at).toLocaleDateString()}</p>
-                  </div>
-                  {doc.verified ? (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-success font-medium">
-                      <CheckCircle className="h-3 w-3" /> Verified
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-muted-foreground">Pending review</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Status History */}
         <div className="rounded-2xl border bg-card p-6 space-y-4">
