@@ -36,7 +36,7 @@ export interface Settlement {
   matched_via?: string;
 }
 
-export type ClaimStatus = "submitted" | "under_review" | "approved" | "rejected" | "paid";
+export type ClaimStatus = "submitted" | "under_review" | "documentation_required" | "approved" | "rejected" | "paid";
 
 export interface Claim {
   id: string;
