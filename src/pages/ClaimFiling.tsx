@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
+import { VerificationBadge } from "@/components/VerificationBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +14,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   Shield, Lock, ChevronRight, ChevronLeft, Upload, FileText,
   Clock, AlertTriangle, CheckCircle, DollarSign, Camera, X,
-  Bookmark, Eye, Send, Sparkles, ArrowRight, Loader2, ShieldCheck, ExternalLink,
+  Bookmark, Eye, Send, Sparkles, ArrowRight, Loader2, ExternalLink,
 } from "lucide-react";
 
 const STEPS = ["Overview", "Identity", "Eligibility", "Documents", "Review"];
@@ -41,6 +42,7 @@ interface SettlementData {
   official_source_url: string | null;
   claims_filing_url: string | null;
   administrator_name: string | null;
+  source_url: string | null;
 }
 
 interface UploadedDoc {
@@ -52,12 +54,6 @@ interface UploadedDoc {
   uploaded?: boolean;
   url?: string;
 }
-
-const VERIFICATION_LABELS: Record<string, string> = {
-  source_linked: "Source linked",
-  court_verified: "Court verified",
-  administrator_confirmed: "Administrator confirmed",
-};
 
 const ClaimFiling = () => {
   const [searchParams] = useSearchParams();
@@ -73,7 +69,6 @@ const ClaimFiling = () => {
   const [submitting, setSubmitting] = useState(false);
   const [createdClaimId, setCreatedClaimId] = useState<string | null>(null);
 
-  // Form state
   const [identity, setIdentity] = useState({ fullName: "", email: "", phone: "", address: "" });
   const [eligibility, setEligibility] = useState({
     breachImpact: false, financialLoss: false, monitoringPurchase: false,
@@ -83,13 +78,12 @@ const ClaimFiling = () => {
   const [consent, setConsent] = useState(false);
   const [selectedDocType, setSelectedDocType] = useState(DOC_TYPES[0].label);
 
-  // Load settlement from DB
   useEffect(() => {
     if (!settlementId) { setLoadingSettlement(false); return; }
     const fetchSettlement = async () => {
       const { data } = await supabase
         .from("settlements")
-        .select("id, name, company, breach_year, description, payout_min, payout_max, deadline, status, verified, verification_level, claim_deadline, official_source_url, claims_filing_url, administrator_name")
+        .select("id, name, company, breach_year, description, payout_min, payout_max, deadline, status, verified, verification_level, claim_deadline, official_source_url, claims_filing_url, administrator_name, source_url")
         .eq("id", settlementId)
         .maybeSingle();
       if (data) {
@@ -104,6 +98,7 @@ const ClaimFiling = () => {
           official_source_url: data.official_source_url || null,
           claims_filing_url: data.claims_filing_url || null,
           administrator_name: data.administrator_name || null,
+          source_url: data.source_url || null,
         });
       }
       setLoadingSettlement(false);
@@ -111,7 +106,6 @@ const ClaimFiling = () => {
     fetchSettlement();
   }, [settlementId]);
 
-  // Pre-fill email from auth
   useEffect(() => {
     if (user?.email && !identity.email) {
       setIdentity(prev => ({ ...prev, email: user.email! }));
@@ -328,28 +322,17 @@ const ClaimFiling = () => {
 
         {/* Verified Settlement Callout */}
         {settlement.verified && (
-          <div className="mb-4 rounded-xl border border-green-200 dark:border-green-800/40 bg-green-50 dark:bg-green-900/10 p-3 flex items-start gap-3">
-            <ShieldCheck className="h-4 w-4 text-green-700 dark:text-green-400 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-green-800 dark:text-green-300">Verified settlement</p>
-              <p className="text-xs text-green-700/80 dark:text-green-400/70">
-                {VERIFICATION_LABELS[settlement.verification_level] || "Verified"}
-                {settlement.administrator_name && ` by ${settlement.administrator_name}`}.
-                Eligibility depends on settlement administrator review.
-              </p>
-              <div className="flex gap-2 mt-1">
-                {settlement.official_source_url && (
-                  <a href={settlement.official_source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline">
-                    <ExternalLink className="h-2.5 w-2.5" /> Official source
-                  </a>
-                )}
-                {settlement.claims_filing_url && (
-                  <a href={settlement.claims_filing_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline">
-                    <ExternalLink className="h-2.5 w-2.5" /> Claims filing site
-                  </a>
-                )}
-              </div>
-            </div>
+          <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-3">
+            <VerificationBadge
+              level={settlement.verification_level}
+              verified={settlement.verified}
+              sourceUrl={settlement.official_source_url || settlement.source_url}
+            />
+            {settlement.claims_filing_url && (
+              <a href={settlement.claims_filing_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-2 ml-6.5">
+                <ExternalLink className="h-3 w-3" /> Claims filing site
+              </a>
+            )}
           </div>
         )}
 
@@ -419,15 +402,14 @@ const ClaimFiling = () => {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor="address">Address</Label>
-                    <Input id="address" placeholder="123 Main St, City, ST" value={identity.address} onChange={(e) => setIdentity((p) => ({ ...p, address: e.target.value }))} />
+                    <Input id="address" placeholder="City, State" value={identity.address} onChange={(e) => setIdentity((p) => ({ ...p, address: e.target.value }))} />
                   </div>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-4 text-[11px] text-muted-foreground pt-2 border-t border-border">
-                <span className="flex items-center gap-1"><Lock className="h-3 w-3 text-primary" /> Encrypted submission</span>
-                <span className="flex items-center gap-1"><Shield className="h-3 w-3 text-primary" /> Bank-level security</span>
-                <span className="flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-primary" /> Data never sold</span>
-              </div>
+            </div>
+            <div className="rounded-xl bg-muted/30 p-3 flex items-start gap-2">
+              <Shield className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+              <p className="text-xs text-muted-foreground">Your data is encrypted and used solely for claim verification.</p>
             </div>
           </div>
         )}
@@ -438,50 +420,45 @@ const ClaimFiling = () => {
             <div className="rounded-2xl border bg-card p-6 space-y-5">
               <div>
                 <h2 className="text-lg font-bold mb-1">Eligibility Questions</h2>
-                <p className="text-sm text-muted-foreground">Answer a few questions to confirm your eligibility.</p>
+                <p className="text-sm text-muted-foreground">Confirm your eligibility for this settlement.</p>
               </div>
+
               <div className="space-y-4">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <Checkbox checked={eligibility.breachImpact} onCheckedChange={(v) => setEligibility((p) => ({ ...p, breachImpact: !!v }))} className="mt-0.5" />
+                <div className="flex items-start gap-3 rounded-xl bg-muted/30 p-4">
+                  <Checkbox id="breachImpact" checked={eligibility.breachImpact} onCheckedChange={(v) => setEligibility((p) => ({ ...p, breachImpact: !!v }))} className="mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium">Were you affected by this data breach?</p>
-                    <p className="text-xs text-muted-foreground">Your data was found in our scan results for this breach.</p>
+                    <Label htmlFor="breachImpact" className="font-medium cursor-pointer">I was affected by this data breach</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">My personal data was exposed in the {settlement.company} breach ({settlement.breach_year}).</p>
                   </div>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <Checkbox checked={eligibility.financialLoss} onCheckedChange={(v) => setEligibility((p) => ({ ...p, financialLoss: !!v }))} className="mt-0.5" />
+                </div>
+
+                <div className="flex items-start gap-3 rounded-xl bg-muted/30 p-4">
+                  <Checkbox id="financialLoss" checked={eligibility.financialLoss} onCheckedChange={(v) => setEligibility((p) => ({ ...p, financialLoss: !!v }))} className="mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium">Did you experience financial loss?</p>
-                    <p className="text-xs text-muted-foreground">Unauthorized charges, identity theft costs, etc.</p>
+                    <Label htmlFor="financialLoss" className="font-medium cursor-pointer">I experienced financial loss</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">I incurred out-of-pocket costs as a result of this breach.</p>
+                    {eligibility.financialLoss && (
+                      <Input placeholder="Amount ($)" type="number" className="mt-2 max-w-[200px]" value={eligibility.lossAmount} onChange={(e) => setEligibility((p) => ({ ...p, lossAmount: e.target.value }))} />
+                    )}
                   </div>
-                </label>
-                {eligibility.financialLoss && (
-                  <div className="ml-8 space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <Label htmlFor="lossAmount">Estimated Loss Amount</Label>
-                    <Input id="lossAmount" placeholder="$0.00" value={eligibility.lossAmount} onChange={(e) => setEligibility((p) => ({ ...p, lossAmount: e.target.value }))} />
-                  </div>
-                )}
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <Checkbox checked={eligibility.monitoringPurchase} onCheckedChange={(v) => setEligibility((p) => ({ ...p, monitoringPurchase: !!v }))} className="mt-0.5" />
+                </div>
+
+                <div className="flex items-start gap-3 rounded-xl bg-muted/30 p-4">
+                  <Checkbox id="monitoringPurchase" checked={eligibility.monitoringPurchase} onCheckedChange={(v) => setEligibility((p) => ({ ...p, monitoringPurchase: !!v }))} className="mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium">Did you purchase credit monitoring?</p>
-                    <p className="text-xs text-muted-foreground">As a result of this breach.</p>
+                    <Label htmlFor="monitoringPurchase" className="font-medium cursor-pointer">I purchased credit monitoring</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">I signed up for credit monitoring due to this breach.</p>
+                    {eligibility.monitoringPurchase && (
+                      <Input placeholder="Cost ($)" type="number" className="mt-2 max-w-[200px]" value={eligibility.monitoringCost} onChange={(e) => setEligibility((p) => ({ ...p, monitoringCost: e.target.value }))} />
+                    )}
                   </div>
-                </label>
-                {eligibility.monitoringPurchase && (
-                  <div className="ml-8 space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
-                    <Label htmlFor="monitoringCost">Monitoring Cost</Label>
-                    <Input id="monitoringCost" placeholder="$0.00" value={eligibility.monitoringCost} onChange={(e) => setEligibility((p) => ({ ...p, monitoringCost: e.target.value }))} />
-                  </div>
-                )}
+                </div>
+
                 <div className="space-y-1.5">
-                  <Label htmlFor="desc">Additional Details (optional)</Label>
-                  <Textarea id="desc" placeholder="Describe any additional impact..." value={eligibility.description} onChange={(e) => setEligibility((p) => ({ ...p, description: e.target.value }))} rows={3} />
+                  <Label htmlFor="description">Additional Details (optional)</Label>
+                  <Textarea id="description" placeholder="Describe your experience..." value={eligibility.description} onChange={(e) => setEligibility((p) => ({ ...p, description: e.target.value }))} rows={3} />
                 </div>
               </div>
-              <p className="text-[11px] text-muted-foreground flex items-center gap-1">
-                <Sparkles className="h-3 w-3 text-primary" /> Responses auto-saved as you type.
-              </p>
             </div>
           </div>
         )}
@@ -492,19 +469,16 @@ const ClaimFiling = () => {
             <div className="rounded-2xl border bg-card p-6 space-y-5">
               <div>
                 <h2 className="text-lg font-bold mb-1">Supporting Documents</h2>
-                <p className="text-sm text-muted-foreground">Upload evidence to strengthen your claim (optional).</p>
+                <p className="text-sm text-muted-foreground">Upload documents to strengthen your claim.</p>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 mb-2">
                 {DOC_TYPES.map(dt => (
                   <button
                     key={dt.label}
                     onClick={() => setSelectedDocType(dt.label)}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-colors ${
-                      selectedDocType === dt.label
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted text-muted-foreground hover:text-foreground"
-                    }`}
+                    className={`rounded-xl px-3 py-1.5 text-xs font-medium transition-colors ${selectedDocType === dt.label ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:text-foreground"
+                      }`}
                   >
                     {dt.label}
                   </button>
@@ -515,40 +489,30 @@ const ClaimFiling = () => {
 
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full rounded-xl border-2 border-dashed border-border hover:border-primary/50 bg-muted/30 p-8 text-center transition-colors group cursor-pointer"
+                className="w-full rounded-xl border-2 border-dashed border-border hover:border-primary/50 bg-muted/30 p-6 text-center transition-colors group cursor-pointer"
               >
-                <Upload className="mx-auto h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors mb-2" />
-                <p className="text-sm font-medium">Click to browse or drag & drop</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Uploading as: <span className="text-primary font-medium">{selectedDocType}</span>
+                <Upload className="mx-auto h-6 w-6 text-muted-foreground group-hover:text-primary transition-colors mb-1" />
+                <p className="text-sm font-medium">Click to upload</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Type: <span className="text-primary">{selectedDocType}</span> · PDF or image
                 </p>
-                <div className="flex justify-center gap-4 mt-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1"><FileText className="h-3 w-3" /> PDF, JPG, PNG</span>
-                  <span className="flex items-center gap-1"><Camera className="h-3 w-3" /> Camera capture</span>
-                </div>
               </button>
 
               {documents.length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground">{documents.length} file(s) selected</p>
-                  {documents.map((doc, i) => (
-                    <div key={i} className="flex items-center justify-between rounded-lg bg-muted/50 px-4 py-2.5">
-                      <div className="flex items-center gap-2">
-                        {doc.uploading ? (
-                          <Loader2 className="h-4 w-4 text-primary animate-spin" />
-                        ) : doc.uploaded ? (
-                          <CheckCircle className="h-4 w-4 text-success" />
-                        ) : (
-                          <FileText className="h-4 w-4 text-primary" />
-                        )}
-                        <div>
-                          <span className="text-sm">{doc.name}</span>
-                          <span className="text-xs text-muted-foreground ml-2">{doc.size}</span>
-                        </div>
-                        <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full ml-2">{doc.type}</span>
+                  {documents.map((doc, index) => (
+                    <div key={index} className="flex items-center gap-3 rounded-xl bg-muted/30 p-3">
+                      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{doc.name}</p>
+                        <p className="text-xs text-muted-foreground">{doc.type} · {doc.size}</p>
                       </div>
-                      {!doc.uploading && !doc.uploaded && (
-                        <button onClick={() => removeFile(i)} className="text-muted-foreground hover:text-destructive transition-colors">
+                      {doc.uploading ? (
+                        <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                      ) : doc.uploaded ? (
+                        <CheckCircle className="h-4 w-4 text-success" />
+                      ) : (
+                        <button onClick={() => removeFile(index)} className="text-muted-foreground hover:text-destructive">
                           <X className="h-4 w-4" />
                         </button>
                       )}
@@ -564,68 +528,63 @@ const ClaimFiling = () => {
         {step === 4 && (
           <div className="space-y-4">
             <div className="rounded-2xl border bg-card p-6 space-y-5">
-              <h2 className="text-lg font-bold">Review & Submit</h2>
+              <div>
+                <h2 className="text-lg font-bold mb-1">Review & Submit</h2>
+                <p className="text-sm text-muted-foreground">Review your claim details before submitting.</p>
+              </div>
+
               <div className="space-y-3">
-                <div className="rounded-xl bg-muted/50 p-4 space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Settlement</p>
-                  <p className="font-semibold">{settlement.name}</p>
-                  <p className="text-sm text-muted-foreground">{settlement.company} · {settlement.breach_year}</p>
+                <div className="rounded-xl bg-muted/30 p-4 space-y-2">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Settlement</h4>
+                  <p className="text-sm font-semibold">{settlement.name}</p>
+                  <p className="text-xs text-muted-foreground">{settlement.company} · {settlement.breach_year}</p>
                 </div>
-                <div className="rounded-xl bg-muted/50 p-4 space-y-2">
-                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Your Information</p>
+                <div className="rounded-xl bg-muted/30 p-4 space-y-2">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Your Information</h4>
                   <p className="text-sm">{identity.fullName}</p>
-                  <p className="text-sm text-muted-foreground">{identity.email}</p>
+                  <p className="text-xs text-muted-foreground">{identity.email}</p>
                 </div>
-                {documents.length > 0 && (
-                  <div className="rounded-xl bg-muted/50 p-4 space-y-2">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Documents</p>
-                    <p className="text-sm">{documents.length} file(s) will be uploaded</p>
-                    <div className="flex flex-wrap gap-1">
-                      {[...new Set(documents.map(d => d.type))].map(t => (
-                        <span key={t} className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full">{t}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <div className="rounded-xl bg-primary/5 border border-primary/20 p-4">
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="text-muted-foreground">Estimated Payout</span>
-                    <span className="font-bold text-primary">${settlement.payout_min} – ${settlement.payout_max}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Service Fee</span>
-                    <span className="text-muted-foreground">15% (only if paid)</span>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground mt-2">
-                    Estimated amounts may vary. Final payout is determined by the settlement administrator.
-                  </p>
+                <div className="rounded-xl bg-muted/30 p-4 space-y-2">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Estimated Payout</h4>
+                  <p className="text-sm font-bold text-primary">${settlement.payout_min} – ${settlement.payout_max}</p>
+                  <p className="text-[10px] text-muted-foreground">Subject to administrator review. 15% platform fee applies only if paid.</p>
+                </div>
+                <div className="rounded-xl bg-muted/30 p-4 space-y-2">
+                  <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Documents</h4>
+                  <p className="text-sm">{documents.length} document(s) attached</p>
                 </div>
               </div>
 
-              <label className="flex items-start gap-3 cursor-pointer pt-2">
-                <Checkbox checked={consent} onCheckedChange={(v) => setConsent(!!v)} className="mt-0.5" />
-                <p className="text-sm text-muted-foreground leading-tight">
-                  I certify that the above information is accurate and I authorize BreachPay to file this claim on my behalf. I agree to the <span className="text-primary cursor-pointer">Terms of Service</span> and a 15% contingency fee on any payout received.
-                </p>
-              </label>
+              <div className="flex items-start gap-3 rounded-xl bg-muted/30 p-4">
+                <Checkbox id="consent" checked={consent} onCheckedChange={(v) => setConsent(!!v)} className="mt-0.5" />
+                <div>
+                  <Label htmlFor="consent" className="font-medium cursor-pointer">I confirm this information is accurate</Label>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    I understand that eligibility depends on settlement administrator review and that estimated payouts may vary.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         )}
 
         {/* Navigation */}
         {step > 0 && (
-          <div className="flex gap-3 mt-6">
-            <Button variant="outline" className="flex-1" onClick={() => setStep(step - 1)}>
+          <div className="flex items-center justify-between mt-6">
+            <Button variant="ghost" onClick={() => setStep((s) => s - 1)}>
               <ChevronLeft className="h-4 w-4 mr-1" /> Back
             </Button>
             {step < STEPS.length - 1 ? (
-              <Button className="flex-1" disabled={!canProceed} onClick={() => setStep(step + 1)}>
-                Next <ChevronRight className="h-4 w-4 ml-1" />
+              <Button onClick={() => setStep((s) => s + 1)} disabled={!canProceed}>
+                Continue <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             ) : (
-              <Button className="flex-1" disabled={!canProceed || submitting} onClick={handleSubmit}>
-                {submitting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Send className="h-4 w-4 mr-1" />}
-                {submitting ? "Submitting..." : "Submit Claim"}
+              <Button onClick={handleSubmit} disabled={!canProceed || submitting}>
+                {submitting ? (
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Submitting...</>
+                ) : (
+                  <><Send className="h-4 w-4 mr-1" /> Submit Claim</>
+                )}
               </Button>
             )}
           </div>

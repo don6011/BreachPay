@@ -1,13 +1,14 @@
 import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
+import { VerificationBadge } from "@/components/VerificationBadge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Send, Zap, RefreshCw, Pencil, ShieldCheck, ExternalLink } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Plus, Send, Zap, RefreshCw, Pencil, ExternalLink } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +33,11 @@ interface Settlement {
   claims_filing_url: string | null;
   claim_deadline: string | null;
   notes_internal: string | null;
+  source_type: string | null;
+  source_name: string | null;
+  source_url: string | null;
+  verification_notes: string | null;
+  last_verified_at: string | null;
 }
 
 const VERIFICATION_LEVELS = [
@@ -41,9 +47,6 @@ const VERIFICATION_LEVELS = [
   { value: "administrator_confirmed", label: "Administrator Confirmed" },
 ];
 
-const verificationLabel = (level: string) =>
-  VERIFICATION_LEVELS.find((v) => v.value === level)?.label || level;
-
 const emptyForm = () => ({
   name: "", company: "", breach_year: "", status: "open",
   payout_min: "", payout_max: "", deadline: "", description: "",
@@ -51,6 +54,8 @@ const emptyForm = () => ({
   jurisdiction: "", case_number: "", administrator_name: "",
   official_source_url: "", claims_filing_url: "",
   claim_deadline: "", notes_internal: "",
+  source_type: "", source_name: "", source_url: "",
+  verification_notes: "",
 });
 
 const AdminSettlements = () => {
@@ -69,7 +74,7 @@ const AdminSettlements = () => {
   const fetchSettlements = async () => {
     const { data } = await supabase
       .from("settlements")
-      .select("id, name, company, breach_year, status, payout_min, payout_max, deadline, description, verified, verification_level, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, claim_deadline, notes_internal")
+      .select("id, name, company, breach_year, status, payout_min, payout_max, deadline, description, verified, verification_level, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, claim_deadline, notes_internal, source_type, source_name, source_url, verification_notes, last_verified_at")
       .order("created_at", { ascending: false });
     if (data) setSettlements(data as Settlement[]);
     setLoading(false);
@@ -103,6 +108,10 @@ const AdminSettlements = () => {
       claims_filing_url: s.claims_filing_url || "",
       claim_deadline: s.claim_deadline || "",
       notes_internal: s.notes_internal || "",
+      source_type: s.source_type || "",
+      source_name: s.source_name || "",
+      source_url: s.source_url || "",
+      verification_notes: s.verification_notes || "",
     });
     setValidationErrors([]);
     setDialogOpen(true);
@@ -150,7 +159,16 @@ const AdminSettlements = () => {
       claims_filing_url: form.claims_filing_url.trim() || null,
       claim_deadline: form.claim_deadline || null,
       notes_internal: form.notes_internal.trim() || null,
+      source_type: form.source_type.trim() || null,
+      source_name: form.source_name.trim() || null,
+      source_url: form.source_url.trim() || null,
+      verification_notes: form.verification_notes.trim() || null,
     };
+
+    // Auto-update last_verified_at when verified changes to true
+    if (form.verified) {
+      payload.last_verified_at = new Date().toISOString();
+    }
 
     try {
       if (editingId) {
@@ -229,7 +247,7 @@ const AdminSettlements = () => {
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Year</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Payout Range</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Deadline</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Verified</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Verification</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Actions</th>
             </tr>
@@ -248,13 +266,7 @@ const AdminSettlements = () => {
                   <td className="px-4 py-3 text-primary">${s.payout_min || 0}–${(s.payout_max || 0).toLocaleString()}</td>
                   <td className="px-4 py-3">{effectiveDeadline(s) || "—"}</td>
                   <td className="px-4 py-3">
-                    {s.verified ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-[10px] font-semibold text-green-800 dark:text-green-400">
-                        <ShieldCheck className="h-2.5 w-2.5" /> {verificationLabel(s.verification_level)}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">Unverified</span>
-                    )}
+                    <VerificationBadge level={s.verification_level} verified={s.verified} compact />
                   </td>
                   <td className="px-4 py-3"><StatusPill variant={s.status as any} /></td>
                   <td className="px-4 py-3">
@@ -363,32 +375,54 @@ const AdminSettlements = () => {
                   <Input placeholder="https://..." className="rounded-xl" value={form.claims_filing_url} onChange={(e) => setForm((f) => ({ ...f, claims_filing_url: e.target.value }))} />
                 </div>
               </div>
-            </div>
 
-            {/* User Preview */}
-            {form.verified && (
-              <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4 space-y-2">
-                <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">User Preview</p>
-                <div className="flex items-center gap-2">
-                  <ShieldCheck className="h-4 w-4 text-green-600" />
-                  <span className="text-sm font-semibold">Verified Settlement</span>
-                  <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 px-2 py-0.5 rounded-full font-medium">
-                    {verificationLabel(form.verification_level)}
-                  </span>
+              {/* Source fields */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Source Type</Label>
+                  <Select value={form.source_type || "none"} onValueChange={(v) => setForm((f) => ({ ...f, source_type: v === "none" ? "" : v }))}>
+                    <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
+                      <SelectItem value="court_filing">Court Filing</SelectItem>
+                      <SelectItem value="news_article">News Article</SelectItem>
+                      <SelectItem value="government">Government</SelectItem>
+                      <SelectItem value="administrator">Administrator</SelectItem>
+                      <SelectItem value="public">Public</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
-                {form.jurisdiction && <p className="text-xs text-muted-foreground">Jurisdiction: {form.jurisdiction}</p>}
-                {form.case_number && <p className="text-xs text-muted-foreground">Case: {form.case_number}</p>}
-                {form.administrator_name && <p className="text-xs text-muted-foreground">Administrator: {form.administrator_name}</p>}
-                <div className="flex gap-2 mt-1">
-                  {form.official_source_url && (
-                    <span className="text-[10px] text-primary flex items-center gap-0.5"><ExternalLink className="h-2.5 w-2.5" /> Official source</span>
-                  )}
-                  {form.claims_filing_url && (
-                    <span className="text-[10px] text-primary flex items-center gap-0.5"><ExternalLink className="h-2.5 w-2.5" /> File claim</span>
-                  )}
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Source Name</Label>
+                  <Input placeholder="e.g. Reuters" className="rounded-xl" value={form.source_name} onChange={(e) => setForm((f) => ({ ...f, source_name: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Source URL</Label>
+                  <Input placeholder="https://..." className="rounded-xl" value={form.source_url} onChange={(e) => setForm((f) => ({ ...f, source_url: e.target.value }))} />
                 </div>
               </div>
-            )}
+
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Verification Notes</Label>
+                <Textarea placeholder="Notes about verification process..." className="rounded-xl" value={form.verification_notes} onChange={(e) => setForm((f) => ({ ...f, verification_notes: e.target.value }))} rows={2} />
+              </div>
+            </div>
+
+            {/* Live Preview */}
+            <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4 space-y-3">
+              <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">User Preview</p>
+              <VerificationBadge
+                level={form.verification_level}
+                verified={form.verified}
+                sourceUrl={form.official_source_url || form.source_url || undefined}
+              />
+              {form.jurisdiction && <p className="text-xs text-muted-foreground ml-6.5">Jurisdiction: {form.jurisdiction}</p>}
+              {form.case_number && <p className="text-xs text-muted-foreground ml-6.5">Case: {form.case_number}</p>}
+              {form.administrator_name && <p className="text-xs text-muted-foreground ml-6.5">Administrator: {form.administrator_name}</p>}
+              {form.claims_filing_url && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-primary ml-6.5"><ExternalLink className="h-2.5 w-2.5" /> Claims filing site</span>
+              )}
+            </div>
 
             {/* Internal Notes */}
             <div className="space-y-1.5">
