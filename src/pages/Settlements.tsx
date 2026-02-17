@@ -8,11 +8,13 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   Scale, DollarSign, Clock, ArrowRight, Shield, AlertTriangle, FileCheck,
   Zap, ChevronDown, Sparkles, TrendingUp, CheckCircle2, Target,
+  ShieldCheck, ExternalLink, Gavel, Building,
 } from "lucide-react";
 import type { SettlementStatus } from "@/types";
 import { Link, useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type FilterTab = "all" | SettlementStatus | "filed";
 type SortOption = "payout" | "deadline" | "newest";
@@ -43,6 +45,15 @@ interface SettlementData {
   description: string | null;
   match_reason: string | null;
   payout_estimate: number | null;
+  // Verification fields
+  verified: boolean;
+  verification_level: string;
+  jurisdiction: string | null;
+  case_number: string | null;
+  administrator_name: string | null;
+  official_source_url: string | null;
+  claims_filing_url: string | null;
+  claim_deadline: string | null;
 }
 
 interface ClaimData {
@@ -51,6 +62,12 @@ interface ClaimData {
   status: string;
   est_payout: number | null;
 }
+
+const VERIFICATION_LABELS: Record<string, string> = {
+  source_linked: "Source linked",
+  court_verified: "Court verified",
+  administrator_confirmed: "Administrator confirmed",
+};
 
 const Settlements = () => {
   const { user } = useAuth();
@@ -62,16 +79,16 @@ const Settlements = () => {
   const [claims, setClaims] = useState<ClaimData[]>([]);
   const [loading, setLoading] = useState(true);
   const [filingId, setFilingId] = useState<string | null>(null);
+  const [detailSettlement, setDetailSettlement] = useState<SettlementData | null>(null);
 
   useEffect(() => {
     if (!user) return;
 
     const fetchData = async () => {
       try {
-        // Fetch user's settlement matches with settlement details
         const { data: matchData } = await supabase
           .from("settlement_matches")
-          .select("settlement_id, match_reason, payout_estimate, settlements(id, name, company, breach_year, status, payout_min, payout_max, deadline, description)")
+          .select("settlement_id, match_reason, payout_estimate, settlements(id, name, company, breach_year, status, payout_min, payout_max, deadline, description, verified, verification_level, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, claim_deadline)")
           .eq("user_id", user.id);
 
         if (matchData) {
@@ -87,10 +104,17 @@ const Settlements = () => {
             description: m.settlements?.description,
             match_reason: m.match_reason,
             payout_estimate: m.payout_estimate ? Number(m.payout_estimate) : null,
+            verified: m.settlements?.verified || false,
+            verification_level: m.settlements?.verification_level || "unverified",
+            jurisdiction: m.settlements?.jurisdiction,
+            case_number: m.settlements?.case_number,
+            administrator_name: m.settlements?.administrator_name,
+            official_source_url: m.settlements?.official_source_url,
+            claims_filing_url: m.settlements?.claims_filing_url,
+            claim_deadline: m.settlements?.claim_deadline,
           })));
         }
 
-        // Fetch user's claims
         const { data: claimsData } = await supabase
           .from("claims")
           .select("id, settlement_id, status, est_payout")
@@ -120,10 +144,13 @@ const Settlements = () => {
     } else if (filter !== "all") {
       list = list.filter((s) => s.status === filter);
     }
-
     list.sort((a, b) => {
       if (sort === "payout") return b.payout_max - a.payout_max;
-      if (sort === "deadline") return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+      if (sort === "deadline") {
+        const da = a.claim_deadline || a.deadline;
+        const db = b.claim_deadline || b.deadline;
+        return new Date(da).getTime() - new Date(db).getTime();
+      }
       return (b.breach_year || 0) - (a.breach_year || 0);
     });
     return list;
@@ -134,7 +161,8 @@ const Settlements = () => {
   const totalMax = openSettlements.reduce((a, s) => a + s.payout_max, 0);
   const claimsFiled = claims.length;
   const deadlinesApproaching = openSettlements.filter((s) => {
-    const days = Math.ceil((new Date(s.deadline).getTime() - Date.now()) / 86400000);
+    const dl = s.claim_deadline || s.deadline;
+    const days = Math.ceil((new Date(dl).getTime() - Date.now()) / 86400000);
     return days <= 60;
   }).length;
 
@@ -148,7 +176,6 @@ const Settlements = () => {
     if (!user || filingId) return;
     setFilingId(settlement.id);
     try {
-      // Check for existing claim
       const { data: existing } = await supabase
         .from("claims")
         .select("id")
@@ -194,6 +221,8 @@ const Settlements = () => {
     }
   };
 
+  const getEffectiveDeadline = (s: SettlementData) => s.claim_deadline || s.deadline;
+
   if (loading) {
     return (
       <div>
@@ -214,7 +243,7 @@ const Settlements = () => {
         <div className="flex items-center gap-2 mb-4">
           <Shield className="h-5 w-5 text-primary" />
           <h2 className="text-lg font-bold">
-            {openSettlements.length > 0 ? "You Qualify for Compensation" : "No Matches Yet"}
+            {openSettlements.length > 0 ? "You May Qualify for Compensation" : "No Matches Yet"}
           </h2>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-5">
@@ -223,7 +252,7 @@ const Settlements = () => {
             <p className="text-2xl font-bold">{openSettlements.length}</p>
           </div>
           <div className="rounded-xl bg-muted/50 p-4">
-            <p className="text-xs text-muted-foreground mb-1">Estimated Compensation</p>
+            <p className="text-xs text-muted-foreground mb-1">Estimated Range</p>
             <p className="text-2xl font-bold text-primary">${totalMin.toLocaleString()} – ${totalMax.toLocaleString()}</p>
           </div>
           <div className="rounded-xl bg-muted/50 p-4">
@@ -235,6 +264,9 @@ const Settlements = () => {
             <p className="text-2xl font-bold text-warning">{deadlinesApproaching}</p>
           </div>
         </div>
+        <p className="text-xs text-muted-foreground mb-3">
+          Eligibility depends on settlement administrator review. Estimated amounts may vary.
+        </p>
         <div className="flex flex-col sm:flex-row gap-3">
           <Button asChild className="rounded-xl shadow-[0_0_20px_hsl(172_89%_52%/0.25)] hover:shadow-[0_0_30px_hsl(172_89%_52%/0.4)] transition-all duration-300">
             <Link to="/claims"><FileCheck className="mr-2 h-4 w-4" /> File All Eligible Claims</Link>
@@ -294,7 +326,8 @@ const Settlements = () => {
       ) : (
         <div className="space-y-3">
           {filtered.map((settlement, idx) => {
-            const daysLeft = settlement.deadline ? Math.max(0, Math.ceil((new Date(settlement.deadline).getTime() - Date.now()) / 86400000)) : 0;
+            const effectiveDeadline = getEffectiveDeadline(settlement);
+            const daysLeft = effectiveDeadline ? Math.max(0, Math.ceil((new Date(effectiveDeadline).getTime() - Date.now()) / 86400000)) : 0;
             const filingStatus = getFilingStatus(settlement.id);
             const claim = claimMap[settlement.id];
             const payoutProgress = claim && claim.est_payout ? Math.min(100, (Number(claim.est_payout) / settlement.payout_max) * 100) : 0;
@@ -330,18 +363,30 @@ const Settlements = () => {
                 }`}>
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h3 className="font-semibold">{settlement.name}</h3>
                         {settlement.status === "open" && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                             <CheckCircle2 className="h-2.5 w-2.5" /> ELIGIBLE
                           </span>
                         )}
+                        {settlement.verified && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-[10px] font-semibold text-green-800 dark:text-green-400">
+                            <ShieldCheck className="h-2.5 w-2.5" /> Verified
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-muted-foreground">{settlement.company} · {settlement.breach_year}</p>
+                      {/* Credibility line */}
+                      {settlement.verified && settlement.verification_level !== "unverified" && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          {VERIFICATION_LABELS[settlement.verification_level] || settlement.verification_level}
+                          {settlement.administrator_name && ` · ${settlement.administrator_name}`}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
-                    {filingStatus !== "not_filed" && <StatusPill variant={filingStatus as any} />}
+                      {filingStatus !== "not_filed" && <StatusPill variant={filingStatus as any} />}
                       <StatusPill variant={settlement.status as any} />
                     </div>
                   </div>
@@ -358,11 +403,16 @@ const Settlements = () => {
                         ${settlement.payout_min.toLocaleString()} – ${settlement.payout_max.toLocaleString()}
                       </span>
                     </div>
-                    {settlement.deadline && (
+                    {effectiveDeadline && (
                       <div className={`flex items-center gap-1.5 text-sm ${isUrgent ? "text-critical" : "text-muted-foreground"}`}>
                         {isUrgent ? <AlertTriangle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
                         <span className={isUrgent ? "font-semibold" : ""}>{daysLeft} days left</span>
                       </div>
+                    )}
+                    {settlement.official_source_url && (
+                      <a href={settlement.official_source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] font-medium text-primary hover:underline">
+                        <ExternalLink className="h-2.5 w-2.5" /> View official source
+                      </a>
                     )}
                     {settlement.status === "open" && filingStatus === "not_filed" && (
                       <TooltipProvider>
@@ -381,11 +431,11 @@ const Settlements = () => {
                   </div>
 
                   {/* Deadline Countdown Bar */}
-                  {settlement.status !== "closed" && settlement.deadline && (
+                  {settlement.status !== "closed" && effectiveDeadline && (
                     <div className="mb-3">
                       <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                        <span>Deadline</span>
-                        <span className={isUrgent ? "text-critical font-medium" : ""}>{settlement.deadline}</span>
+                        <span>Filing deadline</span>
+                        <span className={isUrgent ? "text-critical font-medium" : ""}>{effectiveDeadline}</span>
                       </div>
                       <Progress value={deadlineProgress} className={`h-1.5 ${isUrgent ? "[&>div]:bg-critical" : ""}`} />
                     </div>
@@ -404,6 +454,10 @@ const Settlements = () => {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 mt-1">
+                    {/* Detail button */}
+                    <Button size="sm" variant="ghost" className="rounded-xl text-xs" onClick={() => setDetailSettlement(settlement)}>
+                      Details
+                    </Button>
                     {settlement.status === "open" && filingStatus === "not_filed" ? (
                       <Button
                         size="sm"
@@ -434,6 +488,89 @@ const Settlements = () => {
           })}
         </div>
       )}
+
+      {/* Settlement Detail Dialog */}
+      <Dialog open={!!detailSettlement} onOpenChange={(open) => !open && setDetailSettlement(null)}>
+        <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{detailSettlement?.name}</DialogTitle>
+          </DialogHeader>
+          {detailSettlement && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">{detailSettlement.company} · {detailSettlement.breach_year} Breach</p>
+              {detailSettlement.description && <p className="text-sm text-muted-foreground">{detailSettlement.description}</p>}
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-xl bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Estimated Payout</p>
+                  <p className="text-sm font-bold text-primary">${detailSettlement.payout_min.toLocaleString()} – ${detailSettlement.payout_max.toLocaleString()}</p>
+                </div>
+                <div className="rounded-xl bg-muted/50 p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Filing Deadline</p>
+                  <p className="text-sm font-bold">{getEffectiveDeadline(detailSettlement) || "—"}</p>
+                </div>
+              </div>
+
+              {/* Verification & Source Panel */}
+              <div className="rounded-xl border p-4 space-y-3">
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4" /> Verification & Source
+                </h4>
+                {detailSettlement.verified ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/30 px-2.5 py-1 text-xs font-semibold text-green-800 dark:text-green-400">
+                        <ShieldCheck className="h-3 w-3" /> Verified
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {VERIFICATION_LABELS[detailSettlement.verification_level] || detailSettlement.verification_level}
+                      </span>
+                    </div>
+                    {detailSettlement.jurisdiction && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Gavel className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground">Jurisdiction:</span>
+                        <span>{detailSettlement.jurisdiction}</span>
+                      </div>
+                    )}
+                    {detailSettlement.case_number && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-muted-foreground ml-5">Case:</span>
+                        <span>{detailSettlement.case_number}</span>
+                      </div>
+                    )}
+                    {detailSettlement.administrator_name && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Building className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-muted-foreground">Administrator:</span>
+                        <span>{detailSettlement.administrator_name}</span>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {detailSettlement.official_source_url && (
+                        <a href={detailSettlement.official_source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline rounded-lg bg-primary/5 px-2.5 py-1.5">
+                          <ExternalLink className="h-3 w-3" /> Official source
+                        </a>
+                      )}
+                      {detailSettlement.claims_filing_url && (
+                        <a href={detailSettlement.claims_filing_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline rounded-lg bg-primary/5 px-2.5 py-1.5">
+                          <ExternalLink className="h-3 w-3" /> Claims filing site
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">This settlement has not yet been independently verified.</p>
+                )}
+              </div>
+
+              <p className="text-[11px] text-muted-foreground">
+                Eligibility depends on settlement administrator review. Estimated payouts are pending review and subject to settlement terms.
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
