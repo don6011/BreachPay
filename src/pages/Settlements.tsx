@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { DeadlineBadge, isDeadlinePassed } from "@/components/DeadlineBadge";
+import { PayoutRange } from "@/components/PayoutRange";
 import {
   Scale, DollarSign, Clock, ArrowRight, Shield, AlertTriangle, FileCheck,
   Zap, ChevronDown, Sparkles, TrendingUp, CheckCircle2, Target,
-  ExternalLink,
+  ExternalLink, XCircle,
 } from "lucide-react";
 import type { SettlementStatus } from "@/types";
 import { Link, useNavigate } from "react-router-dom";
@@ -249,7 +251,7 @@ const Settlements = () => {
           </div>
           <div className="rounded-xl bg-muted/50 p-4">
             <p className="text-xs text-muted-foreground mb-1">Estimated Range</p>
-            <p className="text-2xl font-bold text-primary">${totalMin.toLocaleString()} – ${totalMax.toLocaleString()}</p>
+            <PayoutRange min={totalMin} max={totalMax} size="sm" className="text-2xl" />
           </div>
           <div className="rounded-xl bg-muted/50 p-4">
             <p className="text-xs text-muted-foreground mb-1">Claims Filed</p>
@@ -371,6 +373,7 @@ const Settlements = () => {
                           verified={settlement.verified}
                           compact
                         />
+                        <DeadlineBadge deadline={effectiveDeadline} />
                       </div>
                       <p className="text-xs text-muted-foreground">{settlement.company} · {settlement.breach_year}</p>
                     </div>
@@ -386,12 +389,7 @@ const Settlements = () => {
 
                   {/* Payout + Deadline Row */}
                   <div className="flex flex-wrap items-center gap-4 mb-3">
-                    <div className="flex items-center gap-1.5">
-                      <DollarSign className="h-4 w-4 text-primary" />
-                      <span className="text-lg font-bold text-primary drop-shadow-[0_0_8px_hsl(172_89%_52%/0.3)]">
-                        ${settlement.payout_min.toLocaleString()} – ${settlement.payout_max.toLocaleString()}
-                      </span>
-                    </div>
+                    <PayoutRange min={settlement.payout_min} max={settlement.payout_max} />
                     {effectiveDeadline && (
                       <div className={`flex items-center gap-1.5 text-sm ${isUrgent ? "text-critical" : "text-muted-foreground"}`}>
                         {isUrgent ? <AlertTriangle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
@@ -446,7 +444,11 @@ const Settlements = () => {
                     <Button size="sm" variant="ghost" className="rounded-xl text-xs" onClick={() => setDetailSettlement(settlement)}>
                       Details
                     </Button>
-                    {settlement.status === "open" && filingStatus === "not_filed" ? (
+                    {settlement.status === "closed" || isDeadlinePassed(effectiveDeadline) ? (
+                      <span className="inline-flex items-center gap-1 rounded-full border border-muted-foreground/20 bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground">
+                        <XCircle className="h-3 w-3" /> Filing Closed
+                      </span>
+                    ) : settlement.status === "open" && filingStatus === "not_filed" ? (
                       <Button
                         size="sm"
                         className="rounded-xl shadow-[0_0_16px_hsl(172_89%_52%/0.2)] hover:shadow-[0_0_24px_hsl(172_89%_52%/0.35)] transition-all duration-300"
@@ -460,6 +462,10 @@ const Settlements = () => {
                         )}
                       </Button>
                     ) : filingStatus !== "not_filed" && filingStatus !== "paid" ? (
+                      <Button size="sm" variant="outline" asChild className="rounded-xl">
+                        <Link to={`/claims/${claimMap[settlement.id]?.id}`}>Track Claim</Link>
+                      </Button>
+                    ) : settlement.status === "pending" && filingStatus === "not_filed" ? (
                       <Button size="sm" variant="outline" asChild className="rounded-xl">
                         <Link to={`/claims/${claimMap[settlement.id]?.id}`}>Track Claim</Link>
                       </Button>
@@ -491,7 +497,7 @@ const Settlements = () => {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-xl bg-muted/50 p-3">
                   <p className="text-xs text-muted-foreground mb-1">Estimated Payout</p>
-                  <p className="text-sm font-bold text-primary">${detailSettlement.payout_min.toLocaleString()} – ${detailSettlement.payout_max.toLocaleString()}</p>
+                  <PayoutRange min={detailSettlement.payout_min} max={detailSettlement.payout_max} size="sm" />
                 </div>
                 <div className="rounded-xl bg-muted/50 p-3">
                   <p className="text-xs text-muted-foreground mb-1">Filing Deadline</p>
