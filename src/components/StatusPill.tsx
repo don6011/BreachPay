@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 import type { SeverityLevel, SettlementStatus, ClaimStatus, AlertCategory } from "@/types";
 
-type PillVariant = SeverityLevel | SettlementStatus | ClaimStatus | AlertCategory | "active" | "inactive";
+type PillVariant = SeverityLevel | SettlementStatus | ClaimStatus | AlertCategory | "active" | "inactive" | "processing" | "failed" | "done";
 
 const variantStyles: Record<string, string> = {
   low: "bg-success/15 text-success border-success/20",
@@ -19,6 +19,9 @@ const variantStyles: Record<string, string> = {
   paid: "bg-success/20 text-success border-success/30",
   active: "bg-success/15 text-success border-success/20",
   inactive: "bg-muted-foreground/15 text-muted-foreground border-muted-foreground/20",
+  processing: "bg-warning/15 text-warning border-warning/20",
+  failed: "bg-critical/15 text-critical border-critical/20",
+  done: "bg-success/15 text-success border-success/20",
   breach_detected: "bg-critical/15 text-critical border-critical/20",
   settlement_found: "bg-primary/15 text-primary border-primary/20",
   payout_update: "bg-success/15 text-success border-success/20",

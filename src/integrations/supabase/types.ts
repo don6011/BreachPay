@@ -360,6 +360,47 @@ export type Database = {
           },
         ]
       }
+      claim_tasks: {
+        Row: {
+          assigned_to_role: string
+          claim_id: string
+          completed_at: string | null
+          created_at: string
+          details: string | null
+          id: string
+          status: string
+          task_type: string
+        }
+        Insert: {
+          assigned_to_role?: string
+          claim_id: string
+          completed_at?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          status?: string
+          task_type: string
+        }
+        Update: {
+          assigned_to_role?: string
+          claim_id?: string
+          completed_at?: string | null
+          created_at?: string
+          details?: string | null
+          id?: string
+          status?: string
+          task_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_tasks_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       claims: {
         Row: {
           created_at: string
@@ -371,6 +412,7 @@ export type Database = {
           flagged: boolean
           id: string
           net_payout: number | null
+          partner_firm_id: string | null
           partner_id: string | null
           platform_fee: number | null
           scan_run_id: string | null
@@ -389,6 +431,7 @@ export type Database = {
           flagged?: boolean
           id?: string
           net_payout?: number | null
+          partner_firm_id?: string | null
           partner_id?: string | null
           platform_fee?: number | null
           scan_run_id?: string | null
@@ -407,6 +450,7 @@ export type Database = {
           flagged?: boolean
           id?: string
           net_payout?: number | null
+          partner_firm_id?: string | null
           partner_id?: string | null
           platform_fee?: number | null
           scan_run_id?: string | null
@@ -416,6 +460,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "claims_partner_firm_id_fkey"
+            columns: ["partner_firm_id"]
+            isOneToOne: false
+            referencedRelation: "partner_firms"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "claims_scan_run_id_fkey"
             columns: ["scan_run_id"]
@@ -537,6 +588,65 @@ export type Database = {
           value_last4?: string | null
         }
         Relationships: []
+      }
+      partner_firms: {
+        Row: {
+          contact_email: string | null
+          created_at: string
+          id: string
+          name: string
+          status: string
+          website: string | null
+        }
+        Insert: {
+          contact_email?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          status?: string
+          website?: string | null
+        }
+        Update: {
+          contact_email?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          status?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
+      partner_profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          firm_id: string | null
+          phone: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          firm_id?: string | null
+          phone?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          firm_id?: string | null
+          phone?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_profiles_firm_id_fkey"
+            columns: ["firm_id"]
+            isOneToOne: false
+            referencedRelation: "partner_firms"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payouts: {
         Row: {
