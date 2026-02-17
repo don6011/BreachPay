@@ -248,37 +248,61 @@ export type Database = {
       }
       claim_documents: {
         Row: {
+          admin_notes: string | null
           claim_id: string
           created_at: string
+          doc_type: string
+          file_name: string
           file_path: string
+          file_size: number | null
           file_type: string | null
           id: string
+          mime_type: string | null
           note: string | null
+          status: string
+          updated_at: string
           user_id: string
+          user_notes: string | null
           verified: boolean
           verified_at: string | null
           verified_by: string | null
         }
         Insert: {
+          admin_notes?: string | null
           claim_id: string
           created_at?: string
+          doc_type?: string
+          file_name: string
           file_path: string
+          file_size?: number | null
           file_type?: string | null
           id?: string
+          mime_type?: string | null
           note?: string | null
+          status?: string
+          updated_at?: string
           user_id: string
+          user_notes?: string | null
           verified?: boolean
           verified_at?: string | null
           verified_by?: string | null
         }
         Update: {
+          admin_notes?: string | null
           claim_id?: string
           created_at?: string
+          doc_type?: string
+          file_name?: string
           file_path?: string
+          file_size?: number | null
           file_type?: string | null
           id?: string
+          mime_type?: string | null
           note?: string | null
+          status?: string
+          updated_at?: string
           user_id?: string
+          user_notes?: string | null
           verified?: boolean
           verified_at?: string | null
           verified_by?: string | null

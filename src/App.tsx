@@ -23,6 +23,7 @@ import ClaimTracker from "./pages/ClaimTracker";
 import Monitoring from "./pages/Monitoring";
 import Settings from "./pages/Settings";
 import Wallet from "./pages/Wallet";
+import Vault from "./pages/Vault";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminSettlements from "./pages/admin/AdminSettlements";
@@ -32,6 +33,7 @@ import AdminAutomationLogs from "./pages/admin/AdminAutomationLogs";
 import AdminPayouts from "./pages/admin/AdminPayouts";
 import AdminPartners from "./pages/admin/AdminPartners";
 import AdminBreachCatalog from "./pages/admin/AdminBreachCatalog";
+import AdminDocuments from "./pages/admin/AdminDocuments";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import PartnerClaims from "./pages/partner/PartnerClaims";
 import PartnerClaimDetail from "./pages/partner/PartnerClaimDetail";
@@ -63,6 +65,7 @@ const App = () => (
               <Route path="/claims/:claimId" element={<ClaimTracker />} />
               <Route path="/monitoring" element={<Monitoring />} />
               <Route path="/wallet" element={<Wallet />} />
+              <Route path="/vault" element={<Vault />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
 
@@ -77,6 +80,7 @@ const App = () => (
               <Route path="/admin/payouts" element={<AdminPayouts />} />
               <Route path="/admin/partners" element={<AdminPartners />} />
               <Route path="/admin/breach-catalog" element={<AdminBreachCatalog />} />
+              <Route path="/admin/documents" element={<AdminDocuments />} />
             </Route>
 
             {/* Partner Portal - Protected */}
