@@ -3,8 +3,12 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Send, Zap, RefreshCw } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { Plus, Send, Zap, RefreshCw, Pencil, ShieldCheck, ExternalLink } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,7 +23,35 @@ interface Settlement {
   payout_max: number | null;
   deadline: string | null;
   description: string | null;
+  verified: boolean;
+  verification_level: string;
+  jurisdiction: string | null;
+  case_number: string | null;
+  administrator_name: string | null;
+  official_source_url: string | null;
+  claims_filing_url: string | null;
+  claim_deadline: string | null;
+  notes_internal: string | null;
 }
+
+const VERIFICATION_LEVELS = [
+  { value: "unverified", label: "Unverified" },
+  { value: "source_linked", label: "Source Linked" },
+  { value: "court_verified", label: "Court Verified" },
+  { value: "administrator_confirmed", label: "Administrator Confirmed" },
+];
+
+const verificationLabel = (level: string) =>
+  VERIFICATION_LEVELS.find((v) => v.value === level)?.label || level;
+
+const emptyForm = () => ({
+  name: "", company: "", breach_year: "", status: "open",
+  payout_min: "", payout_max: "", deadline: "", description: "",
+  verified: false, verification_level: "unverified",
+  jurisdiction: "", case_number: "", administrator_name: "",
+  official_source_url: "", claims_filing_url: "",
+  claim_deadline: "", notes_internal: "",
+});
 
 const AdminSettlements = () => {
   const { user } = useAuth();
@@ -28,84 +60,133 @@ const AdminSettlements = () => {
   const [sendingAlerts, setSendingAlerts] = useState(false);
   const [rebuildingMatches, setRebuildingMatches] = useState(false);
   const [runningScan, setRunningScan] = useState(false);
-
-  // Add settlement form state
-  const [newName, setNewName] = useState("");
-  const [newCompany, setNewCompany] = useState("");
-  const [newYear, setNewYear] = useState("");
-  const [newStatus, setNewStatus] = useState("open");
-  const [newPayoutMin, setNewPayoutMin] = useState("");
-  const [newPayoutMax, setNewPayoutMax] = useState("");
-  const [newDeadline, setNewDeadline] = useState("");
-  const [newDescription, setNewDescription] = useState("");
-  const [addingSettlement, setAddingSettlement] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(emptyForm());
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   const fetchSettlements = async () => {
     const { data } = await supabase
       .from("settlements")
-      .select("id, name, company, breach_year, status, payout_min, payout_max, deadline, description")
+      .select("id, name, company, breach_year, status, payout_min, payout_max, deadline, description, verified, verification_level, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, claim_deadline, notes_internal")
       .order("created_at", { ascending: false });
-    if (data) setSettlements(data);
+    if (data) setSettlements(data as Settlement[]);
     setLoading(false);
   };
 
-  useEffect(() => {
-    if (user) fetchSettlements();
-  }, [user]);
+  useEffect(() => { if (user) fetchSettlements(); }, [user]);
 
-  const handleAddSettlement = async () => {
-    if (!newName || !newCompany) return;
-    setAddingSettlement(true);
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(emptyForm());
+    setValidationErrors([]);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (s: Settlement) => {
+    setEditingId(s.id);
+    setForm({
+      name: s.name, company: s.company,
+      breach_year: s.breach_year?.toString() || "",
+      status: s.status,
+      payout_min: s.payout_min?.toString() || "",
+      payout_max: s.payout_max?.toString() || "",
+      deadline: s.deadline || "",
+      description: s.description || "",
+      verified: s.verified,
+      verification_level: s.verification_level,
+      jurisdiction: s.jurisdiction || "",
+      case_number: s.case_number || "",
+      administrator_name: s.administrator_name || "",
+      official_source_url: s.official_source_url || "",
+      claims_filing_url: s.claims_filing_url || "",
+      claim_deadline: s.claim_deadline || "",
+      notes_internal: s.notes_internal || "",
+    });
+    setValidationErrors([]);
+    setDialogOpen(true);
+  };
+
+  const validate = (): string[] => {
+    const errors: string[] = [];
+    if (!form.name.trim()) errors.push("Name is required.");
+    if (!form.company.trim()) errors.push("Company is required.");
+    if (form.verified && !form.official_source_url.trim() && !form.claims_filing_url.trim()) {
+      errors.push("Verified settlements require an Official Source URL or Claims Filing URL.");
+    }
+    if (form.verification_level !== "unverified") {
+      if (!form.official_source_url.trim() && !form.claims_filing_url.trim()) {
+        errors.push("Non-unverified level requires at least one URL.");
+      }
+      if (!form.jurisdiction.trim()) {
+        errors.push("Non-unverified level requires a jurisdiction.");
+      }
+    }
+    return errors;
+  };
+
+  const handleSave = async () => {
+    const errors = validate();
+    if (errors.length) { setValidationErrors(errors); return; }
+    setValidationErrors([]);
+    setSaving(true);
+
+    const payload: any = {
+      name: form.name.trim(),
+      company: form.company.trim(),
+      breach_year: form.breach_year ? parseInt(form.breach_year) : null,
+      status: form.status,
+      payout_min: form.payout_min ? parseFloat(form.payout_min) : null,
+      payout_max: form.payout_max ? parseFloat(form.payout_max) : null,
+      deadline: form.deadline || null,
+      description: form.description.trim() || null,
+      verified: form.verified,
+      verification_level: form.verification_level,
+      jurisdiction: form.jurisdiction.trim() || null,
+      case_number: form.case_number.trim() || null,
+      administrator_name: form.administrator_name.trim() || null,
+      official_source_url: form.official_source_url.trim() || null,
+      claims_filing_url: form.claims_filing_url.trim() || null,
+      claim_deadline: form.claim_deadline || null,
+      notes_internal: form.notes_internal.trim() || null,
+    };
+
     try {
-      const { error } = await supabase.from("settlements").insert({
-        name: newName,
-        company: newCompany,
-        breach_year: newYear ? parseInt(newYear) : null,
-        status: newStatus as any,
-        payout_min: newPayoutMin ? parseFloat(newPayoutMin) : null,
-        payout_max: newPayoutMax ? parseFloat(newPayoutMax) : null,
-        deadline: newDeadline || null,
-        description: newDescription || null,
-        created_by: user?.id,
-      });
-      if (error) throw error;
-      toast({ title: "Success", description: "Settlement added" });
+      if (editingId) {
+        const { error } = await supabase.from("settlements").update(payload).eq("id", editingId);
+        if (error) throw error;
+        toast({ title: "Settlement updated" });
+      } else {
+        payload.created_by = user?.id;
+        const { error } = await supabase.from("settlements").insert(payload);
+        if (error) throw error;
+        toast({ title: "Settlement created" });
+      }
       setDialogOpen(false);
-      setNewName(""); setNewCompany(""); setNewYear(""); setNewPayoutMin(""); setNewPayoutMax(""); setNewDeadline(""); setNewDescription("");
       fetchSettlements();
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to add settlement", variant: "destructive" });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
-      setAddingSettlement(false);
+      setSaving(false);
     }
   };
 
-  const callEdgeFunction = async (
-    functionName: string,
-    loadingState: [boolean, (v: boolean) => void]
-  ) => {
+  const callEdgeFunction = async (functionName: string, loadingState: [boolean, (v: boolean) => void]) => {
     const [, setLoadingState] = loadingState;
     setLoadingState(true);
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const { data: { session } } = await supabase.auth.getSession();
-
       const response = await fetch(`${supabaseUrl}/functions/v1/${functionName}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token || ''}`,
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token || ''}` },
         body: JSON.stringify({}),
       });
-
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
       const data = await response.json();
       let title = "Success";
       let description = "";
-
       if (functionName === "run-deadline-alerts") {
         description = data.alerts_sent ? `Sent ${data.alerts_sent} deadline alerts` : data.message || "Alerts sent";
       } else if (functionName === "rebuild-settlement-matches") {
@@ -113,51 +194,21 @@ const AdminSettlements = () => {
       } else if (functionName === "run-scheduled-scans") {
         description = data.scans_initiated ? `Initiated ${data.scans_initiated} scans` : data.message || "Scans initiated";
       }
-
-      if (data.message && !data.success && !data.created && !data.alerts_sent && !data.scans_initiated) {
-        title = "Info";
-      }
-
+      if (data.message && !data.success && !data.created && !data.alerts_sent && !data.scans_initiated) title = "Info";
       toast({ title, description });
     } catch (error) {
-      toast({
-        title: "Error",
-        description: `Failed to trigger ${functionName}: ${error instanceof Error ? error.message : String(error)}`,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: `Failed to trigger ${functionName}: ${error instanceof Error ? error.message : String(error)}`, variant: "destructive" });
     } finally {
       setLoadingState(false);
     }
   };
 
+  const effectiveDeadline = (s: Settlement) => s.claim_deadline || s.deadline;
+
   return (
     <div>
-      <PageHeader title="Settlement Management" subtitle="Manage settlement records">
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="rounded-xl"><Plus className="mr-1 h-3 w-3" />Add Settlement</Button>
-          </DialogTrigger>
-          <DialogContent className="bg-card rounded-2xl">
-            <DialogHeader><DialogTitle>Add Settlement</DialogTitle></DialogHeader>
-            <div className="space-y-3">
-              <Input placeholder="Settlement Name" className="rounded-xl" value={newName} onChange={(e) => setNewName(e.target.value)} />
-              <Input placeholder="Company" className="rounded-xl" value={newCompany} onChange={(e) => setNewCompany(e.target.value)} />
-              <div className="grid grid-cols-2 gap-3">
-                <Input placeholder="Breach Year" type="number" className="rounded-xl" value={newYear} onChange={(e) => setNewYear(e.target.value)} />
-                <Input placeholder="Status (open/pending/closed)" className="rounded-xl" value={newStatus} onChange={(e) => setNewStatus(e.target.value)} />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <Input placeholder="Payout Min ($)" type="number" className="rounded-xl" value={newPayoutMin} onChange={(e) => setNewPayoutMin(e.target.value)} />
-                <Input placeholder="Payout Max ($)" type="number" className="rounded-xl" value={newPayoutMax} onChange={(e) => setNewPayoutMax(e.target.value)} />
-              </div>
-              <Input placeholder="Deadline" type="date" className="rounded-xl" value={newDeadline} onChange={(e) => setNewDeadline(e.target.value)} />
-              <Input placeholder="Description" className="rounded-xl" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} />
-              <Button className="w-full rounded-xl bg-primary text-primary-foreground" onClick={handleAddSettlement} disabled={addingSettlement || !newName || !newCompany}>
-                {addingSettlement ? "Adding..." : "Add Settlement"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+      <PageHeader title="Settlement Management" subtitle="Manage settlement records and verification">
+        <Button size="sm" className="rounded-xl" onClick={openCreate}><Plus className="mr-1 h-3 w-3" />Add Settlement</Button>
         <Button size="sm" variant="outline" className="rounded-xl" onClick={() => callEdgeFunction("run-deadline-alerts", [sendingAlerts, setSendingAlerts])} disabled={sendingAlerts}>
           <Send className="mr-1 h-3 w-3" />{sendingAlerts ? "Sending..." : "Send Alerts"}
         </Button>
@@ -178,14 +229,16 @@ const AdminSettlements = () => {
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Year</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Payout Range</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Deadline</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Verified</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Actions</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
             ) : settlements.length === 0 ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No settlements yet</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">No settlements yet</td></tr>
             ) : (
               settlements.map((s) => (
                 <tr key={s.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
@@ -193,14 +246,162 @@ const AdminSettlements = () => {
                   <td className="px-4 py-3">{s.company}</td>
                   <td className="px-4 py-3">{s.breach_year || "—"}</td>
                   <td className="px-4 py-3 text-primary">${s.payout_min || 0}–${(s.payout_max || 0).toLocaleString()}</td>
-                  <td className="px-4 py-3">{s.deadline || "—"}</td>
+                  <td className="px-4 py-3">{effectiveDeadline(s) || "—"}</td>
+                  <td className="px-4 py-3">
+                    {s.verified ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/30 px-2 py-0.5 text-[10px] font-semibold text-green-800 dark:text-green-400">
+                        <ShieldCheck className="h-2.5 w-2.5" /> {verificationLabel(s.verification_level)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Unverified</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3"><StatusPill variant={s.status as any} /></td>
+                  <td className="px-4 py-3">
+                    <Button variant="ghost" size="sm" onClick={() => openEdit(s)} className="gap-1">
+                      <Pencil className="h-3.5 w-3.5" /> Edit
+                    </Button>
+                  </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+
+      {/* Create / Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="bg-card rounded-2xl max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingId ? "Edit Settlement" : "Add Settlement"}</DialogTitle>
+            <DialogDescription>
+              {editingId ? "Update settlement details and verification status." : "Create a new settlement record."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {validationErrors.length > 0 && (
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 space-y-1">
+              {validationErrors.map((e, i) => (
+                <p key={i} className="text-sm text-destructive">{e}</p>
+              ))}
+            </div>
+          )}
+
+          <div className="space-y-6">
+            {/* Basic Info */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Basic Information</h3>
+              <Input placeholder="Settlement Name *" className="rounded-xl" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+              <Input placeholder="Company *" className="rounded-xl" value={form.company} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))} />
+              <div className="grid grid-cols-2 gap-3">
+                <Input placeholder="Breach Year" type="number" className="rounded-xl" value={form.breach_year} onChange={(e) => setForm((f) => ({ ...f, breach_year: e.target.value }))} />
+                <Select value={form.status} onValueChange={(v) => setForm((f) => ({ ...f, status: v }))}>
+                  <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input placeholder="Payout Min ($)" type="number" className="rounded-xl" value={form.payout_min} onChange={(e) => setForm((f) => ({ ...f, payout_min: e.target.value }))} />
+                <Input placeholder="Payout Max ($)" type="number" className="rounded-xl" value={form.payout_max} onChange={(e) => setForm((f) => ({ ...f, payout_max: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Settlement Deadline</Label>
+                  <Input type="date" className="rounded-xl" value={form.deadline} onChange={(e) => setForm((f) => ({ ...f, deadline: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Claims Filing Deadline</Label>
+                  <Input type="date" className="rounded-xl" value={form.claim_deadline} onChange={(e) => setForm((f) => ({ ...f, claim_deadline: e.target.value }))} />
+                </div>
+              </div>
+              <Textarea placeholder="Description" className="rounded-xl" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} rows={2} />
+            </div>
+
+            {/* Verification */}
+            <div className="space-y-3 rounded-xl border p-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Verification</h3>
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Verified Settlement</Label>
+                <Switch checked={form.verified} onCheckedChange={(v) => setForm((f) => ({ ...f, verified: v }))} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Verification Level</Label>
+                <Select value={form.verification_level} onValueChange={(v) => setForm((f) => ({ ...f, verification_level: v }))}>
+                  <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {VERIFICATION_LEVELS.map((vl) => (
+                      <SelectItem key={vl.value} value={vl.value}>{vl.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Jurisdiction</Label>
+                  <Input placeholder="e.g. Southern District of CA" className="rounded-xl" value={form.jurisdiction} onChange={(e) => setForm((f) => ({ ...f, jurisdiction: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Case Number</Label>
+                  <Input placeholder="e.g. 3:21-cv-00001" className="rounded-xl" value={form.case_number} onChange={(e) => setForm((f) => ({ ...f, case_number: e.target.value }))} />
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Administrator Name</Label>
+                <Input placeholder="e.g. Epiq Global" className="rounded-xl" value={form.administrator_name} onChange={(e) => setForm((f) => ({ ...f, administrator_name: e.target.value }))} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Official Source URL</Label>
+                  <Input placeholder="https://..." className="rounded-xl" value={form.official_source_url} onChange={(e) => setForm((f) => ({ ...f, official_source_url: e.target.value }))} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground">Claims Filing URL</Label>
+                  <Input placeholder="https://..." className="rounded-xl" value={form.claims_filing_url} onChange={(e) => setForm((f) => ({ ...f, claims_filing_url: e.target.value }))} />
+                </div>
+              </div>
+            </div>
+
+            {/* User Preview */}
+            {form.verified && (
+              <div className="rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4 space-y-2">
+                <p className="text-[10px] font-semibold text-primary uppercase tracking-wider">User Preview</p>
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-green-600" />
+                  <span className="text-sm font-semibold">Verified Settlement</span>
+                  <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400 px-2 py-0.5 rounded-full font-medium">
+                    {verificationLabel(form.verification_level)}
+                  </span>
+                </div>
+                {form.jurisdiction && <p className="text-xs text-muted-foreground">Jurisdiction: {form.jurisdiction}</p>}
+                {form.case_number && <p className="text-xs text-muted-foreground">Case: {form.case_number}</p>}
+                {form.administrator_name && <p className="text-xs text-muted-foreground">Administrator: {form.administrator_name}</p>}
+                <div className="flex gap-2 mt-1">
+                  {form.official_source_url && (
+                    <span className="text-[10px] text-primary flex items-center gap-0.5"><ExternalLink className="h-2.5 w-2.5" /> Official source</span>
+                  )}
+                  {form.claims_filing_url && (
+                    <span className="text-[10px] text-primary flex items-center gap-0.5"><ExternalLink className="h-2.5 w-2.5" /> File claim</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Internal Notes */}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">Internal Notes (admin only)</Label>
+              <Textarea placeholder="Internal notes..." className="rounded-xl" value={form.notes_internal} onChange={(e) => setForm((f) => ({ ...f, notes_internal: e.target.value }))} rows={2} />
+            </div>
+
+            <Button className="w-full rounded-xl" onClick={handleSave} disabled={saving || !form.name || !form.company}>
+              {saving ? "Saving..." : editingId ? "Save Changes" : "Add Settlement"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

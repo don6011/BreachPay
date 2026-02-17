@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowLeft, FileText, Upload, CheckCircle, Clock, DollarSign,
   AlertTriangle, Shield, Loader2, X, ExternalLink, MessageSquare, Info,
+  ShieldCheck,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
@@ -22,6 +23,12 @@ const PROGRESS_STEPS = [
 ];
 
 const DOC_TYPES = ["ID Verification", "Address Proof", "Breach Notice", "Expense Proof"];
+
+const VERIFICATION_LABELS: Record<string, string> = {
+  source_linked: "Source linked",
+  court_verified: "Court verified",
+  administrator_confirmed: "Administrator confirmed",
+};
 
 interface ClaimDetail {
   id: string;
@@ -40,6 +47,12 @@ interface ClaimDetail {
     deadline: string | null;
     payout_min: number;
     payout_max: number;
+    verified: boolean;
+    verification_level: string;
+    claim_deadline: string | null;
+    official_source_url: string | null;
+    claims_filing_url: string | null;
+    administrator_name: string | null;
   } | null;
 }
 
@@ -87,7 +100,7 @@ const ClaimTracker = () => {
         .from("claims")
         .select(`
           id, status, est_payout, filed_at, updated_at, fee_percent, final_payout, flag_reason,
-          settlements(id, name, company, breach_year, deadline, payout_min, payout_max)
+          settlements(id, name, company, breach_year, deadline, payout_min, payout_max, verified, verification_level, claim_deadline, official_source_url, claims_filing_url, administrator_name)
         `)
         .eq("id", claimId)
         .maybeSingle(),
@@ -114,6 +127,12 @@ const ClaimTracker = () => {
           ...c.settlements,
           payout_min: Number(c.settlements.payout_min) || 0,
           payout_max: Number(c.settlements.payout_max) || 0,
+          verified: c.settlements.verified || false,
+          verification_level: c.settlements.verification_level || "unverified",
+          claim_deadline: c.settlements.claim_deadline || null,
+          official_source_url: c.settlements.official_source_url || null,
+          claims_filing_url: c.settlements.claims_filing_url || null,
+          administrator_name: c.settlements.administrator_name || null,
         } : null,
       });
     }
@@ -183,6 +202,7 @@ const ClaimTracker = () => {
   const isRejected = claim.status === "rejected";
   const isDocRequired = claim.status === "documentation_required";
   const progressPercent = isRejected ? 0 : ((Math.max(0, currentStepIndex) + 1) / PROGRESS_STEPS.length) * 100;
+  const effectiveDeadline = claim.settlement?.claim_deadline || claim.settlement?.deadline;
 
   return (
     <div>
@@ -197,6 +217,33 @@ const ClaimTracker = () => {
           <ArrowLeft className="h-4 w-4 mr-1" /> Back to Claims
         </Button>
 
+        {/* Verified Settlement Callout */}
+        {claim.settlement?.verified && (
+          <div className="rounded-xl border border-green-200 dark:border-green-800/40 bg-green-50 dark:bg-green-900/10 p-3 flex items-start gap-3">
+            <ShieldCheck className="h-4 w-4 text-green-700 dark:text-green-400 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-green-800 dark:text-green-300">Verified settlement</p>
+              <p className="text-xs text-green-700/80 dark:text-green-400/70">
+                {VERIFICATION_LABELS[claim.settlement.verification_level] || "Verified"}
+                {claim.settlement.administrator_name && ` by ${claim.settlement.administrator_name}`}.
+                Eligibility depends on settlement administrator review.
+              </p>
+              <div className="flex gap-2 mt-1">
+                {claim.settlement.official_source_url && (
+                  <a href={claim.settlement.official_source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline">
+                    <ExternalLink className="h-2.5 w-2.5" /> Official source
+                  </a>
+                )}
+                {claim.settlement.claims_filing_url && (
+                  <a href={claim.settlement.claims_filing_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline">
+                    <ExternalLink className="h-2.5 w-2.5" /> Claims filing site
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Status & Settlement Card */}
         <div className="rounded-2xl border bg-card p-6 space-y-4">
           <div className="flex items-start justify-between">
@@ -210,18 +257,18 @@ const ClaimTracker = () => {
           </div>
 
           {/* Deadline Countdown */}
-          {claim.settlement?.deadline && (() => {
-            const daysLeft = Math.max(0, Math.ceil((new Date(claim.settlement.deadline).getTime() - Date.now()) / 86400000));
+          {effectiveDeadline && (() => {
+            const daysLeft = Math.max(0, Math.ceil((new Date(effectiveDeadline).getTime() - Date.now()) / 86400000));
             const isUrgent = daysLeft <= 30;
             return (
               <div className={`flex items-center gap-2 rounded-xl p-3 ${isUrgent ? "bg-destructive/10 border border-destructive/20" : "bg-muted/50"}`}>
                 {isUrgent ? <AlertTriangle className="h-4 w-4 text-destructive shrink-0" /> : <Clock className="h-4 w-4 text-muted-foreground shrink-0" />}
                 <div className="flex-1">
                   <p className={`text-sm font-semibold ${isUrgent ? "text-destructive" : ""}`}>
-                    {daysLeft} days until deadline
+                    {daysLeft} days until filing deadline
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Settlement deadline: {new Date(claim.settlement.deadline).toLocaleDateString()}
+                    Filing deadline: {new Date(effectiveDeadline).toLocaleDateString()} · Enforced by settlement administrator
                   </p>
                 </div>
               </div>
@@ -242,7 +289,7 @@ const ClaimTracker = () => {
                       <Info className="h-3 w-3 text-muted-foreground" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-[240px] bg-card border text-sm">
-                      Estimates are based on settlement terms, verification status, and historical payout ranges. Final amounts depend on administrator review and settlement rules.
+                      Estimates are based on settlement terms. Final amounts depend on administrator review and may vary.
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -449,7 +496,7 @@ const ClaimTracker = () => {
 
         {/* Legal Disclaimer */}
         <p className="text-xs text-muted-foreground text-center pt-2 pb-4">
-          BreachPay is not a law firm and does not provide legal advice. Estimated payouts are pending review and subject to settlement terms. Service fee of 15% applies only upon successful payout.
+          BreachPay is not a law firm and does not provide legal advice. Estimated payouts are pending review and subject to settlement terms. Service fee of 15% applies only upon successful payout. Filing deadline is enforced by the settlement administrator.
         </p>
       </div>
     </div>

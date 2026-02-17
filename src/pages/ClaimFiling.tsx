@@ -13,7 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   Shield, Lock, ChevronRight, ChevronLeft, Upload, FileText,
   Clock, AlertTriangle, CheckCircle, DollarSign, Camera, X,
-  Bookmark, Eye, Send, Sparkles, ArrowRight, Loader2
+  Bookmark, Eye, Send, Sparkles, ArrowRight, Loader2, ShieldCheck, ExternalLink,
 } from "lucide-react";
 
 const STEPS = ["Overview", "Identity", "Eligibility", "Documents", "Review"];
@@ -35,6 +35,12 @@ interface SettlementData {
   payout_max: number;
   deadline: string;
   status: string;
+  verified: boolean;
+  verification_level: string;
+  claim_deadline: string | null;
+  official_source_url: string | null;
+  claims_filing_url: string | null;
+  administrator_name: string | null;
 }
 
 interface UploadedDoc {
@@ -46,6 +52,12 @@ interface UploadedDoc {
   uploaded?: boolean;
   url?: string;
 }
+
+const VERIFICATION_LABELS: Record<string, string> = {
+  source_linked: "Source linked",
+  court_verified: "Court verified",
+  administrator_confirmed: "Administrator confirmed",
+};
 
 const ClaimFiling = () => {
   const [searchParams] = useSearchParams();
@@ -77,7 +89,7 @@ const ClaimFiling = () => {
     const fetchSettlement = async () => {
       const { data } = await supabase
         .from("settlements")
-        .select("id, name, company, breach_year, description, payout_min, payout_max, deadline, status")
+        .select("id, name, company, breach_year, description, payout_min, payout_max, deadline, status, verified, verification_level, claim_deadline, official_source_url, claims_filing_url, administrator_name")
         .eq("id", settlementId)
         .maybeSingle();
       if (data) {
@@ -86,6 +98,12 @@ const ClaimFiling = () => {
           payout_min: Number(data.payout_min) || 0,
           payout_max: Number(data.payout_max) || 0,
           deadline: data.deadline || "",
+          verified: data.verified || false,
+          verification_level: data.verification_level || "unverified",
+          claim_deadline: data.claim_deadline || null,
+          official_source_url: data.official_source_url || null,
+          claims_filing_url: data.claims_filing_url || null,
+          administrator_name: data.administrator_name || null,
         });
       }
       setLoadingSettlement(false);
@@ -100,11 +118,13 @@ const ClaimFiling = () => {
     }
   }, [user]);
 
+  const effectiveDeadline = settlement?.claim_deadline || settlement?.deadline || "";
+
   const deadlineDays = useMemo(() => {
-    if (!settlement?.deadline) return 0;
-    const diff = new Date(settlement.deadline).getTime() - Date.now();
+    if (!effectiveDeadline) return 0;
+    const diff = new Date(effectiveDeadline).getTime() - Date.now();
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
-  }, [settlement?.deadline]);
+  }, [effectiveDeadline]);
 
   const deadlineColor = deadlineDays <= 30 ? "text-destructive" : deadlineDays <= 60 ? "text-warning" : "text-success";
 
@@ -153,7 +173,6 @@ const ClaimFiling = () => {
         continue;
       }
 
-      // Insert record into claim_documents
       await supabase.from("claim_documents").insert({
         claim_id: claimId,
         user_id: user.id,
@@ -165,7 +184,6 @@ const ClaimFiling = () => {
       setDocuments(prev => prev.map((d, idx) => idx === i ? { ...d, uploading: false, uploaded: true, url: filePath } : d));
     }
 
-    // Log document upload in history
     await supabase.from("claim_status_history").insert({
       claim_id: claimId,
       status: "submitted",
@@ -194,7 +212,6 @@ const ClaimFiling = () => {
       const claimId = claimData.id;
       setCreatedClaimId(claimId);
 
-      // Insert initial status history
       await supabase.from("claim_status_history").insert({
         claim_id: claimId,
         status: "submitted",
@@ -202,7 +219,6 @@ const ClaimFiling = () => {
         updated_by: "user",
       });
 
-      // Upload documents if any
       if (documents.length > 0) {
         await uploadDocuments(claimId);
       }
@@ -258,9 +274,13 @@ const ClaimFiling = () => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Status</span>
-                <span className="font-semibold text-warning">Submitted</span>
+                <span className="font-semibold text-warning">Submitted — pending review</span>
               </div>
             </div>
+
+            <p className="text-xs text-muted-foreground mb-4">
+              Eligibility depends on settlement administrator review. Filing deadline is enforced by the settlement administrator.
+            </p>
 
             <div className="flex items-center gap-1 mb-6">
               {["Submitted", "Under Review", "Approved", "Paid"].map((s, i) => (
@@ -305,6 +325,34 @@ const ClaimFiling = () => {
       </div>
 
       <div className="mx-auto max-w-2xl">
+
+        {/* Verified Settlement Callout */}
+        {settlement.verified && (
+          <div className="mb-4 rounded-xl border border-green-200 dark:border-green-800/40 bg-green-50 dark:bg-green-900/10 p-3 flex items-start gap-3">
+            <ShieldCheck className="h-4 w-4 text-green-700 dark:text-green-400 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-green-800 dark:text-green-300">Verified settlement</p>
+              <p className="text-xs text-green-700/80 dark:text-green-400/70">
+                {VERIFICATION_LABELS[settlement.verification_level] || "Verified"}
+                {settlement.administrator_name && ` by ${settlement.administrator_name}`}.
+                Eligibility depends on settlement administrator review.
+              </p>
+              <div className="flex gap-2 mt-1">
+                {settlement.official_source_url && (
+                  <a href={settlement.official_source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline">
+                    <ExternalLink className="h-2.5 w-2.5" /> Official source
+                  </a>
+                )}
+                {settlement.claims_filing_url && (
+                  <a href={settlement.claims_filing_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] text-primary hover:underline">
+                    <ExternalLink className="h-2.5 w-2.5" /> Claims filing site
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* STEP 0 — Overview */}
         {step === 0 && (
           <div className="space-y-4">
@@ -323,13 +371,15 @@ const ClaimFiling = () => {
                   <p className="text-lg font-bold text-primary drop-shadow-[0_0_8px_hsl(172_89%_52%/0.4)]">
                     ${settlement.payout_min} – ${settlement.payout_max}
                   </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Subject to administrator review</p>
                 </div>
                 <div className="rounded-xl bg-muted/50 p-4">
                   <div className="flex items-center gap-1.5 mb-1">
                     <Clock className="h-3 w-3 text-muted-foreground" />
-                    <p className="text-xs text-muted-foreground">Deadline</p>
+                    <p className="text-xs text-muted-foreground">Filing Deadline</p>
                   </div>
                   <p className={`text-lg font-bold ${deadlineColor}`}>{deadlineDays} days</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Enforced by settlement administrator</p>
                 </div>
               </div>
             </div>
@@ -445,7 +495,6 @@ const ClaimFiling = () => {
                 <p className="text-sm text-muted-foreground">Upload evidence to strengthen your claim (optional).</p>
               </div>
 
-              {/* Document type selector */}
               <div className="flex flex-wrap gap-2">
                 {DOC_TYPES.map(dt => (
                   <button
@@ -462,14 +511,7 @@ const ClaimFiling = () => {
                 ))}
               </div>
 
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                accept="image/*,.pdf"
-                multiple
-                onChange={handleFileSelect}
-              />
+              <input ref={fileInputRef} type="file" className="hidden" accept="image/*,.pdf" multiple onChange={handleFileSelect} />
 
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -554,6 +596,9 @@ const ClaimFiling = () => {
                     <span className="text-muted-foreground">Service Fee</span>
                     <span className="text-muted-foreground">15% (only if paid)</span>
                   </div>
+                  <p className="text-[10px] text-muted-foreground mt-2">
+                    Estimated amounts may vary. Final payout is determined by the settlement administrator.
+                  </p>
                 </div>
               </div>
 
