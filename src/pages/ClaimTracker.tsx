@@ -129,7 +129,8 @@ const ClaimTracker = () => {
     setUploading(true);
 
     for (const file of Array.from(files)) {
-      const filePath = `${user.id}/${claimId}/${Date.now()}_${file.name}`;
+      const docTypeSlug = selectedDocType.toLowerCase().replace(/\s+/g, "_");
+      const filePath = `${user.id}/${claimId}/${docTypeSlug}/${Date.now()}_${file.name}`;
       const { error: uploadError } = await supabase.storage
         .from("claim-documents")
         .upload(filePath, file);
@@ -150,7 +151,7 @@ const ClaimTracker = () => {
       await supabase.from("claim_status_history").insert({
         claim_id: claimId,
         status: claim?.status || "submitted",
-        note: `Document uploaded: ${file.name} (${selectedDocType})`,
+        note: `Document uploaded: ${selectedDocType}`,
         updated_by: "user",
       });
     }
@@ -378,21 +379,36 @@ const ClaimTracker = () => {
             <div className="space-y-2">
               {documents.map(doc => (
                 <div key={doc.id} className={`flex items-center justify-between rounded-lg px-4 py-2.5 ${doc.verified ? "bg-success/10 border border-success/20" : "bg-muted/50"}`}>
-                  <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" />
-                    <div>
-                      <p className="text-sm">{doc.note || doc.file_path.split("/").pop()}</p>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <FileText className="h-4 w-4 text-primary shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm truncate">{doc.note || doc.file_path.split("/").pop()}</p>
                       <p className="text-[10px] text-muted-foreground">{new Date(doc.created_at).toLocaleString()}</p>
                     </div>
                     {doc.file_type && (
-                      <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full">{doc.file_type}</span>
+                      <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full shrink-0">{doc.file_type}</span>
                     )}
                     {doc.verified && (
-                      <span className="text-[10px] bg-success/10 text-success px-2 py-0.5 rounded-full flex items-center gap-0.5">
+                      <span className="text-[10px] bg-success/10 text-success px-2 py-0.5 rounded-full flex items-center gap-0.5 shrink-0">
                         <CheckCircle className="h-2.5 w-2.5" /> Verified
                       </span>
                     )}
                   </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 shrink-0 ml-2"
+                    onClick={async () => {
+                      const { data } = await supabase.storage
+                        .from("claim-documents")
+                        .createSignedUrl(doc.file_path, 600);
+                      if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                      else toast({ title: "Failed to generate download link", variant: "destructive" });
+                    }}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 mr-1" />
+                    <span className="text-xs">Download</span>
+                  </Button>
                 </div>
               ))}
             </div>
