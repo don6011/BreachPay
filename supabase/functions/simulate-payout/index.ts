@@ -57,62 +57,155 @@ Deno.serve(async (req) => {
   }
 
   // --- Parse body ---
-  const { claim_id } = await req.json();
+  const { claim_id, action } = await req.json();
   if (!claim_id) return json({ error: "claim_id required" }, 400);
 
   // Fetch claim
   const { data: claim, error: claimErr } = await supabase
     .from("claims")
-    .select("id, user_id, net_payout, status, settlement_id")
+    .select("id, user_id, net_payout, final_payout, platform_fee, status, settlement_id")
     .eq("id", claim_id)
     .single();
 
   if (claimErr || !claim) return json({ error: "Claim not found" }, 404);
 
+  // === ACTION: initiate ===
+  if (action === "initiate") {
+    if (claim.status !== "approved") {
+      return json({ error: "Claim must be approved before initiating payout" }, 400);
+    }
+
+    const payoutAmount = claim.net_payout ?? 0;
+    let stripeRef = `sim_${claim.id.slice(0, 8)}_${Date.now()}`;
+
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (stripeKey) {
+      try {
+        const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+        const pi = await stripe.paymentIntents.create({
+          amount: Math.round(payoutAmount * 100),
+          currency: "usd",
+          metadata: {
+            claim_id: claim.id,
+            user_id: claim.user_id,
+            type: "payout_simulation",
+          },
+          description: `BreachPay payout for claim ${claim.id.slice(0, 8)}`,
+          confirm: false,
+        });
+        stripeRef = pi.id;
+        console.log("Stripe PaymentIntent created:", pi.id);
+      } catch (stripeErr) {
+        console.warn("Stripe PI creation failed, using sim ref:", stripeErr);
+      }
+    }
+
+    // Insert payout record as processing
+    const { error: payoutErr } = await supabase.from("payouts").insert({
+      claim_id: claim.id,
+      user_id: claim.user_id,
+      amount: payoutAmount,
+      currency: "usd",
+      status: "processing",
+      stripe_ref: stripeRef,
+    });
+
+    if (payoutErr) {
+      console.error("Payout insert error:", payoutErr);
+      return json({ error: "Failed to create payout record" }, 500);
+    }
+
+    // Log status change
+    await supabase.from("claim_status_history").insert({
+      claim_id: claim.id,
+      status: claim.status,
+      updated_by: userData.user.id,
+      note: `Payout initiated — $${payoutAmount.toFixed(2)}. Ref: ${stripeRef}`,
+    });
+
+    // Alert user
+    await supabase.from("alerts").insert({
+      user_id: claim.user_id,
+      type: "payout_update",
+      title: "Payout initiated",
+      body: "Your payout is processing. You'll be notified when it's marked paid.",
+      severity: "low",
+      related_claim_id: claim.id,
+      related_settlement_id: claim.settlement_id,
+    });
+
+    // Admin activity log
+    await supabase.from("admin_activity_logs").insert({
+      admin_user_id: userData.user.id,
+      action: "Initiated payout",
+      entity_type: "claim",
+      entity_id: claim.id,
+      meta: { amount: payoutAmount, stripe_ref: stripeRef },
+    });
+
+    return json({ ok: true, stripe_ref: stripeRef, amount: payoutAmount, action: "initiated" });
+  }
+
+  // === ACTION: mark_paid (default for backwards compat) ===
   if (claim.status === "paid") {
     return json({ error: "Claim already paid" }, 400);
   }
 
-  // Create a Stripe PaymentIntent in test mode for audit trail
   const payoutAmount = claim.net_payout ?? 0;
-  let stripeRef = `sim_${claim.id.slice(0, 8)}_${Date.now()}`;
 
-  const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
-  if (stripeKey) {
-    try {
-      const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
-      const pi = await stripe.paymentIntents.create({
-        amount: Math.round(payoutAmount * 100), // cents
-        currency: "usd",
-        metadata: {
-          claim_id: claim.id,
-          user_id: claim.user_id,
-          type: "payout_simulation",
-        },
-        description: `BreachPay payout for claim ${claim.id.slice(0, 8)}`,
-        confirm: false,
-      });
-      stripeRef = pi.id;
-      console.log("Stripe PaymentIntent created:", pi.id);
-    } catch (stripeErr) {
-      console.warn("Stripe PI creation failed, using sim ref:", stripeErr);
+  // Find existing processing payout or create one
+  const { data: existingPayout } = await supabase
+    .from("payouts")
+    .select("id, stripe_ref")
+    .eq("claim_id", claim.id)
+    .eq("status", "processing")
+    .maybeSingle();
+
+  let stripeRef: string;
+
+  if (existingPayout) {
+    // Mark existing payout as paid
+    stripeRef = existingPayout.stripe_ref || `sim_${claim.id.slice(0, 8)}_${Date.now()}`;
+    await supabase.from("payouts").update({
+      status: "paid",
+      paid_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }).eq("id", existingPayout.id);
+  } else {
+    // Direct mark paid (legacy flow)
+    stripeRef = `sim_${claim.id.slice(0, 8)}_${Date.now()}`;
+
+    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+    if (stripeKey) {
+      try {
+        const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+        const pi = await stripe.paymentIntents.create({
+          amount: Math.round(payoutAmount * 100),
+          currency: "usd",
+          metadata: { claim_id: claim.id, user_id: claim.user_id, type: "payout_simulation" },
+          description: `BreachPay payout for claim ${claim.id.slice(0, 8)}`,
+          confirm: false,
+        });
+        stripeRef = pi.id;
+      } catch (e) {
+        console.warn("Stripe PI creation failed:", e);
+      }
     }
-  }
 
-  // Insert payout record
-  const { error: payoutErr } = await supabase.from("payouts").insert({
-    claim_id: claim.id,
-    user_id: claim.user_id,
-    amount: payoutAmount,
-    currency: "usd",
-    status: "paid",
-    stripe_ref: stripeRef,
-    paid_at: new Date().toISOString(),
-  });
+    const { error: payoutErr } = await supabase.from("payouts").insert({
+      claim_id: claim.id,
+      user_id: claim.user_id,
+      amount: payoutAmount,
+      currency: "usd",
+      status: "paid",
+      stripe_ref: stripeRef,
+      paid_at: new Date().toISOString(),
+    });
 
-  if (payoutErr) {
-    console.error("Payout insert error:", payoutErr);
-    return json({ error: "Failed to create payout record" }, 500);
+    if (payoutErr) {
+      console.error("Payout insert error:", payoutErr);
+      return json({ error: "Failed to create payout record" }, 500);
+    }
   }
 
   // Update claim status to paid
@@ -121,12 +214,12 @@ Deno.serve(async (req) => {
     .update({ status: "paid", updated_at: new Date().toISOString() })
     .eq("id", claim.id);
 
-  // Log status change in claim_status_history
+  // Log status change
   await supabase.from("claim_status_history").insert({
     claim_id: claim.id,
     status: "paid",
     updated_by: userData.user.id,
-    note: `Payout of $${payoutAmount.toFixed(2)} issued. Ref: ${stripeRef}`,
+    note: `Payout of $${payoutAmount.toFixed(2)} marked paid. Ref: ${stripeRef}`,
   });
 
   // Alert user
@@ -134,7 +227,7 @@ Deno.serve(async (req) => {
     user_id: claim.user_id,
     type: "payout_update",
     title: "Payout sent",
-    body: `Your claim payout of $${payoutAmount.toFixed(2)} has been issued. Check your wallet for details.`,
+    body: `Your claim payout of $${payoutAmount.toFixed(2)} has been issued. View it in your Wallet.`,
     severity: "low",
     related_claim_id: claim.id,
     related_settlement_id: claim.settlement_id,
@@ -149,5 +242,5 @@ Deno.serve(async (req) => {
     meta: { amount: payoutAmount, stripe_ref: stripeRef },
   });
 
-  return json({ ok: true, stripe_ref: stripeRef, amount: payoutAmount });
+  return json({ ok: true, stripe_ref: stripeRef, amount: payoutAmount, action: "paid" });
 });

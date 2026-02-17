@@ -22,6 +22,7 @@ import ClaimFiling from "./pages/ClaimFiling";
 import ClaimTracker from "./pages/ClaimTracker";
 import Monitoring from "./pages/Monitoring";
 import Settings from "./pages/Settings";
+import Wallet from "./pages/Wallet";
 import AdminAnalytics from "./pages/admin/AdminAnalytics";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminSettlements from "./pages/admin/AdminSettlements";
@@ -61,6 +62,7 @@ const App = () => (
               <Route path="/claims/file" element={<ClaimFiling />} />
               <Route path="/claims/:claimId" element={<ClaimTracker />} />
               <Route path="/monitoring" element={<Monitoring />} />
+              <Route path="/wallet" element={<Wallet />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
 

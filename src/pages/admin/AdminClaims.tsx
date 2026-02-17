@@ -80,6 +80,8 @@ const AdminClaims = () => {
   const [updating, setUpdating] = useState(false);
 
   const [payoutActual, setPayoutActual] = useState("");
+  const [initiatingPayout, setInitiatingPayout] = useState(false);
+  const [markingPaid, setMarkingPaid] = useState(false);
 
   const [docs, setDocs] = useState<ClaimDoc[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
@@ -628,7 +630,42 @@ const AdminClaims = () => {
               )}
             </div>
 
-            {/* Status Update */}
+            {/* Payout Actions */}
+            {selectedClaim?.status === "approved" && (
+              <div className="border-t pt-4">
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                  <DollarSign className="h-4 w-4" /> Payout Actions
+                </h4>
+                <Button
+                  className="w-full"
+                  disabled={initiatingPayout}
+                  onClick={async () => {
+                    setInitiatingPayout(true);
+                    try {
+                      const { data: { session } } = await supabase.auth.getSession();
+                      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/simulate-payout`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token || ""}` },
+                        body: JSON.stringify({ claim_id: selectedClaim.id, action: "initiate" }),
+                      });
+                      const result = await res.json();
+                      if (!res.ok) throw new Error(result.error || "Failed");
+                      toast.success(`Payout initiated — Ref: ${result.stripe_ref}`);
+                      fetchClaims();
+                      setSelectedClaim(null);
+                    } catch (err: any) {
+                      toast.error(err.message);
+                    } finally {
+                      setInitiatingPayout(false);
+                    }
+                  }}
+                >
+                  {initiatingPayout ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Initiating...</> : <><DollarSign className="mr-2 h-4 w-4" />Initiate Payout</>}
+                </Button>
+              </div>
+            )}
+
+
             <div className="border-t pt-4 space-y-3">
               <h4 className="text-sm font-semibold">Update Status</h4>
               <div>
