@@ -138,8 +138,60 @@ export type Database = {
         }
         Relationships: []
       }
+      breach_catalog: {
+        Row: {
+          active: boolean
+          breach_year: number | null
+          company: string
+          created_at: string
+          exposed_fields: string
+          id: string
+          name: string
+          severity: string
+          source_name: string | null
+          source_type: string
+          source_url: string | null
+          tags: string[]
+          updated_at: string
+          verified: boolean
+        }
+        Insert: {
+          active?: boolean
+          breach_year?: number | null
+          company: string
+          created_at?: string
+          exposed_fields: string
+          id?: string
+          name: string
+          severity?: string
+          source_name?: string | null
+          source_type?: string
+          source_url?: string | null
+          tags?: string[]
+          updated_at?: string
+          verified?: boolean
+        }
+        Update: {
+          active?: boolean
+          breach_year?: number | null
+          company?: string
+          created_at?: string
+          exposed_fields?: string
+          id?: string
+          name?: string
+          severity?: string
+          source_name?: string | null
+          source_type?: string
+          source_url?: string | null
+          tags?: string[]
+          updated_at?: string
+          verified?: boolean
+        }
+        Relationships: []
+      }
       breach_events: {
         Row: {
+          breach_catalog_id: string | null
           breach_year: number | null
           created_at: string
           details: Json
@@ -152,6 +204,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          breach_catalog_id?: string | null
           breach_year?: number | null
           created_at?: string
           details?: Json
@@ -164,6 +217,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          breach_catalog_id?: string | null
           breach_year?: number | null
           created_at?: string
           details?: Json
@@ -176,6 +230,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "breach_events_breach_catalog_id_fkey"
+            columns: ["breach_catalog_id"]
+            isOneToOne: false
+            referencedRelation: "breach_catalog"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "breach_events_scan_run_id_fkey"
             columns: ["scan_run_id"]

@@ -1,4 +1,4 @@
-import { BarChart3, Users, Scale, FileText, Activity, ArrowLeft, Cog, DollarSign } from "lucide-react";
+import { BarChart3, Users, Scale, FileText, Activity, ArrowLeft, Cog, DollarSign, Database } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/logo.png";
@@ -12,6 +12,7 @@ const adminNav = [
   { title: "Payouts", url: "/admin/payouts", icon: DollarSign },
   { title: "Activity Logs", url: "/admin/activity-logs", icon: Activity },
   { title: "Automation Logs", url: "/admin/automation-logs", icon: Cog },
+  { title: "Breach Catalog", url: "/admin/breach-catalog", icon: Database },
 ];
 
 export function AdminSidebar() {
