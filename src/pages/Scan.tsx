@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, Shield, AlertTriangle, Loader2, Crown, Check, Eye, DollarSign, Zap, Bell, Activity, ArrowRight } from "lucide-react";
+import { Search, Shield, AlertTriangle, Loader2, Crown, Check, Eye, DollarSign, Zap, Bell, Activity, ArrowRight, ExternalLink, BadgeCheck, Clock, CalendarClock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
+import { formatDistanceToNow, format } from "date-fns";
 
 type ScanState = "idle" | "scanning" | "results";
 
@@ -18,6 +20,13 @@ const severityColor: Record<string, string> = {
   critical: "text-destructive bg-destructive/10 border-destructive/20",
 };
 
+interface CatalogInfo {
+  verified: boolean;
+  source_type: string;
+  source_name: string | null;
+  source_url: string | null;
+}
+
 interface BreachResult {
   id: string;
   source: string;
@@ -26,6 +35,8 @@ interface BreachResult {
   exposed_fields: string[];
   record_count_estimate: number | null;
   details: any;
+  breach_catalog_id: string | null;
+  catalog?: CatalogInfo | null;
 }
 
 interface MatchResult {
@@ -42,6 +53,15 @@ interface MatchResult {
   } | null;
 }
 
+interface ScanMeta {
+  lastScanAt: string | null;
+  nextScanAt: string | null;
+  scanStartedAt: string | null;
+  scanCompletedAt: string | null;
+  databasesScanned: number;
+  isScheduled: boolean;
+}
+
 const Scan = () => {
   const { user } = useAuth();
   const [state, setState] = useState<ScanState>("idle");
@@ -52,17 +72,32 @@ const Scan = () => {
   const [riskScore, setRiskScore] = useState(0);
   const [scanRunId, setScanRunId] = useState<string | null>(null);
   const [isPremium, setIsPremium] = useState(false);
+  const [scanMeta, setScanMeta] = useState<ScanMeta>({
+    lastScanAt: null,
+    nextScanAt: null,
+    scanStartedAt: null,
+    scanCompletedAt: null,
+    databasesScanned: 0,
+    isScheduled: false,
+  });
 
-  // Load user profile for premium status
+  // Load user profile for premium status + scan schedule
   useEffect(() => {
     if (!user) return;
     supabase
       .from("user_profiles")
-      .select("plan")
+      .select("plan, last_scan_at, next_scan_at")
       .eq("user_id", user.id)
       .maybeSingle()
       .then(({ data }) => {
-        if (data) setIsPremium(data.plan === "premium");
+        if (data) {
+          setIsPremium(data.plan === "premium");
+          setScanMeta(prev => ({
+            ...prev,
+            lastScanAt: data.last_scan_at,
+            nextScanAt: data.next_scan_at,
+          }));
+        }
       });
   }, [user]);
 
@@ -73,7 +108,7 @@ const Scan = () => {
     const interval = setInterval(async () => {
       const { data: scan } = await supabase
         .from("scan_runs")
-        .select("status, risk_score, breaches_detected, eligible_settlements")
+        .select("status, risk_score, breaches_detected, eligible_settlements, started_at, completed_at, databases_scanned")
         .eq("id", scanRunId)
         .maybeSingle();
 
@@ -86,13 +121,26 @@ const Scan = () => {
         }
 
         setRiskScore(scan.risk_score);
+        setScanMeta(prev => ({
+          ...prev,
+          scanStartedAt: scan.started_at,
+          scanCompletedAt: scan.completed_at,
+          databasesScanned: scan.databases_scanned || 0,
+          isScheduled: false,
+        }));
 
-        // Fetch breaches for this scan
+        // Fetch breaches for this scan with catalog join
         const { data: breachData } = await supabase
           .from("breach_events")
-          .select("*")
+          .select("*, breach_catalog(verified, source_type, source_name, source_url)")
           .eq("scan_run_id", scanRunId);
-        if (breachData) setBreaches(breachData);
+
+        if (breachData) {
+          setBreaches(breachData.map((b: any) => ({
+            ...b,
+            catalog: b.breach_catalog || null,
+          })));
+        }
 
         // Fetch settlement matches for this user
         const { data: matchData } = await supabase
@@ -105,6 +153,20 @@ const Scan = () => {
             ...m,
             settlement: m.settlements,
           })));
+        }
+
+        // Refresh profile scan times
+        const { data: profile } = await supabase
+          .from("user_profiles")
+          .select("last_scan_at, next_scan_at")
+          .eq("user_id", user!.id)
+          .maybeSingle();
+        if (profile) {
+          setScanMeta(prev => ({
+            ...prev,
+            lastScanAt: profile.last_scan_at,
+            nextScanAt: profile.next_scan_at,
+          }));
         }
 
         setState("results");
@@ -215,6 +277,24 @@ const Scan = () => {
                 <Search className="mr-2 h-4 w-4" /> Start Secure Scan
               </Button>
             </form>
+
+            {/* Scan Schedule Info */}
+            {(scanMeta.lastScanAt || scanMeta.nextScanAt) && (
+              <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3 space-y-1.5">
+                {scanMeta.lastScanAt && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Clock className="h-3.5 w-3.5 shrink-0" />
+                    <span>Last scan: {formatDistanceToNow(new Date(scanMeta.lastScanAt), { addSuffix: true })}</span>
+                  </div>
+                )}
+                {scanMeta.nextScanAt && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <CalendarClock className="h-3.5 w-3.5 shrink-0" />
+                    <span>Next scheduled scan: {format(new Date(scanMeta.nextScanAt), "MMM d, yyyy 'at' h:mm a")}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -232,6 +312,32 @@ const Scan = () => {
 
       {state === "results" && (
         <div>
+          {/* Scan Metadata Bar */}
+          <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+            {scanMeta.scanCompletedAt && (
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                <span>Completed {formatDistanceToNow(new Date(scanMeta.scanCompletedAt), { addSuffix: true })}</span>
+              </div>
+            )}
+            {scanMeta.databasesScanned > 0 && (
+              <div className="flex items-center gap-1.5">
+                <Shield className="h-3.5 w-3.5" />
+                <span>{scanMeta.databasesScanned.toLocaleString()} databases scanned</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1.5">
+              <Activity className="h-3.5 w-3.5" />
+              <span>Type: {scanMeta.isScheduled ? "Scheduled" : "Manual"}</span>
+            </div>
+            {scanMeta.nextScanAt && (
+              <div className="flex items-center gap-1.5">
+                <CalendarClock className="h-3.5 w-3.5" />
+                <span>Next scan: {format(new Date(scanMeta.nextScanAt), "MMM d 'at' h:mm a")}</span>
+              </div>
+            )}
+          </div>
+
           {/* Exposure Summary Banner */}
           <div className="mb-6 glass-card p-6 !border-destructive/20">
             <div className="flex items-center gap-3 mb-4">
@@ -304,20 +410,62 @@ const Scan = () => {
             {breaches.map((breach) => {
               const match = getSettlementForBreach(breach.source);
               const settlement = match?.settlement;
+              const catalog = breach.catalog;
+              // Also check details for catalog info (from procedure)
+              const detailSource = breach.details as any;
+              const sourceType = catalog?.source_type || detailSource?.source_type;
+              const sourceName = catalog?.source_name || detailSource?.source_name;
+              const sourceUrl = catalog?.source_url || detailSource?.source_url;
+              const isVerified = catalog?.verified ?? detailSource?.catalog === true;
+
               return (
                 <div key={breach.id} className="glass-card p-6 transition-all hover:border-primary/20">
                   <div className="flex items-start justify-between mb-2">
-                    <div>
+                    <div className="flex items-center gap-2">
                       <h3 className="font-semibold">{breach.source}</h3>
-                      <p className="text-xs text-muted-foreground">
-                        Breach Year: {breach.breach_year || "Unknown"}
-                        {breach.record_count_estimate ? ` · ${breach.record_count_estimate.toLocaleString()} records` : ""}
-                      </p>
+                      {isVerified && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Badge variant="outline" className="gap-1 border-primary/30 text-primary text-[10px] px-1.5 py-0">
+                                <BadgeCheck className="h-3 w-3" />
+                                Verified
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="text-xs">This breach has been verified by our research team</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
                     </div>
                     <span className={`rounded-lg border px-2 py-0.5 text-xs font-semibold capitalize ${severityColor[breach.risk_level] ?? ""}`}>
                       {breach.risk_level}
                     </span>
                   </div>
+
+                  {/* Source credibility line */}
+                  {(sourceType || sourceName) && (
+                    <div className="flex items-center gap-2 mb-2 text-xs text-muted-foreground">
+                      <span className="capitalize">{sourceType}{sourceName ? `: ${sourceName}` : ""}</span>
+                      {sourceUrl && (
+                        <a
+                          href={sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-0.5 text-primary hover:underline"
+                        >
+                          View source <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
+                  )}
+
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Breach Year: {breach.breach_year || "Unknown"}
+                    {breach.record_count_estimate ? ` · ${breach.record_count_estimate.toLocaleString()} records` : ""}
+                  </p>
+
                   <div className="flex flex-wrap gap-1.5 mb-3">
                     {breach.exposed_fields.map((d) => (
                       <span key={d} className="rounded-lg bg-muted px-2 py-0.5 text-xs text-muted-foreground">{d}</span>
