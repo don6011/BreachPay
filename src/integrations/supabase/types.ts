@@ -1247,6 +1247,8 @@ export type Database = {
         | { Args: never; Returns: boolean }
         | { Args: { p_user: string }; Returns: boolean }
       proc_cron_scan_jobs: { Args: { max_jobs?: number }; Returns: Json }
+      proc_enqueue_due_jobs: { Args: { max_jobs?: number }; Returns: number }
+      proc_run_scheduled_jobs: { Args: { max_jobs?: number }; Returns: number }
     }
     Enums: {
       alert_type_t:
