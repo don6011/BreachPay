@@ -38,6 +38,32 @@ export function SplashScreen({ onComplete }: { onComplete: () => void }) {
         backgroundSize: "60px 60px",
       }} />
 
+      {/* Floating dust particles */}
+      {Array.from({ length: 24 }).map((_, i) => {
+        const size = 2 + Math.random() * 3;
+        const left = Math.random() * 100;
+        const top = Math.random() * 100;
+        const duration = 4 + Math.random() * 6;
+        const delay = Math.random() * 5;
+        const drift = 10 + Math.random() * 30;
+        return (
+          <span
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              width: size,
+              height: size,
+              left: `${left}%`,
+              top: `${top}%`,
+              background: `hsl(var(--primary) / ${0.15 + Math.random() * 0.2})`,
+              filter: `blur(${Math.random() < 0.5 ? 1 : 0}px)`,
+              animation: `float-particle ${duration}s ease-in-out ${delay}s infinite`,
+              ["--drift" as string]: `${drift}px`,
+            }}
+          />
+        );
+      })}
+
       {/* Emerald radial glow */}
       <div
         className="absolute rounded-full animate-pulse-glow"
