@@ -645,6 +645,7 @@ export type Database = {
           attempts: number
           channel: string
           created_at: string
+          dedupe_key: string | null
           id: string
           last_error: string | null
           payload: Json
@@ -657,6 +658,7 @@ export type Database = {
           attempts?: number
           channel: string
           created_at?: string
+          dedupe_key?: string | null
           id?: string
           last_error?: string | null
           payload?: Json
@@ -669,6 +671,7 @@ export type Database = {
           attempts?: number
           channel?: string
           created_at?: string
+          dedupe_key?: string | null
           id?: string
           last_error?: string | null
           payload?: Json
@@ -831,6 +834,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      scan_run_log: {
+        Row: {
+          alerts_enqueued: number | null
+          finished_at: string | null
+          id: string
+          last_error: string | null
+          processed_users: number | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          alerts_enqueued?: number | null
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          processed_users?: number | null
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          alerts_enqueued?: number | null
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          processed_users?: number | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
       }
       scan_runs: {
         Row: {
