@@ -1,0 +1,1 @@
+select cron.unschedule('catalog_scheduled_scans_hourly');
