@@ -73,6 +73,10 @@ export default {
           DEFAULT: "hsl(var(--critical))",
           foreground: "hsl(var(--critical-foreground))",
         },
+        gold: {
+          DEFAULT: "hsl(var(--gold))",
+          foreground: "hsl(var(--gold-foreground))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -89,12 +93,16 @@ export default {
           to: { height: "0" },
         },
         "pulse-glow": {
-          "0%, 100%": { boxShadow: "0 0 15px 0 hsl(172 89% 52% / 0.15)" },
-          "50%": { boxShadow: "0 0 25px 5px hsl(172 89% 52% / 0.25)" },
+          "0%, 100%": { boxShadow: "0 0 15px 0 hsl(164 100% 45% / 0.15)" },
+          "50%": { boxShadow: "0 0 25px 5px hsl(164 100% 45% / 0.25)" },
         },
         "scan-line": {
           "0%": { transform: "translateY(0%)" },
           "100%": { transform: "translateY(100%)" },
+        },
+        "emerald-ring": {
+          "0%, 100%": { boxShadow: "0 0 0 0 hsl(164 100% 45% / 0.4)" },
+          "50%": { boxShadow: "0 0 0 8px hsl(164 100% 45% / 0)" },
         },
       },
       animation: {
@@ -102,6 +110,7 @@ export default {
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
         "scan-line": "scan-line 1.5s ease-in-out infinite",
+        "emerald-ring": "emerald-ring 2s ease-in-out infinite",
       },
     },
   },

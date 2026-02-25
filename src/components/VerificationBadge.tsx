@@ -37,8 +37,8 @@ const CONFIG: Record<VerificationLevel, VerificationConfig> = {
     icon: BadgeCheck,
     label: "Administrator confirmed",
     text: "Confirmed with settlement administrator.",
-    colorClass: "text-primary drop-shadow-[0_0_6px_hsl(172_89%_52%/0.4)]",
-    badgeBg: "bg-primary/15 border-primary/30 text-primary shadow-[0_0_8px_hsl(172_89%_52%/0.15)]",
+    colorClass: "text-gold drop-shadow-[0_0_6px_hsl(43_52%_54%/0.4)]",
+    badgeBg: "badge-gold",
   },
 };
 
@@ -46,7 +46,6 @@ interface VerificationBadgeProps {
   level: string;
   verified: boolean;
   sourceUrl?: string | null;
-  /** Compact mode: icon + label only, no description text */
   compact?: boolean;
   className?: string;
 }

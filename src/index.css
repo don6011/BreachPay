@@ -4,54 +4,56 @@
 
 @layer base {
   :root {
-    /* Background: #020617 */
-    --background: 224 71% 4%;
-    /* Text: #E6EDF3 */
-    --foreground: 210 29% 93%;
+    /* Background: #070A12 (Deep Navy Base) */
+    --background: 222 43% 5%;
+    /* Text: #FFFFFF */
+    --foreground: 0 0% 100%;
 
-    /* Card: #0A0F1A */
-    --card: 221 45% 7%;
-    --card-foreground: 210 29% 93%;
+    /* Card: #101828 */
+    --card: 218 39% 11%;
+    --card-foreground: 0 0% 100%;
 
-    --popover: 221 45% 7%;
-    --popover-foreground: 210 29% 93%;
+    /* Popover: #0E1726 (Panel Navy) */
+    --popover: 218 45% 10%;
+    --popover-foreground: 0 0% 100%;
 
-    /* Primary Teal: #14F1D9 */
-    --primary: 172 89% 52%;
-    --primary-foreground: 224 71% 4%;
+    /* Primary Emerald: #00E6A8 */
+    --primary: 164 100% 45%;
+    --primary-foreground: 222 43% 5%;
 
-    /* Secondary Teal: #0FB8A5 */
-    --secondary: 172 84% 39%;
-    --secondary-foreground: 210 29% 93%;
+    /* Secondary: #00BFA6 */
+    --secondary: 172 100% 37%;
+    --secondary-foreground: 0 0% 100%;
 
-    /* Muted */
-    --muted: 219 31% 12%;
-    /* Secondary Text: #8B9BB0 */
-    --muted-foreground: 217 16% 62%;
+    /* Muted: Panel Navy */
+    --muted: 218 39% 13%;
+    /* Secondary Text: rgba(255,255,255,.55) → approx */
+    --muted-foreground: 0 0% 100% / 0.55;
 
-    --accent: 172 89% 52%;
-    --accent-foreground: 224 71% 4%;
+    /* Accent = primary emerald */
+    --accent: 164 100% 45%;
+    --accent-foreground: 222 43% 5%;
 
     /* Critical: #EF4444 */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders: #1C2433 */
-    --border: 219 31% 16%;
-    --input: 219 31% 16%;
-    --ring: 172 89% 52%;
+    /* Borders: rgba(255,255,255,.08) */
+    --border: 0 0% 100% / 0.08;
+    --input: 0 0% 100% / 0.08;
+    --ring: 164 100% 45%;
 
     --radius: 1rem;
 
     /* Sidebar */
-    --sidebar-background: 224 60% 5%;
-    --sidebar-foreground: 217 16% 62%;
-    --sidebar-primary: 172 89% 52%;
-    --sidebar-primary-foreground: 224 71% 4%;
-    --sidebar-accent: 219 31% 10%;
-    --sidebar-accent-foreground: 210 29% 93%;
-    --sidebar-border: 219 31% 14%;
-    --sidebar-ring: 172 89% 52%;
+    --sidebar-background: 222 43% 4%;
+    --sidebar-foreground: 0 0% 100% / 0.55;
+    --sidebar-primary: 164 100% 45%;
+    --sidebar-primary-foreground: 222 43% 5%;
+    --sidebar-accent: 0 0% 100% / 0.06;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 0 0% 100% / 0.08;
+    --sidebar-ring: 164 100% 45%;
 
     /* Alert colors */
     /* Success: #22C55E */
@@ -61,11 +63,20 @@
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 0%;
     /* Info = Primary */
-    --info: 172 89% 52%;
-    --info-foreground: 224 71% 4%;
+    --info: 164 100% 45%;
+    --info-foreground: 222 43% 5%;
     /* Critical: #EF4444 */
     --critical: 0 84% 60%;
     --critical-foreground: 0 0% 100%;
+
+    /* Gold Authority Accent: #C8A24C */
+    --gold: 43 52% 54%;
+    --gold-foreground: 222 43% 5%;
+
+    /* Emerald gradient endpoints */
+    --emerald-start: 164 100% 45%;
+    --emerald-mid: 143 74% 48%;
+    --emerald-end: 172 100% 37%;
   }
 }
 
@@ -83,7 +94,7 @@
 @layer components {
   .glass-card {
     @apply rounded-2xl border bg-card/80 backdrop-blur-sm;
-    box-shadow: 0 0 0 1px hsl(var(--border) / 0.5), inset 0 1px 0 0 hsl(var(--foreground) / 0.03);
+    box-shadow: 0 0 0 1px hsl(var(--border)), inset 0 1px 0 0 hsl(0 0% 100% / 0.03);
   }
   .glass-card-glow {
     @apply glass-card;
@@ -100,5 +111,24 @@
   .premium-lock::after {
     content: '';
     @apply absolute inset-0 bg-background/60 backdrop-blur-[2px] z-10;
+  }
+
+  /* Emerald gradient for CTAs and highlights */
+  .gradient-emerald {
+    background: linear-gradient(135deg, hsl(var(--emerald-start)), hsl(var(--emerald-mid)), hsl(var(--emerald-end)));
+  }
+  .gradient-emerald-text {
+    background: linear-gradient(135deg, hsl(var(--emerald-start)), hsl(var(--emerald-mid)), hsl(var(--emerald-end)));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Gold badge */
+  .badge-gold {
+    @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold;
+    background: hsl(var(--gold) / 0.12);
+    border-color: hsl(var(--gold) / 0.25);
+    color: hsl(var(--gold));
   }
 }

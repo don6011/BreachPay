@@ -92,7 +92,7 @@ const Landing = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Breach Ticker */}
-      <div className="border-b border-border/50 bg-destructive/5 py-2">
+      <div className="border-b border-border bg-destructive/5 py-2">
         <div className="mx-auto max-w-6xl px-6 flex items-center justify-center gap-3 text-sm">
           <span className="flex items-center gap-1.5">
             <span className="relative flex h-2 w-2">
@@ -108,17 +108,17 @@ const Landing = () => {
       </div>
 
       {/* Navbar */}
-      <header className="sticky top-0 z-50 border-b border-border/50 backdrop-blur-xl bg-background/85">
+      <header className="sticky top-0 z-50 border-b border-border backdrop-blur-xl bg-background/85">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <img src={logo} alt="BreachPay" className="h-10" />
           <div className="flex items-center gap-3">
-            <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground hover:bg-muted">
+            <Button variant="ghost" asChild>
               <Link to="/pricing">Pricing</Link>
             </Button>
-            <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground hover:bg-muted">
+            <Button variant="ghost" asChild>
               <Link to="/login">Log In</Link>
             </Button>
-            <Button asChild className="rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300">
+            <Button asChild className="rounded-xl">
               <Link to="/scan">Start Free Scan</Link>
             </Button>
           </div>
@@ -130,24 +130,24 @@ const Landing = () => {
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: 'radial-gradient(ellipse 80% 50% at 50% 0%, hsl(172 89% 52% / 0.07) 0%, hsl(172 84% 39% / 0.03) 40%, transparent 70%)',
+            background: 'radial-gradient(ellipse 80% 50% at 50% 0%, hsl(164 100% 45% / 0.07) 0%, hsl(172 100% 37% / 0.03) 40%, transparent 70%)',
           }}
         />
         <div
           className="absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] pointer-events-none"
           style={{
-            background: 'radial-gradient(ellipse at center, hsl(172 89% 52% / 0.05) 0%, transparent 70%)',
+            background: 'radial-gradient(ellipse at center, hsl(164 100% 45% / 0.05) 0%, transparent 70%)',
           }}
         />
         <div className="relative mx-auto max-w-4xl px-6 text-center">
           {/* Logo */}
           <div className="mb-8 flex justify-center">
-            <img src={logo} alt="BreachPay" className="h-24 sm:h-28 lg:h-32 w-auto drop-shadow-[0_0_30px_hsl(172_89%_52%/0.25)]" />
+            <img src={logo} alt="BreachPay" className="h-24 sm:h-28 lg:h-32 w-auto drop-shadow-[0_0_30px_hsl(164_100%_45%/0.25)]" />
           </div>
 
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
             Your Data Was Breached.{" "}
-            <span className="bg-gradient-to-r from-primary to-[hsl(172_60%_70%)] bg-clip-text text-transparent">
+            <span className="gradient-emerald-text">
               You Could Be Owed Money.
             </span>
           </h1>
@@ -159,14 +159,10 @@ const Landing = () => {
           </p>
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button
-              size="lg"
-              asChild
-              className="rounded-xl bg-primary text-primary-foreground font-semibold shadow-[0_0_20px_hsl(172_89%_52%/0.25)] hover:shadow-[0_0_32px_hsl(172_89%_52%/0.4)] transition-all duration-500"
-            >
+            <Button size="lg" asChild className="rounded-xl shadow-[0_0_20px_hsl(164_100%_45%/0.25)] hover:shadow-[0_0_32px_hsl(164_100%_45%/0.4)] transition-all duration-500">
               <Link to="/scan">Start Free Scan <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
-            <Button variant="outline" size="lg" asChild className="rounded-xl border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-300">
+            <Button variant="outline" size="lg" asChild className="rounded-xl">
               <Link to="/signup">Create Account</Link>
             </Button>
           </div>
@@ -231,7 +227,7 @@ const Landing = () => {
             { icon: Check, text: "GDPR & CCPA Ready" },
             { icon: Shield, text: "Zero Data Selling" },
           ].map((badge) => (
-            <div key={badge.text} className="flex items-center gap-2 rounded-xl border border-border/50 bg-card/50 px-4 py-2.5 text-sm text-muted-foreground">
+            <div key={badge.text} className="flex items-center gap-2 rounded-xl border border-border bg-card/50 px-4 py-2.5 text-sm text-muted-foreground">
               <badge.icon className="h-4 w-4 text-primary" />
               {badge.text}
             </div>
@@ -247,7 +243,7 @@ const Landing = () => {
             {steps.map((step, i) => (
               <div
                 key={step.title}
-                className="glass-card p-6 text-center transition-all duration-300 hover:border-primary/20 hover:shadow-[0_0_20px_0_hsl(172_89%_52%/0.06)]"
+                className="glass-card p-6 text-center transition-all duration-300 hover:border-primary/20 hover:shadow-[0_0_20px_0_hsl(164_100%_45%/0.06)]"
               >
                 <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
                   <step.icon className="h-5 w-5 text-primary" />
@@ -278,7 +274,7 @@ const Landing = () => {
             />
             <div className="rounded-xl bg-muted/50 p-6 text-center">
               <p className="text-sm text-muted-foreground mb-1">Estimated Recovery Range</p>
-              <p className="text-3xl font-bold text-primary drop-shadow-[0_0_10px_hsl(172_89%_52%/0.3)]">
+              <p className="text-3xl font-bold gradient-emerald-text">
                 ${calcMin.toLocaleString()} – ${calcMax.toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground mt-2">Based on average settlement payouts</p>
@@ -286,7 +282,7 @@ const Landing = () => {
             <Button
               asChild
               size="lg"
-              className="w-full mt-6 rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300"
+              className="w-full mt-6 rounded-xl"
             >
               <Link to="/scan">Scan Now — It's Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
@@ -308,7 +304,7 @@ const Landing = () => {
                 }`}
               >
                 {plan.badge && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-bold text-primary-foreground">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full gradient-emerald px-4 py-1 text-xs font-bold text-primary-foreground">
                     {plan.badge}
                   </div>
                 )}
@@ -331,11 +327,8 @@ const Landing = () => {
                 </ul>
                 <Button
                   asChild
-                  className={`mt-8 w-full rounded-xl transition-all duration-300 ${
-                    plan.highlighted
-                      ? "bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)]"
-                      : "bg-muted text-foreground hover:bg-muted/80"
-                  }`}
+                  variant={plan.highlighted ? "default" : "secondary"}
+                  className="mt-8 w-full rounded-xl"
                 >
                   <Link to={plan.ctaLink}>{plan.cta}</Link>
                 </Button>

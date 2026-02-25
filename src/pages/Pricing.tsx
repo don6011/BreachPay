@@ -78,17 +78,17 @@ const Pricing = () => {
   return (
     <div className="min-h-screen bg-background">
       {/* Navbar */}
-      <header className="sticky top-0 z-50 border-b border-border/50 backdrop-blur-xl bg-background/85">
+      <header className="sticky top-0 z-50 border-b border-border backdrop-blur-xl bg-background/85">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
           <Link to="/"><img src={logo} alt="BreachPay" className="h-10" /></Link>
           <div className="flex items-center gap-3">
-            <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground hover:bg-muted">
+            <Button variant="ghost" asChild>
               <Link to="/pricing">Pricing</Link>
             </Button>
-            <Button variant="ghost" asChild className="text-muted-foreground hover:text-foreground hover:bg-muted">
+            <Button variant="ghost" asChild>
               <Link to="/login">Log In</Link>
             </Button>
-            <Button asChild className="rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300">
+            <Button asChild className="rounded-xl">
               <Link to="/scan">Start Free Scan</Link>
             </Button>
           </div>
@@ -100,7 +100,7 @@ const Pricing = () => {
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: 'radial-gradient(ellipse 80% 50% at 50% 0%, hsl(172 89% 52% / 0.07) 0%, hsl(172 84% 39% / 0.03) 40%, transparent 70%)',
+            background: 'radial-gradient(ellipse 80% 50% at 50% 0%, hsl(164 100% 45% / 0.07) 0%, hsl(172 100% 37% / 0.03) 40%, transparent 70%)',
           }}
         />
         <div className="relative mx-auto max-w-4xl px-6 text-center">
@@ -123,12 +123,12 @@ const Pricing = () => {
                 key={plan.name}
                 className={`relative rounded-2xl border p-8 transition-all duration-300 ${
                   plan.highlighted
-                    ? "border-primary/30 bg-card shadow-[0_0_30px_0_hsl(172_89%_52%/0.08)]"
+                    ? "border-primary/30 bg-card shadow-[0_0_30px_0_hsl(164_100%_45%/0.08)]"
                     : "border-border bg-card"
                 }`}
               >
                 {plan.badge && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-4 py-1 text-xs font-bold text-primary-foreground">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full gradient-emerald px-4 py-1 text-xs font-bold text-primary-foreground">
                     {plan.badge}
                   </div>
                 )}
@@ -151,11 +151,8 @@ const Pricing = () => {
                 </ul>
                 <Button
                   asChild
-                  className={`mt-8 w-full rounded-xl transition-all duration-300 ${
-                    plan.highlighted
-                      ? "bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)]"
-                      : "bg-muted text-foreground hover:bg-muted/80"
-                  }`}
+                  variant={plan.highlighted ? "default" : "secondary"}
+                  className="mt-8 w-full rounded-xl"
                 >
                   <Link to={plan.ctaLink}>{plan.cta}</Link>
                 </Button>
@@ -217,10 +214,10 @@ const Pricing = () => {
           <h2 className="text-2xl font-bold mb-3">Ready to protect your identity?</h2>
           <p className="text-muted-foreground mb-8">Scan for breaches in seconds. No credit card required.</p>
           <div className="flex items-center justify-center gap-4">
-            <Button size="lg" asChild className="rounded-xl bg-primary text-primary-foreground font-semibold hover:shadow-[0_0_24px_hsl(172_89%_52%/0.3)] transition-all duration-300">
+            <Button size="lg" asChild className="rounded-xl">
               <Link to="/scan">Start Free Scan <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
-            <Button variant="outline" size="lg" asChild className="rounded-xl border-border text-muted-foreground hover:bg-muted hover:text-foreground transition-all duration-300">
+            <Button variant="outline" size="lg" asChild className="rounded-xl">
               <Link to="/signup">Create Account</Link>
             </Button>
           </div>

@@ -11,7 +11,7 @@ function getSeverity(score: number) {
   if (score >= 60) return { label: "High", color: "hsl(38, 92%, 50%)" };
   if (score >= 40) return { label: "Medium", color: "hsl(38, 92%, 50%)" };
   if (score >= 20) return { label: "Low", color: "hsl(142, 71%, 45%)" };
-  return { label: "Minimal", color: "hsl(172, 89%, 52%)" };
+  return { label: "Minimal", color: "hsl(164, 100%, 45%)" };
 }
 
 export function RiskGauge({ score, maxScore = 100, className }: RiskGaugeProps) {
@@ -25,7 +25,7 @@ export function RiskGauge({ score, maxScore = 100, className }: RiskGaugeProps) 
     <div className={cn("flex flex-col items-center", className)}>
       <div className="relative">
         <svg width="160" height="160" viewBox="0 0 160 160">
-          <circle cx="80" cy="80" r={radius} fill="none" stroke="hsl(219, 31%, 16%)" strokeWidth="10" />
+          <circle cx="80" cy="80" r={radius} fill="none" stroke="hsl(0 0% 100% / 0.08)" strokeWidth="10" />
           <circle
             cx="80" cy="80" r={radius} fill="none"
             stroke={color} strokeWidth="10"
@@ -34,6 +34,7 @@ export function RiskGauge({ score, maxScore = 100, className }: RiskGaugeProps) 
             strokeDashoffset={dashOffset}
             transform="rotate(-90 80 80)"
             className="transition-all duration-1000 ease-out"
+            style={{ filter: `drop-shadow(0 0 8px ${color})` }}
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">

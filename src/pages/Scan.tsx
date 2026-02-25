@@ -273,7 +273,7 @@ const Scan = () => {
                 <label className="mb-1.5 block text-sm font-medium">Phone Number <span className="text-muted-foreground">(optional)</span></label>
                 <Input type="tel" placeholder="+1 (555) 000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl" />
               </div>
-              <Button type="submit" className="w-full rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300" size="lg">
+              <Button type="submit" className="w-full rounded-xl" size="lg">
                 <Search className="mr-2 h-4 w-4" /> Start Secure Scan
               </Button>
             </form>
@@ -374,7 +374,7 @@ const Scan = () => {
                 <p className="text-xs text-muted-foreground mt-1">Settlements Matched</p>
               </div>
               <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-center">
-                <p className="text-2xl font-bold text-primary drop-shadow-[0_0_8px_hsl(172_89%_52%/0.4)]">
+                <p className="text-2xl font-bold gradient-emerald-text">
                   ${estMin.toLocaleString()} – ${estMax.toLocaleString()}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">Estimated Compensation</p>
@@ -382,7 +382,7 @@ const Scan = () => {
             </div>
 
             <div className="mt-4 flex items-center justify-between">
-              <Button asChild className="rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300">
+              <Button asChild className="rounded-xl">
                 <Link to="/settlements"><Eye className="mr-2 h-4 w-4" /> View Eligible Settlements</Link>
               </Button>
               <Button variant="outline" onClick={reset} className="rounded-xl">Run Another Scan</Button>
@@ -399,7 +399,7 @@ const Scan = () => {
                   <p className="text-xs text-muted-foreground">Upgrade to Premium for $9.99/mo</p>
                 </div>
               </div>
-              <Button asChild size="sm" className="rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300 shrink-0">
+              <Button asChild size="sm" className="rounded-xl shrink-0">
                 <Link to="/pricing">Upgrade</Link>
               </Button>
             </div>
@@ -482,7 +482,7 @@ const Scan = () => {
                       {settlement && (
                         <div className="flex items-center gap-1.5">
                           <DollarSign className="h-3.5 w-3.5 text-primary" />
-                          <span className="text-primary font-medium drop-shadow-[0_0_6px_hsl(172_89%_52%/0.3)]">
+                          <span className="text-primary font-medium">
                             Est. Payout: ${settlement.payout_min?.toLocaleString()} – ${settlement.payout_max?.toLocaleString()}
                           </span>
                         </div>
@@ -490,7 +490,7 @@ const Scan = () => {
                     </div>
                     {settlement && (
                       <Link to={`/claims/file?settlement=${settlement.id}`}>
-                        <Button size="sm" className="w-full bg-primary text-primary-foreground hover:shadow-[0_0_15px_hsl(172_89%_52%/0.3)]">
+                        <Button size="sm" className="w-full rounded-xl">
                           File Claim <ArrowRight className="ml-1 h-3 w-3" />
                         </Button>
                       </Link>
@@ -523,7 +523,7 @@ const Scan = () => {
                   </div>
                 ))}
               </div>
-              <Button asChild size="lg" className="rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_24px_hsl(172_89%_52%/0.3)] transition-all duration-300">
+              <Button asChild size="lg" className="rounded-xl">
                 <Link to="/pricing">Upgrade — $9.99/mo</Link>
               </Button>
             </div>

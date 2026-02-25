@@ -266,7 +266,7 @@ const Settlements = () => {
           Eligibility depends on settlement administrator review. Estimated amounts may vary.
         </p>
         <div className="flex flex-col sm:flex-row gap-3">
-          <Button asChild className="rounded-xl shadow-[0_0_20px_hsl(172_89%_52%/0.25)] hover:shadow-[0_0_30px_hsl(172_89%_52%/0.4)] transition-all duration-300">
+          <Button asChild className="rounded-xl shadow-[0_0_20px_hsl(164_100%_45%/0.25)] hover:shadow-[0_0_30px_hsl(164_100%_45%/0.4)] transition-all duration-300">
             <Link to="/claims"><FileCheck className="mr-2 h-4 w-4" /> File All Eligible Claims</Link>
           </Button>
           <Button variant="outline" asChild className="rounded-xl">
@@ -349,7 +349,7 @@ const Settlements = () => {
                           </p>
                         </div>
                       </div>
-                      <Button className="rounded-xl shadow-[0_0_16px_hsl(172_89%_52%/0.2)] hover:shadow-[0_0_24px_hsl(172_89%_52%/0.35)] transition-all duration-300 shrink-0">
+                      <Button className="rounded-xl shadow-[0_0_16px_hsl(164_100%_45%/0.2)] hover:shadow-[0_0_24px_hsl(164_100%_45%/0.35)] transition-all duration-300 shrink-0">
                         <Sparkles className="mr-2 h-4 w-4" /> Enable Auto-Filing
                       </Button>
                     </div>
