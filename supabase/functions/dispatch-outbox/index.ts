@@ -9,8 +9,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const BATCH_SIZE = 25;
-const MAX_ATTEMPTS = 3;
+const MAX_ATTEMPTS = 8;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -30,16 +29,12 @@ Deno.serve(async (req) => {
   const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
   try {
-    // Fetch pending outbox rows (oldest first, skip rows already at max attempts)
-    const { data: rows, error: fetchErr } = await supabase
-      .from("notification_outbox")
-      .select("*")
-      .eq("status", "pending")
-      .lt("attempts", MAX_ATTEMPTS)
-      .order("created_at", { ascending: true })
-      .limit(BATCH_SIZE);
+    // Use SKIP LOCKED claim function for safe concurrent dispatch
+    const { data: rows, error: claimErr } = await supabase.rpc("proc_claim_outbox", {
+      batch_size: 50,
+    });
 
-    if (fetchErr) throw fetchErr;
+    if (claimErr) throw claimErr;
     if (!rows || rows.length === 0) {
       return new Response(JSON.stringify({ ok: true, processed: 0 }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -52,7 +47,8 @@ Deno.serve(async (req) => {
 
     for (const row of rows) {
       const channel = row.channel;
-      // Fetch user email separately (no FK between outbox and user_profiles)
+
+      // Fetch user email if needed
       let email: string | null = null;
       if (channel === "email") {
         const { data: profile } = await supabase
@@ -63,22 +59,15 @@ Deno.serve(async (req) => {
         email = profile?.email || null;
       }
 
-      // Mark as sending
-      await supabase
-        .from("notification_outbox")
-        .update({ status: "sending", attempts: row.attempts + 1 })
-        .eq("id", row.id);
-
       try {
         if (channel === "in_app") {
-          // In-app notifications are already handled via alerts table — just mark sent
+          // In-app notifications are handled via alerts table — just mark sent
           await supabase
             .from("notification_outbox")
             .update({ status: "sent", sent_at: new Date().toISOString() })
             .eq("id", row.id);
           sent++;
         } else if (channel === "email" && resend && email) {
-          // Build email content from template + payload
           const subject = buildSubject(row.template, row.payload);
           const html = buildHtml(row.template, row.payload);
 
@@ -97,23 +86,25 @@ Deno.serve(async (req) => {
             .eq("id", row.id);
           sent++;
         } else {
-          // Channel not supported or missing config — skip but don't fail
+          // Channel not supported or missing config — revert to pending or fail
+          const errorMsg = channel === "email" && !resend
+            ? "RESEND_API_KEY not configured"
+            : channel === "email" && !email
+              ? "User has no email"
+              : `Unsupported channel: ${channel}`;
+
           await supabase
             .from("notification_outbox")
             .update({
-              status: row.attempts + 1 >= MAX_ATTEMPTS ? "failed" : "pending",
-              last_error: channel === "email" && !resend
-                ? "RESEND_API_KEY not configured"
-                : channel === "email" && !email
-                  ? "User has no email"
-                  : `Unsupported channel: ${channel}`,
+              status: row.attempts >= MAX_ATTEMPTS ? "failed" : "pending",
+              last_error: errorMsg,
             })
             .eq("id", row.id);
           skipped++;
         }
       } catch (sendErr: any) {
         const errorMsg = sendErr?.message || String(sendErr);
-        const newStatus = row.attempts + 1 >= MAX_ATTEMPTS ? "failed" : "pending";
+        const newStatus = row.attempts >= MAX_ATTEMPTS ? "failed" : "pending";
         await supabase
           .from("notification_outbox")
           .update({ status: newStatus, last_error: errorMsg })
