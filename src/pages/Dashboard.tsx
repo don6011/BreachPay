@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
 import { RiskGauge } from "@/components/RiskGauge";
 import { AlertRow } from "@/components/AlertRow";
+import { BreachIntelligence } from "@/components/BreachIntelligence";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -169,6 +170,11 @@ const Dashboard = () => {
           <StatCard icon={CheckCircle} label="Approved Value" value={loading ? "—" : `$${approvedValue.toLocaleString()}`} variant="teal" />
         </div>
       </div>
+      </div>
+
+      {/* Breach Intelligence */}
+      <div className="mt-8">
+        <BreachIntelligence />
       </div>
 
       {/* Recent Alerts */}

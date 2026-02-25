@@ -142,49 +142,76 @@ export type Database = {
         Row: {
           active: boolean
           breach_year: number | null
+          claim_deadline: string | null
           company: string
           created_at: string
+          data_types: string[] | null
+          estimated_payout_max: number | null
+          estimated_payout_min: number | null
           exposed_fields: string
           id: string
+          law_firm_partner: string | null
           name: string
+          records_exposed: number | null
+          settlement_available: boolean | null
+          settlement_name: string | null
           severity: string
           source_name: string | null
           source_type: string
           source_url: string | null
           tags: string[]
           updated_at: string
+          verification_status: string | null
           verified: boolean
         }
         Insert: {
           active?: boolean
           breach_year?: number | null
+          claim_deadline?: string | null
           company: string
           created_at?: string
+          data_types?: string[] | null
+          estimated_payout_max?: number | null
+          estimated_payout_min?: number | null
           exposed_fields: string
           id?: string
+          law_firm_partner?: string | null
           name: string
+          records_exposed?: number | null
+          settlement_available?: boolean | null
+          settlement_name?: string | null
           severity?: string
           source_name?: string | null
           source_type?: string
           source_url?: string | null
           tags?: string[]
           updated_at?: string
+          verification_status?: string | null
           verified?: boolean
         }
         Update: {
           active?: boolean
           breach_year?: number | null
+          claim_deadline?: string | null
           company?: string
           created_at?: string
+          data_types?: string[] | null
+          estimated_payout_max?: number | null
+          estimated_payout_min?: number | null
           exposed_fields?: string
           id?: string
+          law_firm_partner?: string | null
           name?: string
+          records_exposed?: number | null
+          settlement_available?: boolean | null
+          settlement_name?: string | null
           severity?: string
           source_name?: string | null
           source_type?: string
           source_url?: string | null
           tags?: string[]
           updated_at?: string
+          verification_status?: string | null
           verified?: boolean
         }
         Relationships: []
