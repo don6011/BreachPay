@@ -10,6 +10,8 @@ import { Link } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow, format } from "date-fns";
+import { BreachDetailModal } from "@/components/BreachDetailModal";
+import type { BreachCatalogEntry } from "@/hooks/useBreachCatalog";
 
 type ScanState = "idle" | "scanning" | "results";
 
@@ -20,7 +22,7 @@ const severityColor: Record<string, string> = {
   critical: "text-destructive bg-destructive/10 border-destructive/20",
 };
 
-interface CatalogInfo {
+interface CatalogInfo extends Partial<BreachCatalogEntry> {
   verified: boolean;
   source_type: string;
   source_name: string | null;
@@ -71,6 +73,7 @@ const Scan = () => {
   const [matches, setMatches] = useState<MatchResult[]>([]);
   const [riskScore, setRiskScore] = useState(0);
   const [scanRunId, setScanRunId] = useState<string | null>(null);
+  const [selectedCatalogBreach, setSelectedCatalogBreach] = useState<BreachCatalogEntry | null>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [scanMeta, setScanMeta] = useState<ScanMeta>({
     lastScanAt: null,
@@ -129,10 +132,10 @@ const Scan = () => {
           isScheduled: false,
         }));
 
-        // Fetch breaches for this scan with catalog join
+        // Fetch breaches for this scan with catalog join (including new fields)
         const { data: breachData } = await supabase
           .from("breach_events")
-          .select("*, breach_catalog(verified, source_type, source_name, source_url)")
+          .select("*, breach_catalog(id, name, company, breach_year, severity, exposed_fields, data_types, records_exposed, verified, verification_status, source_type, source_name, source_url, tags, active, settlement_available, settlement_name, estimated_payout_min, estimated_payout_max, claim_deadline, law_firm_partner, created_at, updated_at)")
           .eq("scan_run_id", scanRunId);
 
         if (breachData) {
@@ -495,6 +498,16 @@ const Scan = () => {
                         </Button>
                       </Link>
                     )}
+                    {breach.breach_catalog_id && breach.catalog && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full rounded-xl"
+                        onClick={() => setSelectedCatalogBreach(breach.catalog as BreachCatalogEntry)}
+                      >
+                        <Eye className="mr-1 h-3 w-3" /> View Details
+                      </Button>
+                    )}
                   </div>
                 </div>
               );
@@ -534,6 +547,12 @@ const Scan = () => {
       <p className="mt-8 text-xs text-muted-foreground text-center">
         BreachPay is not a law firm and does not provide legal advice. Data may be sourced from third-party providers and may be incomplete.
       </p>
+
+      <BreachDetailModal
+        breach={selectedCatalogBreach}
+        open={!!selectedCatalogBreach}
+        onOpenChange={(open) => !open && setSelectedCatalogBreach(null)}
+      />
     </div>
   );
 };
