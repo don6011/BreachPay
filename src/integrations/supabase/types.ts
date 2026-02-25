@@ -1279,6 +1279,28 @@ export type Database = {
       is_admin:
         | { Args: never; Returns: boolean }
         | { Args: { p_user: string }; Returns: boolean }
+      proc_claim_outbox: {
+        Args: { batch_size?: number }
+        Returns: {
+          attempts: number
+          channel: string
+          created_at: string
+          dedupe_key: string | null
+          id: string
+          last_error: string | null
+          payload: Json
+          sent_at: string | null
+          status: string
+          template: string
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "notification_outbox"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       proc_cron_scan_jobs: { Args: { max_jobs?: number }; Returns: Json }
       proc_enqueue_due_jobs: { Args: { max_jobs?: number }; Returns: number }
       proc_run_scheduled_jobs: { Args: { max_jobs?: number }; Returns: number }

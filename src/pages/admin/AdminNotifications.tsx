@@ -66,6 +66,21 @@ export default function AdminNotifications() {
     },
   });
 
+  const retryAllFailed = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("notification_outbox")
+        .update({ status: "pending", last_error: null })
+        .eq("status", "failed")
+        .lt("attempts", 8);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-outbox"] });
+      toast({ title: "All failed notifications re-queued" });
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.from("notification_outbox").delete().eq("id", id);
@@ -156,6 +171,12 @@ export default function AdminNotifications() {
         <Button variant="outline" className="rounded-xl" onClick={() => refetch()}>
           <RefreshCw className="mr-2 h-4 w-4" />Refresh
         </Button>
+
+        {stats.failed > 0 && (
+          <Button variant="outline" className="rounded-xl" onClick={() => retryAllFailed.mutate()}>
+            <RotateCcw className="mr-2 h-4 w-4" />Retry All Failed
+          </Button>
+        )}
 
         <Button className="rounded-xl ml-auto" onClick={triggerDispatch}>
           <Send className="mr-2 h-4 w-4" />Dispatch Now
