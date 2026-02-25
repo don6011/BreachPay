@@ -15,5 +15,5 @@ verify_jwt = false
 [functions.process-scan-queue]
 verify_jwt = false
 
-[functions.dispatch-outbox]
+[functions.dispatch-notifications]
 verify_jwt = false
