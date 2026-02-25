@@ -33,7 +33,7 @@ export function PayoutRange({ min, max, className, size = "md" }: PayoutRangePro
   return (
     <div className={cn("flex items-center gap-1.5", className)}>
       <DollarSign className="h-4 w-4 text-primary" />
-      <span className={cn("font-bold text-primary drop-shadow-[0_0_8px_hsl(172_89%_52%/0.3)]", sizeClasses[size])}>
+      <span className={cn("font-bold gradient-emerald-text", sizeClasses[size])}>
         {label}
       </span>
       <span className="text-[10px] text-muted-foreground ml-1">estimated payout</span>

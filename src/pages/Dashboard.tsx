@@ -141,7 +141,7 @@ const Dashboard = () => {
 
         {/* Action Buttons */}
         <div className="flex flex-wrap gap-3">
-          <Button asChild className="rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300">
+          <Button asChild className="rounded-xl">
             <Link to="/scan"><Search className="mr-2 h-4 w-4" />Run Scan</Link>
           </Button>
           <Button variant="outline" asChild className="rounded-xl">

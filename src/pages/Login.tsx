@@ -28,9 +28,9 @@ const Login = () => {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex items-center justify-center">
-          <img src={logo} alt="BreachPay" className="h-12" />
+          <img src={logo} alt="BreachPay" className="h-12 drop-shadow-[0_0_20px_hsl(164_100%_45%/0.2)]" />
         </div>
-        <div className="rounded-2xl border bg-card p-8">
+        <div className="rounded-2xl border border-border bg-card p-8">
           <h2 className="mb-1 text-xl font-bold">Welcome Back</h2>
           <p className="mb-6 text-sm text-muted-foreground">Log in to your BreachPay account</p>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -42,7 +42,7 @@ const Login = () => {
               <label className="mb-1.5 block text-sm font-medium">Password</label>
               <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="rounded-xl" />
             </div>
-            <Button type="submit" disabled={loading} className="w-full rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300">
+            <Button type="submit" disabled={loading} className="w-full rounded-xl">
               {loading ? "Logging in…" : "Log In"}
             </Button>
           </form>
