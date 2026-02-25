@@ -5,14 +5,17 @@ import { RiskGauge } from "@/components/RiskGauge";
 import { AlertRow } from "@/components/AlertRow";
 import { BreachIntelligence } from "@/components/BreachIntelligence";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { ShieldAlert, Scale, DollarSign, FileText, Activity, Search, ArrowRight, Wallet, Clock, CheckCircle } from "lucide-react";
+import { useScanSchedule } from "@/hooks/useScanSchedule";
+import { ShieldAlert, Scale, DollarSign, FileText, Activity, Search, ArrowRight, Wallet, Clock, CheckCircle, CalendarClock } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Dashboard = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
+  const { data: schedule } = useScanSchedule();
   const [riskScore, setRiskScore] = useState(0);
   const [breachCount, setBreachCount] = useState(0);
   const [eligibleCount, setEligibleCount] = useState(0);
@@ -171,6 +174,28 @@ const Dashboard = () => {
         </div>
       </div>
       </div>
+
+      {/* Scheduled Scan Status */}
+      {schedule && (
+        <div className="mt-8 glass-card p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <CalendarClock className="h-5 w-5 text-primary" />
+              <div>
+                <h3 className="text-sm font-semibold">Scheduled Scans</h3>
+                <p className="text-xs text-muted-foreground">
+                  {schedule.is_enabled
+                    ? `${schedule.frequency} · Next: ${new Date(schedule.next_run_at).toLocaleString()}`
+                    : "Disabled"}
+                </p>
+              </div>
+            </div>
+            <Badge variant="outline" className={schedule.is_enabled ? "border-primary/30 text-primary" : "border-muted text-muted-foreground"}>
+              {schedule.is_enabled ? "Active" : "Off"}
+            </Badge>
+          </div>
+        </div>
+      )}
 
       {/* Breach Intelligence */}
       <div className="mt-8">

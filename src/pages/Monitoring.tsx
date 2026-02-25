@@ -5,9 +5,11 @@ import { AlertRow } from "@/components/AlertRow";
 import { StatusPill } from "@/components/StatusPill";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Shield, Database, AlertTriangle, Clock, Bell, Mail, Zap, Crown, Check, Lightbulb, Activity } from "lucide-react";
+import { useScanSchedule, useUpsertSchedule } from "@/hooks/useScanSchedule";
+import { Shield, Database, AlertTriangle, Clock, Bell, Mail, Zap, Crown, Check, Lightbulb, Activity, CalendarClock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { toast } from "@/hooks/use-toast";
@@ -47,6 +49,9 @@ const Monitoring = () => {
   const [breachCount, setBreachCount] = useState(0);
   const [dbsScanned, setDbsScanned] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  const { data: schedule } = useScanSchedule();
+  const upsertSchedule = useUpsertSchedule();
 
   useEffect(() => {
     if (!user) return;
@@ -147,6 +152,54 @@ const Monitoring = () => {
           <StatCard icon={AlertTriangle} label="Breaches Detected" value={breachCount} />
         </div>
         <p className="mt-3 text-xs text-muted-foreground">Scan Frequency: {scanFreqLabel}</p>
+      </div>
+
+      {/* Scheduled Scan Card */}
+      <div className="mb-6 glass-card p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <CalendarClock className="h-4 w-4 text-primary" />
+          <h2 className="font-semibold">Scheduled Scans</h2>
+        </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Auto-scan enabled</p>
+              <p className="text-xs text-muted-foreground">Automatically run breach scans on a schedule</p>
+            </div>
+            <Switch
+              checked={schedule?.is_enabled ?? false}
+              onCheckedChange={(v) => upsertSchedule.mutate({ is_enabled: v, frequency: schedule?.frequency ?? "daily" })}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium">Frequency</p>
+            <Select
+              value={schedule?.frequency ?? "daily"}
+              onValueChange={(v) => upsertSchedule.mutate({ is_enabled: schedule?.is_enabled ?? true, frequency: v })}
+            >
+              <SelectTrigger className="w-32 rounded-xl">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="hourly">Hourly</SelectItem>
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="weekly">Weekly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {schedule?.next_run_at && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Next scheduled run</span>
+              <span>{new Date(schedule.next_run_at).toLocaleString()}</span>
+            </div>
+          )}
+          {schedule?.last_run_at && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Last run</span>
+              <span>{new Date(schedule.last_run_at).toLocaleString()}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Risk Trend Graph */}

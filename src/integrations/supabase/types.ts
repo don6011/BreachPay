@@ -640,6 +640,45 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_outbox: {
+        Row: {
+          attempts: number
+          channel: string
+          created_at: string
+          id: string
+          last_error: string | null
+          payload: Json
+          sent_at: string | null
+          status: string
+          template: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          channel: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          payload?: Json
+          sent_at?: string | null
+          status?: string
+          template: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          channel?: string
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          payload?: Json
+          sent_at?: string | null
+          status?: string
+          template?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       partner_firms: {
         Row: {
           contact_email: string | null
@@ -746,6 +785,53 @@ export type Database = {
           },
         ]
       }
+      scan_job_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          finished_at: string | null
+          id: string
+          last_error: string | null
+          run_at: string
+          schedule_id: string | null
+          started_at: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          run_at: string
+          schedule_id?: string | null
+          started_at?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          run_at?: string
+          schedule_id?: string | null
+          started_at?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scan_job_queue_schedule_id_fkey"
+            columns: ["schedule_id"]
+            isOneToOne: false
+            referencedRelation: "scan_schedule"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scan_runs: {
         Row: {
           breaches_detected: number
@@ -793,6 +879,42 @@ export type Database = {
           risk_score?: number
           started_at?: string | null
           status?: Database["public"]["Enums"]["scan_status_t"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      scan_schedule: {
+        Row: {
+          created_at: string
+          frequency: string
+          id: string
+          is_enabled: boolean
+          last_run_at: string | null
+          next_run_at: string
+          scan_type: string
+          timezone: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          frequency?: string
+          id?: string
+          is_enabled?: boolean
+          last_run_at?: string | null
+          next_run_at?: string
+          scan_type?: string
+          timezone?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          frequency?: string
+          id?: string
+          is_enabled?: boolean
+          last_run_at?: string | null
+          next_run_at?: string
+          scan_type?: string
+          timezone?: string
           user_id?: string
         }
         Relationships: []
@@ -1120,9 +1242,11 @@ export type Database = {
         Args: { p_job: string; p_path: string }
         Returns: Json
       }
+      enqueue_due_scan_jobs: { Args: never; Returns: number }
       is_admin:
         | { Args: never; Returns: boolean }
         | { Args: { p_user: string }; Returns: boolean }
+      proc_cron_scan_jobs: { Args: { max_jobs?: number }; Returns: Json }
     }
     Enums: {
       alert_type_t:

@@ -35,6 +35,7 @@ import AdminAutomationLogs from "./pages/admin/AdminAutomationLogs";
 import AdminPayouts from "./pages/admin/AdminPayouts";
 import AdminPartners from "./pages/admin/AdminPartners";
 import AdminBreachCatalog from "./pages/admin/AdminBreachCatalog";
+import AdminCron from "./pages/admin/AdminCron";
 import AdminDocuments from "./pages/admin/AdminDocuments";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import PartnerClaims from "./pages/partner/PartnerClaims";
@@ -87,6 +88,7 @@ const App = () => {
               <Route path="/admin/payouts" element={<AdminPayouts />} />
               <Route path="/admin/partners" element={<AdminPartners />} />
               <Route path="/admin/breach-catalog" element={<AdminBreachCatalog />} />
+              <Route path="/admin/cron" element={<AdminCron />} />
               <Route path="/admin/documents" element={<AdminDocuments />} />
             </Route>
 
