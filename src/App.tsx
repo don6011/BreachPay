@@ -48,6 +48,9 @@ import PartnerReporting from "./pages/partner/PartnerReporting";
 import PartnerSettings from "./pages/partner/PartnerSettings";
 import NotFound from "./pages/NotFound";
 import ShareClaim from "./pages/ShareClaim";
+import SettlementPublic from "./pages/SettlementPublic";
+import BreachCompany from "./pages/BreachCompany";
+import CheckEligibility from "./pages/CheckEligibility";
 
 const queryClient = new QueryClient();
 
@@ -113,6 +116,11 @@ const App = () => {
 
             {/* Public share page */}
             <Route path="/share/claim" element={<ShareClaim />} />
+
+            {/* Public SEO pages */}
+            <Route path="/settlement/:slug" element={<SettlementPublic />} />
+            <Route path="/breach/:company" element={<BreachCompany />} />
+            <Route path="/check/:slug" element={<CheckEligibility />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
