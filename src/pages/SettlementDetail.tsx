@@ -5,7 +5,12 @@ import { StatusPill } from "@/components/StatusPill";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import { DeadlineBadge, isDeadlinePassed } from "@/components/DeadlineBadge";
 import { PayoutRange } from "@/components/PayoutRange";
+import { BackToTopButton } from "@/components/BackToTopButton";
 import { Button } from "@/components/ui/button";
+import {
+  Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink,
+  BreadcrumbPage, BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
@@ -122,11 +127,25 @@ const SettlementDetail = () => {
 
   return (
     <div>
-      <div className="mb-4">
-        <Button variant="ghost" size="sm" asChild className="rounded-xl text-muted-foreground">
-          <Link to="/settlements"><ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back to Settlements</Link>
-        </Button>
-      </div>
+      <Breadcrumb className="mb-4">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link to="/dashboard">Dashboard</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link to="/settlements">Settlements</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>{settlement?.name ?? "Detail"}</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
       <div className="flex items-start justify-between mb-6 flex-wrap gap-3">
         <div>
@@ -257,6 +276,8 @@ const SettlementDetail = () => {
       <p className="text-[11px] text-muted-foreground">
         BreachPay is not a law firm. Eligibility depends on settlement administrator review. Estimated payouts are subject to settlement terms. All data comes from third-party sources.
       </p>
+
+      <BackToTopButton />
     </div>
   );
 };
