@@ -12,6 +12,8 @@ import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow, format } from "date-fns";
 import { BreachDetailModal } from "@/components/BreachDetailModal";
 import type { BreachCatalogEntry } from "@/hooks/useBreachCatalog";
+import { PremiumUpgradeCard } from "@/components/PremiumUpgradeCard";
+import { IdentityProtectionUpsell } from "@/components/IdentityProtectionUpsell";
 import { useTrackEvent } from "@/hooks/useTrackEvent";
 
 type ScanState = "idle" | "scanning" | "results";
@@ -402,17 +404,8 @@ const Scan = () => {
 
           {/* Premium Upsell */}
           {!isPremium && (
-            <div className="mb-6 glass-card-glow p-5 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Crown className="h-5 w-5 text-primary shrink-0" />
-                <div>
-                  <p className="text-sm font-semibold">Get daily scans + instant breach alerts</p>
-                  <p className="text-xs text-muted-foreground">Upgrade to Premium for $9.99/mo</p>
-                </div>
-              </div>
-              <Button asChild size="sm" className="rounded-xl shrink-0">
-                <Link to="/pricing">Upgrade</Link>
-              </Button>
+            <div className="mb-6">
+              <PremiumUpgradeCard placement="post_scan" compact />
             </div>
           )}
 
@@ -522,31 +515,17 @@ const Scan = () => {
             })}
           </div>
 
-          {/* Monitoring Upsell Block */}
+          {/* Identity Protection Upsell - after breach detection */}
+          {breaches.length > 0 && (
+            <div className="mt-6">
+              <IdentityProtectionUpsell placement="post_scan" compact />
+            </div>
+          )}
+
+          {/* Premium Monitoring Upsell */}
           {!isPremium && (
-            <div className="mt-8 glass-card-glow p-8">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/10">
-                  <Shield className="h-5 w-5 text-primary" />
-                </div>
-                <h3 className="text-lg font-bold">Stay Protected Going Forward</h3>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                {[
-                  { icon: Zap, label: "Daily breach scans" },
-                  { icon: Bell, label: "Instant alerts" },
-                  { icon: Crown, label: "Priority settlement matching" },
-                  { icon: Activity, label: "Advanced identity monitoring" },
-                ].map(({ icon: Icon, label }) => (
-                  <div key={label} className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Icon className="h-4 w-4 text-primary shrink-0" />
-                    <span>{label}</span>
-                  </div>
-                ))}
-              </div>
-              <Button asChild size="lg" className="rounded-xl">
-                <Link to="/pricing">Upgrade — $9.99/mo</Link>
-              </Button>
+            <div className="mt-6">
+              <PremiumUpgradeCard placement="post_scan" />
             </div>
           )}
         </div>

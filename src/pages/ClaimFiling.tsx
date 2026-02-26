@@ -19,6 +19,8 @@ import {
   Bookmark, Eye, Send, Sparkles, ArrowRight, Loader2, ExternalLink,
 } from "lucide-react";
 import { useTrackEvent } from "@/hooks/useTrackEvent";
+import { ClaimAccelerationCard } from "@/components/ClaimAccelerationCard";
+import { IdentityProtectionUpsell } from "@/components/IdentityProtectionUpsell";
 
 const STEPS = ["Overview", "Identity", "Eligibility", "Documents", "Review"];
 
@@ -462,6 +464,17 @@ const ClaimFiling = () => {
               </Button>
             </div>
           </div>
+
+          {/* Claim Acceleration - post submission upsell */}
+          {createdClaimId && (
+            <ClaimAccelerationCard
+              claimId={createdClaimId}
+              estPayout={settlement ? (settlement.payout_min + settlement.payout_max) / 2 : undefined}
+            />
+          )}
+
+          {/* Identity Protection - post claim */}
+          <IdentityProtectionUpsell placement="post_claim" compact />
         </div>
       </div>
     );

@@ -8,6 +8,7 @@ import { DeadlineCountdown } from "@/components/DeadlineCountdown";
 import { ReferralCard } from "@/components/ReferralCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PremiumUpgradeCard } from "@/components/PremiumUpgradeCard";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useScanSchedule } from "@/hooks/useScanSchedule";
@@ -215,6 +216,11 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Premium Upgrade */}
+      <div className="mt-8">
+        <PremiumUpgradeCard placement="dashboard" compact />
+      </div>
 
       {/* Breach Intelligence */}
       <div className="mt-8">

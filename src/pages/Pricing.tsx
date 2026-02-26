@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Check, Crown, ArrowRight, ChevronDown } from "lucide-react";
+import { Check, Crown, ArrowRight, ChevronDown, Zap, FileCheck, ShieldCheck, Shield, CreditCard } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import logo from "@/assets/logo.png";
 
@@ -20,33 +20,39 @@ const plans = [
       "Standard settlement matching",
       "14-day deadline alerts",
       "Email alerts (batched)",
+      "Free claim filing — always",
     ],
   },
   {
     name: "Premium",
-    price: "$9.99",
+    price: "$4.99",
     period: "/mo",
-    description: "Advanced monitoring and priority matching",
+    description: "Real-time monitoring & priority matching",
     cta: "Upgrade to Premium",
     ctaLink: "/signup",
     highlighted: true,
     badge: "Most Popular",
     features: [
       "Daily monitoring scans",
-      "Instant email alerts",
+      "Real-time breach alerts",
+      "Dark web exposure monitoring",
+      "Identity risk scoring dashboard",
       "30-day deadline alerts",
       "Priority settlement matching",
+      "Auto-claim packet generation",
       "Risk trend history + score changes",
-      "Priority support",
     ],
   },
 ];
 
 const comparisonRows = [
   { feature: "Scan frequency", free: "Weekly", premium: "Daily" },
-  { feature: "Alerts", free: "Batched", premium: "Instant" },
+  { feature: "Breach alerts", free: "Batched", premium: "Real-time" },
+  { feature: "Dark web monitoring", free: "—", premium: "✓" },
   { feature: "Deadline alerts window", free: "14 days", premium: "30 days" },
   { feature: "Settlement matching", free: "Standard", premium: "Priority" },
+  { feature: "Identity risk scoring", free: "—", premium: "✓" },
+  { feature: "Auto-claim packets", free: "—", premium: "✓" },
   { feature: "Risk history", free: "—", premium: "✓" },
   { feature: "Support", free: "Standard", premium: "Priority" },
 ];
@@ -185,6 +191,55 @@ const Pricing = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      </section>
+
+      {/* Claim Acceleration Services */}
+      <section className="pb-16">
+        <div className="mx-auto max-w-4xl px-6">
+          <h2 className="mb-2 text-center text-2xl font-bold">Claim Acceleration</h2>
+          <p className="mb-8 text-center text-sm text-muted-foreground">Optional add-ons to speed up your payout. Claims are always free to file.</p>
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              { icon: Zap, title: "Expedited Review", desc: "Priority processing within 48 hours", price: "$9" },
+              { icon: FileCheck, title: "Document Verification", desc: "Expert review of your evidence", price: "$14" },
+              { icon: ShieldCheck, title: "Eligibility Appeal", desc: "Professional appeal if denied", price: "$29" },
+            ].map(({ icon: Icon, title, desc, price }) => (
+              <div key={title} className="rounded-2xl border bg-card p-6 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                  <Icon className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="font-semibold mb-1">{title}</h3>
+                <p className="text-xs text-muted-foreground mb-3">{desc}</p>
+                <p className="text-2xl font-bold">{price}</p>
+                <p className="text-xs text-muted-foreground">one-time</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Identity Protection */}
+      <section className="pb-16">
+        <div className="mx-auto max-w-4xl px-6">
+          <h2 className="mb-2 text-center text-2xl font-bold">Identity Protection</h2>
+          <p className="mb-8 text-center text-sm text-muted-foreground">Ongoing protection from our trusted partners</p>
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              { icon: CreditCard, title: "Credit Monitoring", desc: "Alerts on credit changes & new accounts" },
+              { icon: Shield, title: "Identity Insurance", desc: "Up to $1M theft coverage" },
+              { icon: Crown, title: "Restoration Service", desc: "Dedicated identity restoration specialist" },
+            ].map(({ icon: Icon, title, desc }) => (
+              <div key={title} className="rounded-2xl border bg-card p-6 text-center">
+                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
+                  <Icon className="h-6 w-6 text-primary" />
+                </div>
+                <h3 className="font-semibold mb-1">{title}</h3>
+                <p className="text-xs text-muted-foreground">{desc}</p>
+                <p className="mt-3 text-xs text-muted-foreground">Partner offer</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
