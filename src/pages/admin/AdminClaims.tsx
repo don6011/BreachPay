@@ -53,6 +53,9 @@ interface ClaimRow {
   exposed_fields: string[];
   partner_id: string | null;
   partner_firm_id: string | null;
+  flagged: boolean;
+  flag_reason: string | null;
+  exposure_confidence: number;
 }
 
 interface FirmOption {
@@ -150,7 +153,7 @@ const AdminClaims = () => {
     try {
       const { data } = await supabase
         .from("claims")
-        .select(`id, status, est_payout, filed_at, updated_at, user_id, settlement_id, partner_id, partner_firm_id, settlements(name, company, breach_year)`)
+        .select(`id, status, est_payout, filed_at, updated_at, user_id, settlement_id, partner_id, partner_firm_id, flagged, flag_reason, exposure_confidence, settlements(name, company, breach_year)`)
         .order("created_at", { ascending: false })
         .limit(200);
 
@@ -198,6 +201,9 @@ const AdminClaims = () => {
           exposed_fields: exposureMap[c.user_id] ? Array.from(exposureMap[c.user_id]) : [],
           partner_id: c.partner_id || null,
           partner_firm_id: c.partner_firm_id || null,
+          flagged: c.flagged || false,
+          flag_reason: c.flag_reason || null,
+          exposure_confidence: c.exposure_confidence ?? 75,
         })));
       }
     } catch (error) {
@@ -500,7 +506,14 @@ const AdminClaims = () => {
               filteredClaims.map((c) => (
                 <tr key={c.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => openClaimDialog(c)}>
                   <td className="px-4 py-3 text-xs">{c.user_email}</td>
-                  <td className="px-4 py-3 font-medium">{c.settlement_name}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <span>{c.settlement_name}</span>
+                    {c.flagged && (
+                      <span className="ml-1.5 inline-flex items-center gap-0.5 rounded-full bg-destructive/10 px-1.5 py-0.5 text-[10px] font-bold text-destructive" title={c.flag_reason || "Flagged"}>
+                        <Flag className="h-2.5 w-2.5" /> FLAGGED
+                      </span>
+                    )}
+                  </td>
                   <td className="px-4 py-3"><StatusPill variant={c.status as any} /></td>
                   <td className="px-4 py-3 text-primary">${c.est_payout.toLocaleString()}</td>
                   <td className="px-4 py-3 text-xs">{c.partner_id ? (partnerOptions.find(p => p.user_id === c.partner_id)?.email || "Assigned") : <span className="text-muted-foreground">—</span>}</td>

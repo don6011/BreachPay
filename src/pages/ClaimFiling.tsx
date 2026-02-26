@@ -244,6 +244,41 @@ const ClaimFiling = () => {
     return claimData.id;
   };
 
+  // Hash a file for duplicate detection
+  const hashFile = async (file: File): Promise<string> => {
+    const buffer = await file.arrayBuffer();
+    const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+  };
+
+  // Hash a string for fingerprinting
+  const hashString = async (str: string): Promise<string> => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(str.toLowerCase().trim());
+    const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+  };
+
+  // Collect and store user fingerprint
+  const collectFingerprint = async () => {
+    if (!user) return;
+    const emailHash = user.email ? await hashString(user.email) : null;
+    const phoneHash = identity.phone ? await hashString(identity.phone) : null;
+    // Simple device fingerprint from navigator properties
+    const deviceStr = [navigator.userAgent, navigator.language, screen.width, screen.height, Intl.DateTimeFormat().resolvedOptions().timeZone].join("|");
+    const deviceHash = await hashString(deviceStr);
+
+    await supabase.from("user_fingerprints").insert({
+      user_id: user.id,
+      email_hash: emailHash,
+      phone_hash: phoneHash,
+      device_hash: deviceHash,
+      // IP hash handled server-side
+    } as any);
+  };
+
   const uploadDocuments = async (claimId: string) => {
     if (!user || documents.length === 0) return;
 
@@ -252,6 +287,8 @@ const ClaimFiling = () => {
       setDocuments(prev => prev.map((d, idx) => idx === i ? { ...d, uploading: true } : d));
 
       const filePath = `${user.id}/${claimId}/${Date.now()}_${doc.file.name}`;
+      const fileHash = await hashFile(doc.file);
+
       const { error: uploadError } = await supabase.storage
         .from("claim-documents")
         .upload(filePath, doc.file);
@@ -271,6 +308,7 @@ const ClaimFiling = () => {
         doc_type: doc.type,
         file_type: doc.type,
         note: doc.name,
+        file_hash: fileHash,
       } as any);
 
       setDocuments(prev => prev.map((d, idx) => idx === i ? { ...d, uploading: false, uploaded: true, url: filePath } : d));
@@ -327,6 +365,9 @@ const ClaimFiling = () => {
         claimId = await ensureDraftClaim();
         if (!claimId) throw new Error("Failed to create claim");
       }
+
+      // Collect fingerprint for fraud detection
+      await collectFingerprint();
 
       // Save final application data
       await saveApplicationData(claimId);
