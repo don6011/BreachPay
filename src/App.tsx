@@ -39,6 +39,7 @@ import AdminBreachCatalog from "./pages/admin/AdminBreachCatalog";
 import AdminCron from "./pages/admin/AdminCron";
 import AdminDocuments from "./pages/admin/AdminDocuments";
 import AdminNotifications from "./pages/admin/AdminNotifications";
+import AdminInvoices from "./pages/admin/AdminInvoices";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import PartnerClaims from "./pages/partner/PartnerClaims";
 import PartnerClaimDetail from "./pages/partner/PartnerClaimDetail";
@@ -95,6 +96,7 @@ const App = () => {
               <Route path="/admin/cron" element={<AdminCron />} />
               <Route path="/admin/documents" element={<AdminDocuments />} />
               <Route path="/admin/notifications" element={<AdminNotifications />} />
+              <Route path="/admin/invoices" element={<AdminInvoices />} />
             </Route>
 
             {/* Partner Portal - Protected */}

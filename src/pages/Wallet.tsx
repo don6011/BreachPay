@@ -13,6 +13,8 @@ interface PayoutRow {
   amount: number;
   currency: string;
   status: string;
+  method: string | null;
+  external_ref: string | null;
   stripe_ref: string | null;
   paid_at: string | null;
   created_at: string;
@@ -42,7 +44,7 @@ const Wallet = () => {
       const [payoutsRes, claimsRes, matchesRes] = await Promise.all([
         supabase
           .from("payouts")
-          .select("id, claim_id, amount, currency, status, stripe_ref, paid_at, created_at, claims(settlement_id, settlements(name))")
+          .select("id, claim_id, amount, currency, status, method, external_ref, stripe_ref, paid_at, created_at, claims(settlement_id, settlements(name))")
           .eq("user_id", user!.id)
           .order("created_at", { ascending: false }),
         supabase
@@ -61,6 +63,8 @@ const Wallet = () => {
         amount: Number(p.amount),
         currency: p.currency,
         status: p.status,
+        method: p.method || null,
+        external_ref: p.external_ref || null,
         stripe_ref: p.stripe_ref,
         paid_at: p.paid_at,
         created_at: p.created_at,
@@ -194,10 +198,17 @@ const Wallet = () => {
                 </div>
               </div>
 
-              {selectedPayout.stripe_ref && (
+              {(selectedPayout.method && selectedPayout.method !== "unknown") && (
+                <div className="rounded-xl bg-muted/50 p-4">
+                  <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Payment Method</p>
+                  <p className="text-xs font-medium capitalize">{selectedPayout.method.replace(/_/g, " ")}</p>
+                </div>
+              )}
+
+              {(selectedPayout.external_ref || selectedPayout.stripe_ref) && (
                 <div className="rounded-xl bg-muted/50 p-4">
                   <p className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">Reference</p>
-                  <p className="text-xs font-mono break-all">{selectedPayout.stripe_ref}</p>
+                  <p className="text-xs font-mono break-all">{selectedPayout.external_ref || selectedPayout.stripe_ref}</p>
                 </div>
               )}
 

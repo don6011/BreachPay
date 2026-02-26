@@ -74,6 +74,12 @@ interface PartnerNote {
   note: string;
   created_at: string;
 }
+interface PayoutEvent {
+  id: string;
+  event_type: string;
+  meta: any;
+  created_at: string;
+}
 
 const ClaimTracker = () => {
   const { claimId } = useParams();
@@ -85,6 +91,7 @@ const ClaimTracker = () => {
   const [documents, setDocuments] = useState<DocRow[]>([]);
   const [docRequests, setDocRequests] = useState<DocRequest[]>([]);
   const [partnerNotes, setPartnerNotes] = useState<PartnerNote[]>([]);
+  const [payoutEvents, setPayoutEvents] = useState<PayoutEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingPacket, setGeneratingPacket] = useState(false);
   const [creatingShare, setCreatingShare] = useState(false);
@@ -186,7 +193,7 @@ const ClaimTracker = () => {
     if (!claimId) return;
     setLoading(true);
 
-    const [claimRes, historyRes, docsRes, docReqRes, notesRes] = await Promise.all([
+    const [claimRes, historyRes, docsRes, docReqRes, notesRes, payoutEventsRes] = await Promise.all([
       supabase
         .from("claims")
         .select(`
@@ -215,6 +222,11 @@ const ClaimTracker = () => {
         .select("id, note, created_at")
         .eq("claim_id", claimId)
         .order("created_at", { ascending: false }),
+      supabase
+        .from("claim_payout_events")
+        .select("id, event_type, meta, created_at")
+        .eq("claim_id", claimId)
+        .order("created_at", { ascending: true }),
     ]);
 
     if (claimRes.data) {
@@ -243,6 +255,7 @@ const ClaimTracker = () => {
     if (docsRes.data) setDocuments(docsRes.data);
     setDocRequests((docReqRes.data as DocRequest[]) || []);
     setPartnerNotes((notesRes.data as PartnerNote[]) || []);
+    setPayoutEvents((payoutEventsRes.data as PayoutEvent[]) || []);
     setLoading(false);
   };
 
@@ -519,6 +532,37 @@ const ClaimTracker = () => {
                 <div key={n.id} className="rounded-lg border p-3 text-sm">
                   <p>{n.note}</p>
                   <span className="text-[10px] text-muted-foreground">{format(new Date(n.created_at), "MMM d, h:mm a")}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Payout History */}
+        {payoutEvents.length > 0 && (
+          <div className="rounded-2xl border bg-card p-6 space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-success" /> Payout History
+            </h3>
+            <div className="space-y-2">
+              {payoutEvents.map((ev) => (
+                <div key={ev.id} className="flex items-start gap-3">
+                  <div className="flex flex-col items-center">
+                    <div className="h-2.5 w-2.5 rounded-full bg-success" />
+                  </div>
+                  <div className="flex-1 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium capitalize">{ev.event_type.replace(/_/g, " ")}</span>
+                      <span className="text-[10px] text-muted-foreground">{format(new Date(ev.created_at), "MMM d, h:mm a")}</span>
+                    </div>
+                    {ev.meta && (
+                      <div className="text-xs text-muted-foreground mt-0.5 flex gap-3">
+                        {ev.meta.amount && <span className="font-semibold text-success">${Number(ev.meta.amount).toLocaleString()}</span>}
+                        {ev.meta.method && ev.meta.method !== "unknown" && <span className="capitalize">{ev.meta.method.replace(/_/g, " ")}</span>}
+                        {ev.meta.external_ref && <span className="font-mono">{ev.meta.external_ref}</span>}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
