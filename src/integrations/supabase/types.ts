@@ -2069,6 +2069,10 @@ export type Database = {
       proc_cron_scan_jobs: { Args: { max_jobs?: number }; Returns: Json }
       proc_enqueue_due_jobs: { Args: { max_jobs?: number }; Returns: number }
       proc_run_scheduled_jobs: { Args: { max_jobs?: number }; Returns: number }
+      rpc_admin_generate_partner_invoices: {
+        Args: { p_period_end: string; p_period_start: string }
+        Returns: number
+      }
       rpc_admin_mark_claim_paid: {
         Args: {
           p_amount: number
@@ -2076,6 +2080,10 @@ export type Database = {
           p_external_ref?: string
           p_method?: string
         }
+        Returns: undefined
+      }
+      rpc_admin_mark_invoice_paid: {
+        Args: { p_invoice_id: string }
         Returns: undefined
       }
       rpc_partner_add_claim_note: {
