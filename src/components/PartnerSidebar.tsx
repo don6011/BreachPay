@@ -1,4 +1,4 @@
-import { BarChart3, FileText, Settings, ArrowLeft, TrendingUp, Users, DollarSign, Code2 } from "lucide-react";
+import { BarChart3, FileText, Settings, ArrowLeft, TrendingUp, Users, DollarSign, Code2, Key } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/logo.png";
@@ -10,6 +10,7 @@ const partnerNav = [
   { title: "Revenue", url: "/partner/revenue", icon: DollarSign },
   { title: "Reports", url: "/partner/reporting", icon: TrendingUp },
   { title: "Integrations", url: "/partner/integrations", icon: Code2 },
+  { title: "API Access", url: "/partner/api", icon: Key },
   { title: "Settings", url: "/partner/settings", icon: Settings },
 ];
 

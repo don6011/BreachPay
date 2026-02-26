@@ -49,6 +49,7 @@ import PartnerSettings from "./pages/partner/PartnerSettings";
 import PartnerIntake from "./pages/partner/PartnerIntake";
 import PartnerRevenue from "./pages/partner/PartnerRevenue";
 import PartnerIntegrations from "./pages/partner/PartnerIntegrations";
+import PartnerApiAccess from "./pages/partner/PartnerApiAccess";
 import NotFound from "./pages/NotFound";
 import ShareClaim from "./pages/ShareClaim";
 import SettlementPublic from "./pages/SettlementPublic";
@@ -119,6 +120,7 @@ const App = () => {
               <Route path="/partner/intake" element={<PartnerIntake />} />
               <Route path="/partner/revenue" element={<PartnerRevenue />} />
               <Route path="/partner/integrations" element={<PartnerIntegrations />} />
+              <Route path="/partner/api" element={<PartnerApiAccess />} />
               <Route path="/partner/settings" element={<PartnerSettings />} />
             </Route>
 

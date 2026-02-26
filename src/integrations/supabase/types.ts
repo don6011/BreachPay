@@ -188,6 +188,100 @@ export type Database = {
           },
         ]
       }
+      api_keys: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          label: string | null
+          last_used_at: string | null
+          partner_id: string
+          rate_limit: number
+          revoked_at: string | null
+          scopes: string[]
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          key_hash: string
+          key_prefix: string
+          label?: string | null
+          last_used_at?: string | null
+          partner_id: string
+          rate_limit?: number
+          revoked_at?: string | null
+          scopes?: string[]
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          label?: string | null
+          last_used_at?: string | null
+          partner_id?: string
+          rate_limit?: number
+          revoked_at?: string | null
+          scopes?: string[]
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_keys_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      api_usage_logs: {
+        Row: {
+          api_key_id: string
+          created_at: string
+          endpoint: string
+          id: string
+          method: string
+          request_count: number
+          response_time_ms: number | null
+          status_code: number | null
+        }
+        Insert: {
+          api_key_id: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          method?: string
+          request_count?: number
+          response_time_ms?: number | null
+          status_code?: number | null
+        }
+        Update: {
+          api_key_id?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          method?: string
+          request_count?: number
+          response_time_ms?: number | null
+          status_code?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_usage_logs_api_key_id_fkey"
+            columns: ["api_key_id"]
+            isOneToOne: false
+            referencedRelation: "api_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automation_runs: {
         Row: {
           completed_at: string | null
@@ -2456,6 +2550,10 @@ export type Database = {
         Args: { p_job: string; p_path: string }
         Returns: Json
       }
+      check_rate_limit: {
+        Args: { p_key_id: string; p_limit: number }
+        Returns: boolean
+      }
       compute_fraud_score: { Args: { p_claim_id: string }; Returns: number }
       enqueue_due_scan_jobs: { Args: never; Returns: number }
       get_partner_id_for_user: { Args: { p_user_id: string }; Returns: string }
@@ -2525,6 +2623,15 @@ export type Database = {
       rpc_partner_update_claim_status: {
         Args: { p_claim_id: string; p_new_status: string; p_notes?: string }
         Returns: undefined
+      }
+      validate_api_key: {
+        Args: { p_key_hash: string }
+        Returns: {
+          key_id: string
+          partner_id: string
+          rate_limit: number
+          scopes: string[]
+        }[]
       }
     }
     Enums: {
