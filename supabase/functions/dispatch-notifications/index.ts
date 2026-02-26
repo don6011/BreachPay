@@ -31,9 +31,7 @@ function buildEmailHtml(
   const payout = payload.payout_estimate ?? payload.payout_est ?? "";
   const daysLeft = payload.days_left ?? "";
 
-  const detailsUrl = settlementId
-    ? `${appBaseUrl.replace(/\/$/, "")}/settlements/${encodeURIComponent(settlementId)}`
-    : `${appBaseUrl.replace(/\/$/, "")}/dashboard`;
+  const detailsUrl = `${appBaseUrl.replace(/\/$/, "")}/settlements`;
 
   if (template === "new_match") {
     const subject = `New settlement match: ${settlementName}`;
