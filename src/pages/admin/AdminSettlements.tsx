@@ -58,6 +58,7 @@ interface QueueItem {
   status: string;
   notes: string | null;
   created_at: string;
+  changes_diff: Record<string, { old: any; new: any }> | null;
   settlement?: Settlement;
 }
 
@@ -168,6 +169,14 @@ const AdminSettlements = () => {
   const [csvStep, setCsvStep] = useState<"upload" | "map" | "preview">("upload");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Saved mapping templates
+  const [savedTemplates, setSavedTemplates] = useState<{ id: string; template_name: string; mapping_json: Record<string, string>; source_id: string | null }[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+  const [saveTemplateName, setSaveTemplateName] = useState("");
+
+  // Diff view state
+  const [diffItem, setDiffItem] = useState<QueueItem | null>(null);
+
   // Actions
   const [sendingAlerts, setSendingAlerts] = useState(false);
   const [rebuildingMatches, setRebuildingMatches] = useState(false);
@@ -226,12 +235,18 @@ const AdminSettlements = () => {
     setRawLoading(false);
   };
 
+  const fetchTemplates = async () => {
+    const { data } = await supabase.from("csv_mapping_templates").select("*").order("updated_at", { ascending: false });
+    if (data) setSavedTemplates(data as any);
+  };
+
   useEffect(() => {
     if (!user) return;
     fetchQueue();
     fetchSettlements();
     fetchSources();
     fetchRawIngest();
+    fetchTemplates();
   }, [user]);
 
   // ── Queue Actions ──────────────────────────────────────
@@ -545,7 +560,34 @@ const AdminSettlements = () => {
     }
   };
 
-  // ── Edge Function Caller ────────────────────────────────
+  // ── Save CSV Template ──────────────────────────────────
+  const handleSaveTemplate = async () => {
+    if (!saveTemplateName.trim()) { toast({ title: "Template name required", variant: "destructive" }); return; }
+    try {
+      const { error } = await supabase.from("csv_mapping_templates").insert({
+        template_name: saveTemplateName.trim(),
+        source_id: csvSourceId || null,
+        mapping_json: csvMapping,
+      });
+      if (error) throw error;
+      toast({ title: "Template saved" });
+      setSaveTemplateName("");
+      fetchTemplates();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const applyTemplate = (templateId: string) => {
+    const tpl = savedTemplates.find(t => t.id === templateId);
+    if (tpl) {
+      setCsvMapping(tpl.mapping_json as Record<string, string>);
+      if (tpl.source_id) setCsvSourceId(tpl.source_id);
+      setSelectedTemplateId(templateId);
+    }
+  };
+
+
   const callEdgeFunction = async (functionName: string, setLoading: (v: boolean) => void) => {
     setLoading(true);
     try {
@@ -645,6 +687,11 @@ const AdminSettlements = () => {
                             {s && (
                               <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => openEdit(s)}>
                                 <Pencil className="h-3.5 w-3.5" /> Edit
+                              </Button>
+                            )}
+                            {item.changes_diff && Object.keys(item.changes_diff).length > 0 && (
+                              <Button size="sm" variant="ghost" className="h-7 gap-1 text-warning hover:text-warning" onClick={() => setDiffItem(item)}>
+                                <FileSearch className="h-3.5 w-3.5" /> Diff
                               </Button>
                             )}
                           </div>
@@ -1002,6 +1049,19 @@ const AdminSettlements = () => {
 
           {csvStep === "map" && (
             <div className="space-y-4">
+              {/* Saved template selector */}
+              {savedTemplates.length > 0 && (
+                <div className="rounded-xl border p-3 space-y-2">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Use Saved Template</p>
+                  <Select value={selectedTemplateId} onValueChange={applyTemplate}>
+                    <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select a saved mapping template" /></SelectTrigger>
+                    <SelectContent>
+                      {savedTemplates.map(t => <SelectItem key={t.id} value={t.id}>{t.template_name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
               <div className="rounded-xl border p-4 space-y-3">
                 <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Column Mapping</p>
                 {csvHeaders.map(header => (
@@ -1024,6 +1084,20 @@ const AdminSettlements = () => {
                 ))}
               </div>
               <p className="text-xs text-muted-foreground">{csvRows.length} data rows detected. "name" and "company" mappings are required.</p>
+              
+              {/* Save as template */}
+              <div className="flex items-center gap-2">
+                <Input
+                  placeholder="Save mapping as template..."
+                  className="rounded-xl flex-1 text-xs"
+                  value={saveTemplateName}
+                  onChange={(e) => setSaveTemplateName(e.target.value)}
+                />
+                <Button size="sm" variant="outline" className="rounded-xl shrink-0" onClick={handleSaveTemplate} disabled={!saveTemplateName.trim()}>
+                  Save Template
+                </Button>
+              </div>
+
               <div className="flex gap-2">
                 <Button variant="outline" className="rounded-xl" onClick={() => setCsvStep("upload")}>Back</Button>
                 <Button
@@ -1066,6 +1140,37 @@ const AdminSettlements = () => {
                   {csvUploading ? "Importing..." : `Import ${csvRows.length} Rows`}
                 </Button>
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Diff View Dialog ──────────────────────── */}
+      <Dialog open={!!diffItem} onOpenChange={(open) => !open && setDiffItem(null)}>
+        <DialogContent className="bg-card rounded-2xl max-w-lg">
+          <DialogHeader>
+            <DialogTitle>What Changed</DialogTitle>
+            <DialogDescription>
+              {diffItem?.settlement?.name || "Settlement"} — changes detected during re-ingest
+            </DialogDescription>
+          </DialogHeader>
+          {diffItem?.changes_diff && (
+            <div className="space-y-3">
+              {Object.entries(diffItem.changes_diff).map(([field, change]) => (
+                <div key={field} className="rounded-xl border p-3 space-y-1.5">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{field.replace(/_/g, " ")}</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-lg bg-destructive/5 border border-destructive/10 p-2">
+                      <p className="text-[10px] text-destructive font-medium mb-0.5">Previous</p>
+                      <p className="text-sm">{change.old != null ? String(change.old) : "—"}</p>
+                    </div>
+                    <div className="rounded-lg bg-warning/5 border border-warning/10 p-2">
+                      <p className="text-[10px] text-warning font-medium mb-0.5">New</p>
+                      <p className="text-sm font-medium">{change.new != null ? String(change.new) : "—"}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </DialogContent>

@@ -11,13 +11,14 @@ import { PayoutRange } from "@/components/PayoutRange";
 import {
   Scale, DollarSign, Clock, ArrowRight, Shield, AlertTriangle, FileCheck,
   Zap, ChevronDown, Sparkles, TrendingUp, CheckCircle2, Target,
-  ExternalLink, XCircle,
+  ExternalLink, XCircle, Info, ChevronRight,
 } from "lucide-react";
 import type { SettlementStatus } from "@/types";
 import { Link, useNavigate } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 type FilterTab = "all" | SettlementStatus | "filed";
 type SortOption = "payout" | "deadline" | "newest";
@@ -66,6 +67,22 @@ interface ClaimData {
   est_payout: number | null;
 }
 
+// Parse match_reason string into structured reasons for "Why this match?" drawer
+const parseMatchReasons = (reason: string | null): { icon: "check" | "warn"; text: string }[] => {
+  if (!reason) return [];
+  return reason.split("; ").map((r) => ({
+    icon: r.toLowerCase().includes("fuzzy") || r.toLowerCase().includes("capped") || r.toLowerCase().includes("partial") ? "warn" : "check",
+    text: r,
+  }));
+};
+
+const confidenceBadgeStyles = (level: string, score: number) => {
+  if (level === "strong") return "bg-success/10 text-success border-success/20";
+  if (level === "medium") return "bg-warning/10 text-warning border-warning/20";
+  if (level === "weak") return "bg-muted text-muted-foreground border-border";
+  return "bg-muted/50 text-muted-foreground border-border";
+};
+
 const Settlements = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -77,6 +94,7 @@ const Settlements = () => {
   const [loading, setLoading] = useState(true);
   const [filingId, setFilingId] = useState<string | null>(null);
   const [detailSettlement, setDetailSettlement] = useState<SettlementData | null>(null);
+  const [showPossible, setShowPossible] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -137,9 +155,22 @@ const Settlements = () => {
     return map;
   }, [claims]);
 
+  // Primary matches: verified/open AND confidence >= 40
+  const primaryMatches = useMemo(() => {
+    return settlements.filter(
+      (s) => (s.status === "verified" || s.status === "open") && s.confidence_score >= 40
+    );
+  }, [settlements]);
+
+  // Hidden/possible matches: confidence < 40 (or non-verified)
+  const possibleMatches = useMemo(() => {
+    return settlements.filter(
+      (s) => (s.status === "verified" || s.status === "open") && s.confidence_score < 40
+    );
+  }, [settlements]);
+
   const filtered = useMemo(() => {
-    // Only show verified/open (active) settlements to users
-    let list = settlements.filter((s) => s.status === "verified" || s.status === "open");
+    let list = [...primaryMatches];
     if (filter === "filed") {
       list = list.filter((s) => claimMap[s.id]);
     } else if (filter === "verified") {
@@ -155,9 +186,9 @@ const Settlements = () => {
       return (b.breach_year || 0) - (a.breach_year || 0);
     });
     return list;
-  }, [filter, sort, claimMap, settlements]);
+  }, [filter, sort, claimMap, primaryMatches]);
 
-  const openSettlements = settlements.filter((s) => s.status === "open" || s.status === "verified");
+  const openSettlements = primaryMatches;
   const totalMin = openSettlements.reduce((a, s) => a + s.payout_min, 0);
   const totalMax = openSettlements.reduce((a, s) => a + s.payout_max, 0);
   const claimsFiled = claims.length;
@@ -223,6 +254,216 @@ const Settlements = () => {
   };
 
   const getEffectiveDeadline = (s: SettlementData) => s.claim_deadline || s.deadline;
+
+  const renderSettlementCard = (settlement: SettlementData, idx: number, showUpsell = true) => {
+    const effectiveDeadline = getEffectiveDeadline(settlement);
+    const daysLeft = effectiveDeadline ? Math.max(0, Math.ceil((new Date(effectiveDeadline).getTime() - Date.now()) / 86400000)) : 0;
+    const filingStatus = getFilingStatus(settlement.id);
+    const claim = claimMap[settlement.id];
+    const payoutProgress = claim && claim.est_payout ? Math.min(100, (Number(claim.est_payout) / settlement.payout_max) * 100) : 0;
+    const isUrgent = daysLeft <= 30;
+    const deadlineProgress = Math.max(0, Math.min(100, 100 - (daysLeft / 365) * 100));
+    const reasons = parseMatchReasons(settlement.match_reason);
+
+    return (
+      <div key={settlement.id}>
+        {/* Auto-filing upsell after 2nd card */}
+        {showUpsell && idx === 2 && (
+          <div className="mb-3 glass-card-glow p-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl bg-primary/10 p-2.5">
+                  <Zap className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-1">Let Us File For You</h3>
+                  <p className="text-sm text-muted-foreground">
+                    We prepare and submit all eligible claims automatically. <span className="text-primary font-medium">15% fee only if paid.</span>
+                  </p>
+                </div>
+              </div>
+              <Button className="rounded-xl shadow-[0_0_16px_hsl(164_100%_45%/0.2)] hover:shadow-[0_0_24px_hsl(164_100%_45%/0.35)] transition-all duration-300 shrink-0">
+                <Sparkles className="mr-2 h-4 w-4" /> Enable Auto-Filing
+              </Button>
+            </div>
+          </div>
+        )}
+
+        <div className={`glass-card p-6 transition-all duration-300 hover:translate-y-[-1px] ${
+          settlement.status === "closed" ? "" : filingStatus === "approved" || filingStatus === "paid" ? "!border-success/30" : settlement.status === "open" ? "hover:border-primary/25" : ""
+        }`}>
+          <div className="flex items-start justify-between mb-3">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <h3 className="font-semibold">{settlement.name}</h3>
+                {(settlement.status === "open" || settlement.status === "verified") && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+                    <CheckCircle2 className="h-2.5 w-2.5" /> ELIGIBLE
+                  </span>
+                )}
+                <VerificationBadge
+                  level={settlement.verification_level}
+                  verified={settlement.verified}
+                  compact
+                />
+                <DeadlineBadge deadline={effectiveDeadline} />
+              </div>
+              <p className="text-xs text-muted-foreground">{settlement.company} · {settlement.breach_year}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {filingStatus !== "not_filed" && <StatusPill variant={filingStatus as any} />}
+              <StatusPill variant={settlement.status as any} />
+            </div>
+          </div>
+
+          {settlement.description && (
+            <p className="text-sm text-muted-foreground mb-4">{settlement.description}</p>
+          )}
+
+          {/* Payout + Deadline Row */}
+          <div className="flex flex-wrap items-center gap-4 mb-3">
+            <PayoutRange min={settlement.payout_min} max={settlement.payout_max} />
+            {effectiveDeadline && (
+              <div className={`flex items-center gap-1.5 text-sm ${isUrgent ? "text-critical" : "text-muted-foreground"}`}>
+                {isUrgent ? <AlertTriangle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
+                <span className={isUrgent ? "font-semibold" : ""}>{daysLeft} days left</span>
+              </div>
+            )}
+            {(settlement.official_source_url || settlement.source_url) && (
+              <a href={settlement.official_source_url || settlement.source_url!} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] font-medium text-primary hover:underline">
+                <ExternalLink className="h-2.5 w-2.5" /> View source
+              </a>
+            )}
+            {(settlement.status === "open" || settlement.status === "verified") && filingStatus === "not_filed" && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-2 py-0.5">
+                      <Zap className="h-2.5 w-2.5" /> One-Click Filing
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent className="bg-card border text-sm">
+                    File this claim instantly with your saved profile data.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
+
+          {/* Deadline Countdown Bar */}
+          {settlement.status !== "closed" && effectiveDeadline && (
+            <div className="mb-3">
+              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                <span>Filing deadline</span>
+                <span className={isUrgent ? "text-critical font-medium" : ""}>{effectiveDeadline}</span>
+              </div>
+              <Progress value={deadlineProgress} className={`h-1.5 ${isUrgent ? "[&>div]:bg-critical" : ""}`} />
+            </div>
+          )}
+
+          {/* Payout Progress Bar (for filed claims) */}
+          {claim && (
+            <div className="mb-3">
+              <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
+                <span>Claim Value</span>
+                <span className="text-primary font-medium">${Number(claim.est_payout || 0).toLocaleString()}</span>
+              </div>
+              <Progress value={payoutProgress} className="h-1.5 bg-muted" />
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center gap-2 mt-1">
+            <Button size="sm" variant="ghost" className="rounded-xl text-xs" onClick={() => setDetailSettlement(settlement)}>
+              Details
+            </Button>
+            {settlement.status === "closed" || isDeadlinePassed(effectiveDeadline) ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-muted-foreground/20 bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground">
+                <XCircle className="h-3 w-3" /> Filing Closed
+              </span>
+            ) : (settlement.status === "open" || settlement.status === "verified") && filingStatus === "not_filed" ? (
+              <Button
+                size="sm"
+                className="rounded-xl shadow-[0_0_16px_hsl(172_89%_52%/0.2)] hover:shadow-[0_0_24px_hsl(172_89%_52%/0.35)] transition-all duration-300"
+                disabled={filingId === settlement.id}
+                onClick={() => handleFileClaim(settlement)}
+              >
+                {filingId === settlement.id ? (
+                  <><span className="h-3 w-3 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent mr-1" /> Filing...</>
+                ) : (
+                  <>File Claim <ArrowRight className="ml-1 h-3 w-3" /></>
+                )}
+              </Button>
+            ) : filingStatus !== "not_filed" && filingStatus !== "paid" ? (
+              <Button size="sm" variant="outline" asChild className="rounded-xl">
+                <Link to={`/claims/${claimMap[settlement.id]?.id}`}>Track Claim</Link>
+              </Button>
+            ) : settlement.status === "pending" && filingStatus === "not_filed" ? (
+              <Button size="sm" variant="outline" asChild className="rounded-xl">
+                <Link to={`/claims/${claimMap[settlement.id]?.id}`}>Track Claim</Link>
+              </Button>
+            ) : null}
+
+            {/* Confidence badge + Why this match? */}
+            {settlement.confidence_level && (
+              <Sheet>
+                <SheetTrigger asChild>
+                  <button className={`inline-flex items-center gap-1 text-xs font-medium ml-auto rounded-full px-2.5 py-1 border cursor-pointer hover:opacity-80 transition-opacity ${confidenceBadgeStyles(settlement.confidence_level, settlement.confidence_score)}`}>
+                    <Target className="h-2.5 w-2.5" />
+                    {settlement.confidence_score}% {settlement.confidence_level}
+                    <Info className="h-2.5 w-2.5 ml-0.5 opacity-60" />
+                  </button>
+                </SheetTrigger>
+                <SheetContent className="sm:max-w-md">
+                  <SheetHeader>
+                    <SheetTitle>Why this match?</SheetTitle>
+                  </SheetHeader>
+                  <div className="mt-6 space-y-4">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className={`rounded-full p-2.5 ${confidenceBadgeStyles(settlement.confidence_level, settlement.confidence_score)}`}>
+                        <Target className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold">{settlement.confidence_score}%</p>
+                        <p className="text-sm text-muted-foreground capitalize">{settlement.confidence_level} match confidence</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Match Criteria</p>
+                      {reasons.length > 0 ? reasons.map((r, i) => (
+                        <div key={i} className={`flex items-start gap-2.5 rounded-xl p-3 ${r.icon === "check" ? "bg-success/5 border border-success/10" : "bg-warning/5 border border-warning/10"}`}>
+                          {r.icon === "check" ? (
+                            <CheckCircle2 className="h-4 w-4 text-success mt-0.5 shrink-0" />
+                          ) : (
+                            <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                          )}
+                          <span className="text-sm">{r.text}</span>
+                        </div>
+                      )) : (
+                        <p className="text-sm text-muted-foreground">No detailed match reasons available.</p>
+                      )}
+                    </div>
+
+                    <div className="rounded-xl border p-4 space-y-2 mt-4">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Settlement Details</p>
+                      <p className="text-sm font-medium">{settlement.name}</p>
+                      <p className="text-xs text-muted-foreground">{settlement.company} · {settlement.breach_year || "Year unknown"}</p>
+                      <PayoutRange min={settlement.payout_min} max={settlement.payout_max} size="sm" />
+                    </div>
+
+                    <p className="text-[11px] text-muted-foreground">
+                      Match scores are computed by comparing your detected breach exposures against settlement records. A higher score indicates stronger alignment on company, year, and data types exposed.
+                    </p>
+                  </div>
+                </SheetContent>
+              </Sheet>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -326,168 +567,26 @@ const Settlements = () => {
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((settlement, idx) => {
-            const effectiveDeadline = getEffectiveDeadline(settlement);
-            const daysLeft = effectiveDeadline ? Math.max(0, Math.ceil((new Date(effectiveDeadline).getTime() - Date.now()) / 86400000)) : 0;
-            const filingStatus = getFilingStatus(settlement.id);
-            const claim = claimMap[settlement.id];
-            const payoutProgress = claim && claim.est_payout ? Math.min(100, (Number(claim.est_payout) / settlement.payout_max) * 100) : 0;
-            const isUrgent = daysLeft <= 30;
-            const deadlineProgress = Math.max(0, Math.min(100, 100 - (daysLeft / 365) * 100));
+          {filtered.map((settlement, idx) => renderSettlementCard(settlement, idx))}
+        </div>
+      )}
 
-            return (
-              <div key={settlement.id}>
-                {/* Auto-filing upsell after 2nd card */}
-                {idx === 2 && (
-                  <div className="mb-3 glass-card-glow p-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                      <div className="flex items-start gap-3">
-                        <div className="rounded-xl bg-primary/10 p-2.5">
-                          <Zap className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold mb-1">Let Us File For You</h3>
-                          <p className="text-sm text-muted-foreground">
-                            We prepare and submit all eligible claims automatically. <span className="text-primary font-medium">15% fee only if paid.</span>
-                          </p>
-                        </div>
-                      </div>
-                      <Button className="rounded-xl shadow-[0_0_16px_hsl(164_100%_45%/0.2)] hover:shadow-[0_0_24px_hsl(164_100%_45%/0.35)] transition-all duration-300 shrink-0">
-                        <Sparkles className="mr-2 h-4 w-4" /> Enable Auto-Filing
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                <div className={`glass-card p-6 transition-all duration-300 hover:translate-y-[-1px] ${
-                  settlement.status === "closed" ? "" : filingStatus === "approved" || filingStatus === "paid" ? "!border-success/30" : settlement.status === "open" ? "hover:border-primary/25" : ""
-                }`}>
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <h3 className="font-semibold">{settlement.name}</h3>
-                        {(settlement.status === "open" || settlement.status === "verified") && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
-                            <CheckCircle2 className="h-2.5 w-2.5" /> ELIGIBLE
-                          </span>
-                        )}
-                        <VerificationBadge
-                          level={settlement.verification_level}
-                          verified={settlement.verified}
-                          compact
-                        />
-                        <DeadlineBadge deadline={effectiveDeadline} />
-                      </div>
-                      <p className="text-xs text-muted-foreground">{settlement.company} · {settlement.breach_year}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {filingStatus !== "not_filed" && <StatusPill variant={filingStatus as any} />}
-                      <StatusPill variant={settlement.status as any} />
-                    </div>
-                  </div>
-
-                  {settlement.description && (
-                    <p className="text-sm text-muted-foreground mb-4">{settlement.description}</p>
-                  )}
-
-                  {/* Payout + Deadline Row */}
-                  <div className="flex flex-wrap items-center gap-4 mb-3">
-                    <PayoutRange min={settlement.payout_min} max={settlement.payout_max} />
-                    {effectiveDeadline && (
-                      <div className={`flex items-center gap-1.5 text-sm ${isUrgent ? "text-critical" : "text-muted-foreground"}`}>
-                        {isUrgent ? <AlertTriangle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
-                        <span className={isUrgent ? "font-semibold" : ""}>{daysLeft} days left</span>
-                      </div>
-                    )}
-                    {(settlement.official_source_url || settlement.source_url) && (
-                      <a href={settlement.official_source_url || settlement.source_url!} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[10px] font-medium text-primary hover:underline">
-                        <ExternalLink className="h-2.5 w-2.5" /> View source
-                      </a>
-                    )}
-                    {(settlement.status === "open" || settlement.status === "verified") && filingStatus === "not_filed" && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-primary bg-primary/10 rounded-full px-2 py-0.5">
-                              <Zap className="h-2.5 w-2.5" /> One-Click Filing
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent className="bg-card border text-sm">
-                            File this claim instantly with your saved profile data.
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                  </div>
-
-                  {/* Deadline Countdown Bar */}
-                  {settlement.status !== "closed" && effectiveDeadline && (
-                    <div className="mb-3">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                        <span>Filing deadline</span>
-                        <span className={isUrgent ? "text-critical font-medium" : ""}>{effectiveDeadline}</span>
-                      </div>
-                      <Progress value={deadlineProgress} className={`h-1.5 ${isUrgent ? "[&>div]:bg-critical" : ""}`} />
-                    </div>
-                  )}
-
-                  {/* Payout Progress Bar (for filed claims) */}
-                  {claim && (
-                    <div className="mb-3">
-                      <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                        <span>Claim Value</span>
-                        <span className="text-primary font-medium">${Number(claim.est_payout || 0).toLocaleString()}</span>
-                      </div>
-                      <Progress value={payoutProgress} className="h-1.5 bg-muted" />
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 mt-1">
-                    <Button size="sm" variant="ghost" className="rounded-xl text-xs" onClick={() => setDetailSettlement(settlement)}>
-                      Details
-                    </Button>
-                    {settlement.status === "closed" || isDeadlinePassed(effectiveDeadline) ? (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-muted-foreground/20 bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground">
-                        <XCircle className="h-3 w-3" /> Filing Closed
-                      </span>
-                    ) : (settlement.status === "open" || settlement.status === "verified") && filingStatus === "not_filed" ? (
-                      <Button
-                        size="sm"
-                        className="rounded-xl shadow-[0_0_16px_hsl(172_89%_52%/0.2)] hover:shadow-[0_0_24px_hsl(172_89%_52%/0.35)] transition-all duration-300"
-                        disabled={filingId === settlement.id}
-                        onClick={() => handleFileClaim(settlement)}
-                      >
-                        {filingId === settlement.id ? (
-                          <><span className="h-3 w-3 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent mr-1" /> Filing...</>
-                        ) : (
-                          <>File Claim <ArrowRight className="ml-1 h-3 w-3" /></>
-                        )}
-                      </Button>
-                    ) : filingStatus !== "not_filed" && filingStatus !== "paid" ? (
-                      <Button size="sm" variant="outline" asChild className="rounded-xl">
-                        <Link to={`/claims/${claimMap[settlement.id]?.id}`}>Track Claim</Link>
-                      </Button>
-                    ) : settlement.status === "pending" && filingStatus === "not_filed" ? (
-                      <Button size="sm" variant="outline" asChild className="rounded-xl">
-                        <Link to={`/claims/${claimMap[settlement.id]?.id}`}>Track Claim</Link>
-                      </Button>
-                    ) : null}
-                    {settlement.confidence_level && (
-                      <span className={`inline-flex items-center gap-1 text-xs font-medium ml-auto rounded-full px-2 py-0.5 ${
-                        settlement.confidence_level === "strong" ? "bg-success/10 text-success" :
-                        settlement.confidence_level === "medium" ? "bg-warning/10 text-warning" :
-                        "bg-muted text-muted-foreground"
-                      }`}>
-                        <Target className="h-2.5 w-2.5" />
-                        {settlement.confidence_score}% {settlement.confidence_level} match
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+      {/* Possible Matches (hidden by default, < 40 confidence) */}
+      {possibleMatches.length > 0 && (
+        <div className="mt-6">
+          <button
+            onClick={() => setShowPossible(!showPossible)}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
+          >
+            <ChevronRight className={`h-4 w-4 transition-transform ${showPossible ? "rotate-90" : ""}`} />
+            <span>Possible matches ({possibleMatches.length})</span>
+            <span className="text-xs bg-muted rounded-full px-2 py-0.5">Low confidence</span>
+          </button>
+          {showPossible && (
+            <div className="space-y-3 opacity-75">
+              {possibleMatches.map((s, i) => renderSettlementCard(s, i, false))}
+            </div>
+          )}
         </div>
       )}
 
