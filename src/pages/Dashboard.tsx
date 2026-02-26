@@ -4,6 +4,8 @@ import { StatCard } from "@/components/StatCard";
 import { RiskGauge } from "@/components/RiskGauge";
 import { AlertRow } from "@/components/AlertRow";
 import { BreachIntelligence } from "@/components/BreachIntelligence";
+import { DeadlineCountdown } from "@/components/DeadlineCountdown";
+import { ReferralCard } from "@/components/ReferralCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -129,6 +131,23 @@ const Dashboard = () => {
     <div>
       <PageHeader title="Dashboard" subtitle="Your breach exposure overview" />
 
+      {/* Estimated Value Hero */}
+      {!loading && totalEstimated > 0 && (
+        <div className="mb-6 glass-card-glow p-6 text-center">
+          <p className="text-sm text-muted-foreground mb-1">You may be eligible for up to</p>
+          <p className="text-3xl font-bold gradient-emerald-text">${totalEstimated.toLocaleString()}</p>
+          <p className="text-sm text-muted-foreground mt-1">across {eligibleCount} active settlement{eligibleCount !== 1 ? "s" : ""}</p>
+          <Button className="mt-4 rounded-xl" asChild>
+            <Link to="/settlements">View Matches <ArrowRight className="ml-2 h-4 w-4" /></Link>
+          </Button>
+        </div>
+      )}
+
+      {/* Deadline Countdown */}
+      <div className="mb-6">
+        <DeadlineCountdown />
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
         {/* Risk Gauge */}
         <div className="flex items-center justify-center glass-card-glow p-6 lg:row-span-2">
@@ -200,6 +219,11 @@ const Dashboard = () => {
       {/* Breach Intelligence */}
       <div className="mt-8">
         <BreachIntelligence />
+      </div>
+
+      {/* Referral Card */}
+      <div className="mt-8">
+        <ReferralCard />
       </div>
 
       {/* Recent Alerts */}

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -9,6 +9,8 @@ import logo from "@/assets/logo.png";
 
 const Signup = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const referralCode = searchParams.get("ref") || "";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [terms, setTerms] = useState(false);
@@ -18,15 +20,37 @@ const Signup = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: window.location.origin },
+      options: {
+        emailRedirectTo: window.location.origin,
+        data: referralCode ? { referral_code: referralCode } : undefined,
+      },
     });
     setLoading(false);
     if (error) {
       toast.error(error.message);
     } else {
+      // If referral code provided, create referral record
+      if (referralCode && signUpData.user) {
+        // Find referrer by code
+        const { data: referrer } = await supabase
+          .from("user_profiles")
+          .select("user_id")
+          .eq("referral_code", referralCode)
+          .maybeSingle();
+
+        if (referrer) {
+          await supabase.from("user_referrals").insert({
+            referrer_user_id: referrer.user_id,
+            referred_user_id: signUpData.user.id,
+            referral_code: referralCode,
+            status: "activated",
+          });
+        }
+      }
+
       toast.success("Account created! Check your email to confirm, or log in now.");
       navigate("/login");
     }
@@ -41,6 +65,11 @@ const Signup = () => {
         <div className="rounded-2xl border border-border bg-card p-8">
           <h2 className="mb-1 text-xl font-bold">Create Account</h2>
           <p className="mb-6 text-sm text-muted-foreground">Start protecting your identity today</p>
+          {referralCode && (
+            <div className="mb-4 rounded-xl bg-primary/5 border border-primary/20 px-3 py-2 text-xs text-primary">
+              🎉 You were referred by a friend — you'll both benefit when you submit a claim!
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="mb-1.5 block text-sm font-medium">Email</label>
