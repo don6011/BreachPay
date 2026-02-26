@@ -44,6 +44,45 @@ export type Database = {
         }
         Relationships: []
       }
+      admin_audit_log: {
+        Row: {
+          action: string
+          admin_user_id: string
+          after: Json | null
+          before: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          admin_user_id: string
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          admin_user_id?: string
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       alerts: {
         Row: {
           body: string | null
@@ -1352,6 +1391,30 @@ export type Database = {
           },
         ]
       }
+      product_events: {
+        Row: {
+          created_at: string
+          event_name: string
+          id: string
+          meta: Json | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_name: string
+          id?: string
+          meta?: Json | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_name?: string
+          id?: string
+          meta?: Json | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       referrals: {
         Row: {
           amount_expected: number | null
@@ -2033,7 +2096,51 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      v_daily_active_scanners: {
+        Row: {
+          day: string | null
+          scanner_count: number | null
+        }
+        Relationships: []
+      }
+      v_funnel_rates: {
+        Row: {
+          claim_started: number | null
+          claim_submitted: number | null
+          day: string | null
+          match_viewed: number | null
+          start_rate_pct: number | null
+          submit_rate_pct: number | null
+        }
+        Relationships: []
+      }
+      v_matches_per_scan: {
+        Row: {
+          day: string | null
+          matches: number | null
+          matches_per_scan: number | null
+          scans: number | null
+        }
+        Relationships: []
+      }
+      v_time_to_paid: {
+        Row: {
+          claim_id: string | null
+          days_to_paid: number | null
+          paid_at: string | null
+          submitted_at: string | null
+        }
+        Relationships: []
+      }
+      v_time_to_submit: {
+        Row: {
+          claim_id: string | null
+          hours_to_submit: number | null
+          started_at: string | null
+          submitted_at: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       call_edge_function: {
