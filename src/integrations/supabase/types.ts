@@ -500,40 +500,43 @@ export type Database = {
           },
         ]
       }
-      claim_packet_shares: {
+      claim_packets: {
         Row: {
-          accessed_count: number
           claim_id: string
-          created_at: string
-          expires_at: string
+          generated_at: string
+          generated_by: string | null
           id: string
-          last_accessed_at: string | null
-          token: string
-          user_id: string
+          last_error: string | null
+          meta: Json | null
+          pdf_file_name: string | null
+          pdf_storage_path: string | null
+          status: string
         }
         Insert: {
-          accessed_count?: number
           claim_id: string
-          created_at?: string
-          expires_at?: string
+          generated_at?: string
+          generated_by?: string | null
           id?: string
-          last_accessed_at?: string | null
-          token?: string
-          user_id: string
+          last_error?: string | null
+          meta?: Json | null
+          pdf_file_name?: string | null
+          pdf_storage_path?: string | null
+          status?: string
         }
         Update: {
-          accessed_count?: number
           claim_id?: string
-          created_at?: string
-          expires_at?: string
+          generated_at?: string
+          generated_by?: string | null
           id?: string
-          last_accessed_at?: string | null
-          token?: string
-          user_id?: string
+          last_error?: string | null
+          meta?: Json | null
+          pdf_file_name?: string | null
+          pdf_storage_path?: string | null
+          status?: string
         }
         Relationships: [
           {
-            foreignKeyName: "claim_packet_shares_claim_id_fkey"
+            foreignKeyName: "claim_packets_claim_id_fkey"
             columns: ["claim_id"]
             isOneToOne: false
             referencedRelation: "claims"
@@ -582,6 +585,53 @@ export type Database = {
             columns: ["partner_user_id"]
             isOneToOne: false
             referencedRelation: "partner_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      claim_share_links: {
+        Row: {
+          access_count: number
+          claim_id: string
+          created_at: string
+          created_by: string | null
+          expires_at: string
+          id: string
+          last_accessed_at: string | null
+          revoked_at: string | null
+          scope: string
+          token_hash: string
+        }
+        Insert: {
+          access_count?: number
+          claim_id: string
+          created_at?: string
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          last_accessed_at?: string | null
+          revoked_at?: string | null
+          scope?: string
+          token_hash: string
+        }
+        Update: {
+          access_count?: number
+          claim_id?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          last_accessed_at?: string | null
+          revoked_at?: string | null
+          scope?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_share_links_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
             referencedColumns: ["id"]
           },
         ]
@@ -1889,10 +1939,6 @@ export type Database = {
       proc_cron_scan_jobs: { Args: { max_jobs?: number }; Returns: Json }
       proc_enqueue_due_jobs: { Args: { max_jobs?: number }; Returns: number }
       proc_run_scheduled_jobs: { Args: { max_jobs?: number }; Returns: number }
-      rpc_create_packet_share: {
-        Args: { p_claim_id: string; p_hours?: number }
-        Returns: Json
-      }
       rpc_partner_add_claim_note: {
         Args: { p_claim_id: string; p_note: string; p_visibility?: string }
         Returns: undefined

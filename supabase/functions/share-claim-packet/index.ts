@@ -8,108 +8,18 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-function esc(s: string | null | undefined): string {
-  if (!s) return "";
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+async function hashToken(token: string): Promise<string> {
+  const data = new TextEncoder().encode(token);
+  const hash = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, "0")).join("");
 }
 
-function formatDate(d: string | null): string {
-  if (!d) return "—";
-  return new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
-}
-
-function formatCurrency(n: number | null): string {
-  if (n == null) return "—";
-  return `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
-function buildPacketHtml(claim: any, settlement: any, application: any, documents: any[]): string {
-  const eligibility = application?.eligibility_answers || {};
-  const eligibilityRows = Object.entries(eligibility)
-    .map(([k, v]) => `<tr><td style="padding:6px 12px;border:1px solid #e5e7eb;font-weight:500">${esc(k.replace(/_/g, " "))}</td><td style="padding:6px 12px;border:1px solid #e5e7eb">${esc(String(v))}</td></tr>`)
-    .join("");
-
-  const docRows = documents
-    .map(
-      (d) =>
-        `<tr><td style="padding:6px 12px;border:1px solid #e5e7eb">${esc(d.file_name)}</td><td style="padding:6px 12px;border:1px solid #e5e7eb">${esc(d.doc_type)}</td><td style="padding:6px 12px;border:1px solid #e5e7eb">${esc(d.status)}</td><td style="padding:6px 12px;border:1px solid #e5e7eb">${formatDate(d.created_at)}</td></tr>`
-    )
-    .join("");
-
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><style>
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a1a2e; margin: 40px; font-size: 13px; line-height: 1.6; }
-  h1 { font-size: 22px; margin-bottom: 4px; color: #0f172a; }
-  h2 { font-size: 16px; margin: 28px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #2563eb; color: #2563eb; }
-  .meta { color: #64748b; font-size: 11px; margin-bottom: 24px; }
-  .shared-banner { background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 12px 16px; margin-bottom: 24px; font-size: 12px; color: #92400e; }
-  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12px; }
-  th { background: #f1f5f9; padding: 8px 12px; border: 1px solid #e5e7eb; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-  td { padding: 6px 12px; border: 1px solid #e5e7eb; }
-  .grid { display: flex; gap: 16px; margin: 8px 0; }
-  .grid-item { flex: 1; background: #f8fafc; border-radius: 8px; padding: 12px; }
-  .grid-item .label { font-size: 10px; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; }
-  .grid-item .value { font-size: 15px; font-weight: 600; margin-top: 2px; }
-  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #94a3b8; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-  .badge-status { background: #dbeafe; color: #1e40af; }
-</style></head>
-<body>
-  <div class="shared-banner">
-    ⚠️ This is a shared claim packet. Access expires automatically. Do not share this link further.
-  </div>
-
-  <h1>Claim Packet</h1>
-  <p class="meta">Generated ${new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })} · Claim ID: ${esc(claim.id?.slice(0, 8))}</p>
-
-  <h2>Settlement Details</h2>
-  <table>
-    <tr><th>Settlement</th><td>${esc(settlement?.name)}</td></tr>
-    <tr><th>Company</th><td>${esc(settlement?.company)}</td></tr>
-    <tr><th>Breach Year</th><td>${settlement?.breach_year || "—"}</td></tr>
-    <tr><th>Filing Deadline</th><td>${formatDate(settlement?.claim_deadline || settlement?.deadline)}</td></tr>
-    <tr><th>Payout Range</th><td>${formatCurrency(settlement?.payout_min)} – ${formatCurrency(settlement?.payout_max)}</td></tr>
-    ${settlement?.administrator_name ? `<tr><th>Administrator</th><td>${esc(settlement.administrator_name)}</td></tr>` : ""}
-    ${settlement?.case_number ? `<tr><th>Case Number</th><td>${esc(settlement.case_number)}</td></tr>` : ""}
-  </table>
-
-  <h2>Claim Status</h2>
-  <div class="grid">
-    <div class="grid-item"><div class="label">Status</div><div class="value"><span class="badge badge-status">${esc(claim.status?.toUpperCase())}</span></div></div>
-    <div class="grid-item"><div class="label">Filed</div><div class="value">${formatDate(claim.filed_at)}</div></div>
-    <div class="grid-item"><div class="label">Estimated Payout</div><div class="value">${formatCurrency(claim.est_payout)}</div></div>
-  </div>
-
-  <h2>Claimant Information</h2>
-  <table>
-    <tr><th>Full Name</th><td>${esc(application?.full_name)}</td></tr>
-    <tr><th>Email</th><td>${esc(application?.email)}</td></tr>
-    <tr><th>Phone</th><td>${esc(application?.phone) || "—"}</td></tr>
-    <tr><th>Address</th><td>${esc(application?.address) || "—"}</td></tr>
-    <tr><th>Breach Experience</th><td>${esc(application?.breach_experience) || "—"}</td></tr>
-  </table>
-
-  ${eligibilityRows ? `
-  <h2>Eligibility Answers</h2>
-  <table>
-    <tr><th>Question</th><th>Answer</th></tr>
-    ${eligibilityRows}
-  </table>` : ""}
-
-  <h2>Evidence Index (${documents.length} documents)</h2>
-  ${documents.length > 0 ? `
-  <table>
-    <tr><th>File Name</th><th>Category</th><th>Status</th><th>Uploaded</th></tr>
-    ${docRows}
-  </table>` : "<p>No documents uploaded.</p>"}
-
-  <div class="footer">
-    <p>This document is generated by BreachPay for claims administrator / law firm intake review.</p>
-    <p>BreachPay is not a law firm and does not provide legal advice.</p>
-  </div>
-</body>
-</html>`;
+function generateToken(): string {
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  // base64url encode
+  const base64 = btoa(String.fromCharCode(...bytes));
+  return base64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=/g, "");
 }
 
 Deno.serve(async (req) => {
@@ -117,79 +27,216 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const admin = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    // Get token from query string
-    const url = new URL(req.url);
-    const token = url.searchParams.get("token");
+  const url = new URL(req.url);
 
-    if (!token) {
-      return new Response(JSON.stringify({ error: "Missing token" }), {
+  // ---- POST: Create a share link (authenticated) ----
+  if (req.method === "POST") {
+    try {
+      const authHeader = req.headers.get("Authorization");
+      if (!authHeader?.startsWith("Bearer ")) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      const token = authHeader.replace("Bearer ", "");
+      const { data: claimsData, error: authErr } = await supabaseUser.auth.getClaims(token);
+      if (authErr || !claimsData?.claims) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const userId = claimsData.claims.sub as string;
+
+      const body = await req.json();
+      const { claim_id, scope = "packet", hours = 168 } = body; // default 7 days
+      if (!claim_id) throw new Error("Missing claim_id");
+
+      const admin = createClient(supabaseUrl, serviceKey);
+
+      // Verify ownership
+      const { data: claim } = await admin.from("claims").select("id, user_id").eq("id", claim_id).maybeSingle();
+      if (!claim || claim.user_id !== userId) {
+        const { data: isAdm } = await admin.rpc("is_admin", { p_user: userId });
+        if (!isAdm) throw new Error("Access denied");
+      }
+
+      // Generate token
+      const rawToken = generateToken();
+      const tokenHash = await hashToken(rawToken);
+
+      // Insert share link
+      const expiresAt = new Date(Date.now() + hours * 3600 * 1000).toISOString();
+      const { data: link, error: insertErr } = await admin
+        .from("claim_share_links")
+        .insert({
+          claim_id,
+          token_hash: tokenHash,
+          scope,
+          expires_at: expiresAt,
+          created_by: userId,
+        })
+        .select("id, expires_at, scope")
+        .single();
+
+      if (insertErr) throw insertErr;
+
+      return new Response(JSON.stringify({
+        token: rawToken,
+        expires_at: link.expires_at,
+        scope: link.scope,
+        id: link.id,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return new Response(JSON.stringify({ error: msg }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    // Look up share record
-    const { data: share, error: shareErr } = await admin
-      .from("claim_packet_shares")
-      .select("*")
-      .eq("token", token)
-      .maybeSingle();
-
-    if (shareErr || !share) {
-      return new Response(JSON.stringify({ error: "Invalid or expired share link" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Check expiry
-    if (new Date(share.expires_at) < new Date()) {
-      return new Response(JSON.stringify({ error: "This share link has expired" }), {
-        status: 410,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Bump access counter
-    await admin
-      .from("claim_packet_shares")
-      .update({
-        accessed_count: (share.accessed_count || 0) + 1,
-        last_accessed_at: new Date().toISOString(),
-      })
-      .eq("id", share.id);
-
-    // Fetch claim data
-    const claimId = share.claim_id;
-
-    const [claimRes, settlementRes, appRes, docsRes] = await Promise.all([
-      admin.from("claims").select("*").eq("id", claimId).maybeSingle(),
-      admin.from("claims").select("settlement_id").eq("id", claimId).maybeSingle().then(async (r) => {
-        if (!r.data?.settlement_id) return { data: null };
-        return admin.from("settlements").select("*").eq("id", r.data.settlement_id).maybeSingle();
-      }),
-      admin.from("claim_applications").select("*").eq("claim_id", claimId).maybeSingle(),
-      admin.from("claim_documents").select("*").eq("claim_id", claimId).order("created_at", { ascending: true }),
-    ]);
-
-    const html = buildPacketHtml(claimRes.data, settlementRes.data, appRes.data, docsRes.data || []);
-
-    return new Response(html, {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "text/html; charset=utf-8",
-      },
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
   }
+
+  // ---- GET: Resolve a share token (public, no auth needed) ----
+  if (req.method === "GET") {
+    try {
+      const rawToken = url.searchParams.get("token");
+      if (!rawToken) {
+        return new Response(JSON.stringify({ error: "Missing token" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const tokenHash = await hashToken(rawToken);
+      const admin = createClient(supabaseUrl, serviceKey);
+
+      // Find share link
+      const { data: share, error: shareErr } = await admin
+        .from("claim_share_links")
+        .select("*")
+        .eq("token_hash", tokenHash)
+        .is("revoked_at", null)
+        .maybeSingle();
+
+      if (shareErr || !share) {
+        return new Response(JSON.stringify({ error: "Invalid or expired link" }), {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (new Date(share.expires_at) < new Date()) {
+        return new Response(JSON.stringify({ error: "This share link has expired" }), {
+          status: 410,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // Bump access counter
+      await admin
+        .from("claim_share_links")
+        .update({
+          access_count: (share.access_count || 0) + 1,
+          last_accessed_at: new Date().toISOString(),
+        })
+        .eq("id", share.id);
+
+      const claimId = share.claim_id;
+
+      // Get latest packet
+      const { data: packet } = await admin
+        .from("claim_packets")
+        .select("*")
+        .eq("claim_id", claimId)
+        .eq("status", "generated")
+        .order("generated_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Get claim + settlement metadata
+      const { data: claim } = await admin
+        .from("claims")
+        .select("id, status, est_payout, filed_at, fee_percent, settlement_id")
+        .eq("id", claimId)
+        .maybeSingle();
+
+      let settlement = null;
+      if (claim?.settlement_id) {
+        const { data: s } = await admin.from("settlements").select("name, company, breach_year, payout_min, payout_max, deadline, claim_deadline, administrator_name").eq("id", claim.settlement_id).maybeSingle();
+        settlement = s;
+      }
+
+      // Generate signed URL for the packet HTML
+      let packetSignedUrl = null;
+      if (packet?.pdf_storage_path) {
+        const { data: signedData } = await admin.storage
+          .from("claim-packets")
+          .createSignedUrl(packet.pdf_storage_path, 3600); // 1 hour
+        packetSignedUrl = signedData?.signedUrl || null;
+      }
+
+      // If scope includes evidence, generate signed URLs for evidence docs
+      let evidenceUrls: any[] = [];
+      if (share.scope === "packet_and_evidence") {
+        const { data: docs } = await admin
+          .from("claim_documents")
+          .select("id, file_name, file_path, doc_type, file_size, created_at")
+          .eq("claim_id", claimId)
+          .order("created_at", { ascending: true });
+
+        if (docs && docs.length > 0) {
+          const signedPromises = docs.map(async (doc: any) => {
+            const { data: signed } = await admin.storage
+              .from("claim-evidence")
+              .createSignedUrl(doc.file_path, 3600);
+            return {
+              file_name: doc.file_name,
+              doc_type: doc.doc_type,
+              file_size: doc.file_size,
+              created_at: doc.created_at,
+              signed_url: signed?.signedUrl || null,
+            };
+          });
+          evidenceUrls = await Promise.all(signedPromises);
+        }
+      }
+
+      return new Response(JSON.stringify({
+        claim: claim ? {
+          id: claim.id,
+          status: claim.status,
+          est_payout: claim.est_payout,
+          filed_at: claim.filed_at,
+        } : null,
+        settlement,
+        packet: packet ? {
+          id: packet.id,
+          file_name: packet.pdf_file_name,
+          generated_at: packet.generated_at,
+          signed_url: packetSignedUrl,
+        } : null,
+        evidence: evidenceUrls,
+        scope: share.scope,
+        expires_at: share.expires_at,
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return new Response(JSON.stringify({ error: msg }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+  }
+
+  return new Response(JSON.stringify({ error: "Method not allowed" }), {
+    status: 405,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 });
