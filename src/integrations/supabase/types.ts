@@ -2016,8 +2016,10 @@ export type Database = {
           last_scan_at: string | null
           monitoring_enabled: boolean
           next_scan_at: string | null
+          onboarding_completed: boolean
           plan: Database["public"]["Enums"]["plan_t"]
           push_alerts: boolean
+          referral_code: string | null
           scan_frequency_days: number
           updated_at: string
           user_id: string
@@ -2030,8 +2032,10 @@ export type Database = {
           last_scan_at?: string | null
           monitoring_enabled?: boolean
           next_scan_at?: string | null
+          onboarding_completed?: boolean
           plan?: Database["public"]["Enums"]["plan_t"]
           push_alerts?: boolean
+          referral_code?: string | null
           scan_frequency_days?: number
           updated_at?: string
           user_id: string
@@ -2044,11 +2048,43 @@ export type Database = {
           last_scan_at?: string | null
           monitoring_enabled?: boolean
           next_scan_at?: string | null
+          onboarding_completed?: boolean
           plan?: Database["public"]["Enums"]["plan_t"]
           push_alerts?: boolean
+          referral_code?: string | null
           scan_frequency_days?: number
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      user_referrals: {
+        Row: {
+          created_at: string | null
+          id: string
+          referral_code: string
+          referred_user_id: string | null
+          referrer_user_id: string
+          reward_amount: number | null
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          referral_code: string
+          referred_user_id?: string | null
+          referrer_user_id: string
+          reward_amount?: number | null
+          status?: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          referral_code?: string
+          referred_user_id?: string | null
+          referrer_user_id?: string
+          reward_amount?: number | null
+          status?: string
         }
         Relationships: []
       }

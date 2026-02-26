@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useTrackEvent } from "@/hooks/useTrackEvent";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
@@ -15,6 +15,7 @@ import {
   AlertTriangle, Shield, Loader2, ExternalLink, MessageSquare, Info, Download, FilePlus, Upload, Link2, Copy, Check,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { PostClaimShare } from "@/components/PostClaimShare";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
@@ -110,6 +111,7 @@ const ClaimTracker = () => {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareExpiry, setShareExpiry] = useState<string>("7d");
   const [copied, setCopied] = useState(false);
+  const [showReferralShare, setShowReferralShare] = useState(true);
   const [latestPacket, setLatestPacket] = useState<{ id: string; generated_at: string; pdf_storage_path: string | null; pdf_file_name: string | null } | null>(null);
   const [downloadingPacket, setDownloadingPacket] = useState(false);
 
@@ -662,6 +664,11 @@ const ClaimTracker = () => {
             </div>
           )}
         </div>
+
+        {/* Post-claim referral share */}
+        {claim.status !== "draft" && showReferralShare && (
+          <PostClaimShare onDismiss={() => setShowReferralShare(false)} />
+        )}
 
         <p className="text-[11px] text-muted-foreground text-center">
           Eligibility depends on settlement administrator review. Estimated payouts are subject to settlement terms.
