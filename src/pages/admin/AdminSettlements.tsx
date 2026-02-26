@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { VerificationBadge } from "@/components/VerificationBadge";
@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import {
   Plus, Send, Zap, RefreshCw, Pencil, ExternalLink, Check, X,
-  Database, FileSearch, Shield, AlertTriangle, Eye, Globe,
+  Database, FileSearch, Shield, AlertTriangle, Eye, Globe, Upload, FileJson,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -99,6 +99,13 @@ const STATUS_OPTIONS = [
   { value: "open", label: "Open (legacy)" },
 ];
 
+const REQUIRED_FIELDS = ["name", "company"] as const;
+const OPTIONAL_FIELDS = [
+  "breach_year", "claim_deadline", "payout_min", "payout_max",
+  "eligibility_summary", "claim_url", "description", "category",
+] as const;
+const ALL_PAYLOAD_FIELDS = [...REQUIRED_FIELDS, ...OPTIONAL_FIELDS];
+
 const emptyForm = () => ({
   name: "", company: "", breach_year: "", status: "pending_review",
   payout_min: "", payout_max: "", deadline: "", description: "",
@@ -144,10 +151,26 @@ const AdminSettlements = () => {
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
   const [sourceForm, setSourceForm] = useState({ name: "", type: "manual", base_url: "", reliability_score: "70", is_active: true, fetch_strategy: "manual" });
 
+  // Ingest dialog state
+  const [ingestDialogOpen, setIngestDialogOpen] = useState(false);
+  const [ingestJson, setIngestJson] = useState("");
+  const [ingestSourceId, setIngestSourceId] = useState("");
+  const [ingestUrl, setIngestUrl] = useState("");
+  const [ingestSaving, setIngestSaving] = useState(false);
+
+  // CSV upload state
+  const [csvDialogOpen, setCsvDialogOpen] = useState(false);
+  const [csvRows, setCsvRows] = useState<Record<string, string>[]>([]);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvMapping, setCsvMapping] = useState<Record<string, string>>({});
+  const [csvSourceId, setCsvSourceId] = useState("");
+  const [csvUploading, setCsvUploading] = useState(false);
+  const [csvStep, setCsvStep] = useState<"upload" | "map" | "preview">("upload");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // Actions
   const [sendingAlerts, setSendingAlerts] = useState(false);
   const [rebuildingMatches, setRebuildingMatches] = useState(false);
-  const [runningScan, setRunningScan] = useState(false);
 
   // ── Fetchers ──────────────────────────────────────────
   const fetchQueue = async () => {
@@ -192,7 +215,6 @@ const AdminSettlements = () => {
     setRawLoading(true);
     const { data } = await supabase.from("settlement_raw_ingest").select("*").order("fetched_at", { ascending: false }).limit(100);
     if (data) {
-      // Fetch source names
       const srcIds = [...new Set(data.filter((r: any) => r.source_id).map((r: any) => r.source_id))];
       let srcMap: Record<string, Source> = {};
       if (srcIds.length > 0) {
@@ -398,6 +420,131 @@ const AdminSettlements = () => {
     }
   };
 
+  // ── Manual JSON Ingest ─────────────────────────────────
+  const handleIngestSubmit = async () => {
+    if (!ingestJson.trim()) { toast({ title: "JSON payload required", variant: "destructive" }); return; }
+    setIngestSaving(true);
+    try {
+      const parsed = JSON.parse(ingestJson);
+      if (!parsed.name || !parsed.company) throw new Error("Payload must include 'name' and 'company'");
+
+      const contentHash = btoa(JSON.stringify(parsed)).slice(0, 64);
+
+      const { data: row, error: insertError } = await supabase.from("settlement_raw_ingest").insert({
+        source_id: ingestSourceId || null,
+        raw_url: ingestUrl.trim() || null,
+        raw_payload: parsed,
+        content_hash: contentHash,
+      }).select("id").single();
+
+      if (insertError) throw insertError;
+
+      // Run normalization
+      const { error: normError } = await supabase.rpc("normalize_raw_ingest", { p_ingest_id: row.id });
+      if (normError) throw normError;
+
+      toast({ title: "Ingested & normalized", description: `Settlement "${parsed.name}" added to review queue.` });
+      setIngestDialogOpen(false);
+      setIngestJson("");
+      setIngestSourceId("");
+      setIngestUrl("");
+      fetchRawIngest();
+      fetchQueue();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    } finally {
+      setIngestSaving(false);
+    }
+  };
+
+  // ── CSV Upload ─────────────────────────────────────────
+  const handleCsvFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target?.result as string;
+      const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+      if (lines.length < 2) { toast({ title: "CSV must have header + data rows", variant: "destructive" }); return; }
+
+      const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+      const rows = lines.slice(1).map(line => {
+        const vals = line.split(",").map(v => v.trim().replace(/^"|"$/g, ""));
+        const row: Record<string, string> = {};
+        headers.forEach((h, i) => { row[h] = vals[i] || ""; });
+        return row;
+      });
+
+      setCsvHeaders(headers);
+      setCsvRows(rows);
+
+      // Auto-map matching headers
+      const autoMap: Record<string, string> = {};
+      headers.forEach(h => {
+        const lower = h.toLowerCase().replace(/[^a-z0-9]/g, "_");
+        const match = ALL_PAYLOAD_FIELDS.find(f => f === lower || f === h.toLowerCase());
+        if (match) autoMap[h] = match;
+      });
+      setCsvMapping(autoMap);
+      setCsvStep("map");
+    };
+    reader.readAsText(file);
+  };
+
+  const handleCsvImport = async () => {
+    setCsvUploading(true);
+    let successCount = 0;
+    let errorCount = 0;
+
+    try {
+      for (const row of csvRows) {
+        const payload: Record<string, any> = {};
+        Object.entries(csvMapping).forEach(([csvCol, payloadField]) => {
+          if (payloadField && row[csvCol]) {
+            payload[payloadField] = row[csvCol];
+          }
+        });
+
+        if (!payload.name || !payload.company) { errorCount++; continue; }
+
+        const contentHash = btoa(JSON.stringify(payload)).slice(0, 64);
+
+        try {
+          const { data: ingestRow, error: ie } = await supabase.from("settlement_raw_ingest").insert({
+            source_id: csvSourceId || null,
+            raw_payload: payload,
+            content_hash: contentHash,
+          }).select("id").single();
+
+          if (ie) { errorCount++; continue; }
+
+          await supabase.rpc("normalize_raw_ingest", { p_ingest_id: ingestRow.id });
+          successCount++;
+        } catch {
+          errorCount++;
+        }
+      }
+
+      toast({
+        title: "CSV Import Complete",
+        description: `${successCount} ingested, ${errorCount} failed out of ${csvRows.length} rows.`,
+      });
+
+      setCsvDialogOpen(false);
+      setCsvStep("upload");
+      setCsvRows([]);
+      setCsvHeaders([]);
+      setCsvMapping({});
+      fetchRawIngest();
+      fetchQueue();
+    } catch (err: any) {
+      toast({ title: "Import failed", description: err.message, variant: "destructive" });
+    } finally {
+      setCsvUploading(false);
+    }
+  };
+
   // ── Edge Function Caller ────────────────────────────────
   const callEdgeFunction = async (functionName: string, setLoading: (v: boolean) => void) => {
     setLoading(true);
@@ -426,6 +573,12 @@ const AdminSettlements = () => {
     <div>
       <PageHeader title="Settlement Ingestion Engine" subtitle="Manage sources, review queue, and verified settlements">
         <Button size="sm" className="rounded-xl" onClick={openCreate}><Plus className="mr-1 h-3 w-3" />Add Settlement</Button>
+        <Button size="sm" variant="outline" className="rounded-xl" onClick={() => { setIngestDialogOpen(true); setIngestJson(""); setIngestSourceId(""); setIngestUrl(""); }}>
+          <FileJson className="mr-1 h-3 w-3" />Add Raw Ingest
+        </Button>
+        <Button size="sm" variant="outline" className="rounded-xl" onClick={() => { setCsvDialogOpen(true); setCsvStep("upload"); setCsvRows([]); setCsvHeaders([]); }}>
+          <Upload className="mr-1 h-3 w-3" />CSV Upload
+        </Button>
         <Button size="sm" variant="outline" className="rounded-xl" onClick={() => callEdgeFunction("run-deadline-alerts", setSendingAlerts)} disabled={sendingAlerts}>
           <Send className="mr-1 h-3 w-3" />{sendingAlerts ? "Sending..." : "Send Alerts"}
         </Button>
@@ -780,6 +933,141 @@ const AdminSettlements = () => {
               {editingSourceId ? "Save Changes" : "Add Source"}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Manual JSON Ingest Dialog ─────────────── */}
+      <Dialog open={ingestDialogOpen} onOpenChange={setIngestDialogOpen}>
+        <DialogContent className="bg-card rounded-2xl max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Add Raw Ingest</DialogTitle>
+            <DialogDescription>Paste a JSON payload to ingest and normalize into a settlement record.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={ingestSourceId} onValueChange={setIngestSourceId}>
+              <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select source (optional)" /></SelectTrigger>
+              <SelectContent>
+                {sources.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Input placeholder="Source URL (optional)" className="rounded-xl" value={ingestUrl} onChange={(e) => setIngestUrl(e.target.value)} />
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">JSON Payload (must include "name" and "company")</Label>
+              <Textarea
+                className="rounded-xl font-mono text-xs"
+                rows={10}
+                placeholder={`{\n  "name": "T-Mobile Data Breach Settlement",\n  "company": "T-Mobile",\n  "claim_deadline": "2026-09-30",\n  "payout_min": 25,\n  "payout_max": 5000,\n  "eligibility_summary": "Affected customers...",\n  "claim_url": "https://...",\n  "category": "data_breach",\n  "breach_year": 2021\n}`}
+                value={ingestJson}
+                onChange={(e) => setIngestJson(e.target.value)}
+              />
+            </div>
+            <Button className="w-full rounded-xl" onClick={handleIngestSubmit} disabled={ingestSaving || !ingestJson.trim()}>
+              {ingestSaving ? "Ingesting..." : "Ingest & Normalize"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── CSV Upload Dialog ─────────────────────── */}
+      <Dialog open={csvDialogOpen} onOpenChange={setCsvDialogOpen}>
+        <DialogContent className="bg-card rounded-2xl max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>CSV Import</DialogTitle>
+            <DialogDescription>
+              {csvStep === "upload" && "Upload a CSV file with settlement data."}
+              {csvStep === "map" && `Map your ${csvHeaders.length} CSV columns to settlement fields.`}
+              {csvStep === "preview" && `Preview ${csvRows.length} rows before importing.`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {csvStep === "upload" && (
+            <div className="space-y-4">
+              <Select value={csvSourceId} onValueChange={setCsvSourceId}>
+                <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select source (optional)" /></SelectTrigger>
+                <SelectContent>
+                  {sources.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <div
+                className="rounded-xl border-2 border-dashed border-muted-foreground/30 p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Upload className="h-8 w-8 mx-auto mb-3 text-muted-foreground" />
+                <p className="text-sm font-medium">Click to upload CSV</p>
+                <p className="text-xs text-muted-foreground mt-1">Headers will be auto-detected</p>
+              </div>
+              <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleCsvFile} />
+            </div>
+          )}
+
+          {csvStep === "map" && (
+            <div className="space-y-4">
+              <div className="rounded-xl border p-4 space-y-3">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Column Mapping</p>
+                {csvHeaders.map(header => (
+                  <div key={header} className="flex items-center gap-3">
+                    <span className="text-sm font-mono w-40 truncate">{header}</span>
+                    <span className="text-muted-foreground">→</span>
+                    <Select
+                      value={csvMapping[header] || "_skip"}
+                      onValueChange={(v) => setCsvMapping(m => ({ ...m, [header]: v === "_skip" ? "" : v }))}
+                    >
+                      <SelectTrigger className="rounded-xl flex-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="_skip">— Skip —</SelectItem>
+                        {ALL_PAYLOAD_FIELDS.map(f => (
+                          <SelectItem key={f} value={f}>{f}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">{csvRows.length} data rows detected. "name" and "company" mappings are required.</p>
+              <div className="flex gap-2">
+                <Button variant="outline" className="rounded-xl" onClick={() => setCsvStep("upload")}>Back</Button>
+                <Button
+                  className="rounded-xl flex-1"
+                  disabled={!Object.values(csvMapping).includes("name") || !Object.values(csvMapping).includes("company")}
+                  onClick={() => setCsvStep("preview")}
+                >
+                  Preview ({csvRows.length} rows)
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {csvStep === "preview" && (
+            <div className="space-y-4">
+              <div className="rounded-xl border overflow-hidden max-h-60 overflow-y-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-muted/50 border-b">
+                      {Object.entries(csvMapping).filter(([, v]) => v).map(([, field]) => (
+                        <th key={field} className="px-3 py-2 text-left font-medium">{field}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {csvRows.slice(0, 10).map((row, i) => (
+                      <tr key={i} className="border-b">
+                        {Object.entries(csvMapping).filter(([, v]) => v).map(([csvCol, field]) => (
+                          <td key={field} className="px-3 py-1.5 truncate max-w-32">{row[csvCol] || "—"}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {csvRows.length > 10 && <p className="text-xs text-muted-foreground">Showing first 10 of {csvRows.length} rows</p>}
+              <div className="flex gap-2">
+                <Button variant="outline" className="rounded-xl" onClick={() => setCsvStep("map")}>Back</Button>
+                <Button className="rounded-xl flex-1" onClick={handleCsvImport} disabled={csvUploading}>
+                  {csvUploading ? "Importing..." : `Import ${csvRows.length} Rows`}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>
