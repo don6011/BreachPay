@@ -280,7 +280,7 @@ const Monitoring = () => {
               <Crown className="h-5 w-5 text-primary" />
               <h2 className="font-semibold">Upgrade to Premium</h2>
             </div>
-            <p className="text-sm text-muted-foreground mb-4">Get advanced monitoring and priority matching — $9.99/mo</p>
+            <p className="text-sm text-muted-foreground mb-4">Get advanced monitoring and priority matching — $4.99/mo</p>
             <ul className="space-y-2 mb-5">
               {premiumBenefits.map((b) => (
                 <li key={b} className="flex items-center gap-2 text-sm">
@@ -290,7 +290,7 @@ const Monitoring = () => {
               ))}
             </ul>
             <Button asChild className="w-full rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300">
-              <Link to="/pricing">Upgrade — $9.99/mo</Link>
+              <Link to="/pricing">Upgrade — $4.99/mo</Link>
             </Button>
           </div>
         )}

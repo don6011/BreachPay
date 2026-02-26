@@ -11,7 +11,7 @@ const plans = [
     period: "",
     description: "Get started with basic breach scanning",
     cta: "Start Free Scan",
-    ctaLink: "/scan",
+    ctaLink: "/signup",
     highlighted: false,
     features: [
       "1 secure scan (manual)",
