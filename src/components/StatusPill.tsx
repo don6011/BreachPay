@@ -11,6 +11,10 @@ const variantStyles: Record<string, string> = {
   open: "bg-success/15 text-success border-success/20",
   pending: "bg-warning/15 text-warning border-warning/20",
   closed: "bg-muted-foreground/15 text-muted-foreground border-muted-foreground/20",
+  verified: "bg-success/15 text-success border-success/20",
+  pending_review: "bg-warning/15 text-warning border-warning/20",
+  draft: "bg-muted-foreground/15 text-muted-foreground border-muted-foreground/20",
+  expired: "bg-muted-foreground/15 text-muted-foreground border-muted-foreground/20",
   submitted: "bg-info/15 text-primary border-primary/20",
   documentation_required: "bg-warning/15 text-warning border-warning/20",
   under_review: "bg-warning/15 text-warning border-warning/20",
@@ -32,6 +36,7 @@ const variantStyles: Record<string, string> = {
 const labelMap: Record<string, string> = {
   under_review: "Under Review",
   documentation_required: "Docs Required",
+  pending_review: "Pending Review",
   breach_detected: "Breach Detected",
   settlement_found: "Settlement Found",
   payout_update: "Payout Update",
