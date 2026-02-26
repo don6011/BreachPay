@@ -12,6 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow, format } from "date-fns";
 import { BreachDetailModal } from "@/components/BreachDetailModal";
 import type { BreachCatalogEntry } from "@/hooks/useBreachCatalog";
+import { useTrackEvent } from "@/hooks/useTrackEvent";
 
 type ScanState = "idle" | "scanning" | "results";
 
@@ -66,6 +67,7 @@ interface ScanMeta {
 
 const Scan = () => {
   const { user } = useAuth();
+  const track = useTrackEvent();
   const [state, setState] = useState<ScanState>("idle");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -173,6 +175,11 @@ const Scan = () => {
         }
 
         setState("results");
+        track("scan_completed", { scan_run_id: scanRunId, breaches: scan.breaches_detected, risk_score: scan.risk_score });
+        // Track each match created
+        if (matchData) {
+          matchData.forEach((m: any) => track("match_created", { match_id: m.id, settlement_id: m.settlement_id }));
+        }
       }
     }, 2000);
 
@@ -184,6 +191,7 @@ const Scan = () => {
     if (!user) return;
 
     setState("scanning");
+    track("scan_started", { email_provided: !!email, phone_provided: !!phone });
 
     // Enable monitoring + trigger scan via edge function
     await supabase
@@ -492,7 +500,7 @@ const Scan = () => {
                       )}
                     </div>
                     {settlement && (
-                      <Link to={`/claims/file?settlement=${settlement.id}`}>
+                      <Link to={`/claims/file?settlement=${settlement.id}`} onClick={() => track("match_viewed", { match_id: match?.id, settlement_id: settlement.id })}>
                         <Button size="sm" className="w-full rounded-xl">
                           File Claim <ArrowRight className="ml-1 h-3 w-3" />
                         </Button>

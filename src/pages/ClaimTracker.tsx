@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useTrackEvent } from "@/hooks/useTrackEvent";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
@@ -94,6 +95,7 @@ const ClaimTracker = () => {
   const { claimId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const track = useTrackEvent();
 
   const [claim, setClaim] = useState<ClaimDetail | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -124,8 +126,8 @@ const ClaimTracker = () => {
         title: "Claim Packet Generated",
         description: `Packet created successfully.`,
       });
-      // Refresh latest packet
       fetchLatestPacket();
+      track("packet_generated", { claim_id: claimId });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to generate packet", variant: "destructive" });
     } finally {
@@ -174,6 +176,7 @@ const ClaimTracker = () => {
       if (!data?.ok) throw new Error(data?.error || "Failed to create share link");
 
       setShareUrl(data.share_url);
+      track("share_link_created", { claim_id: claimId });
       toast({
         title: "Share Link Created",
         description: `Expires ${format(new Date(data.expires_at), "MMM d, yyyy")}.`,

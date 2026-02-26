@@ -2,7 +2,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { Users, Shield, Scale, FileText, DollarSign, BarChart3, TrendingUp, AlertTriangle, Plus, Send, Download, Flag, Target } from "lucide-react";
+import { Users, Shield, Scale, FileText, DollarSign, BarChart3, TrendingUp, AlertTriangle, Plus, Send, Download, Flag, Target, Activity, Clock } from "lucide-react";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,7 @@ import { toast } from "@/hooks/use-toast";
 
 const COLORS = ["hsl(172, 89%, 52%)", "hsl(172, 84%, 39%)"];
 
+// ... keep existing code (interfaces)
 interface FraudFlag {
   id: string;
   claim_id: string;
@@ -33,6 +34,23 @@ interface SettlementMetrics {
   conversion_rate: number | null;
 }
 
+interface FunnelData {
+  match_viewed: number;
+  claim_started: number;
+  claim_submitted: number;
+  start_rate_pct: number;
+  submit_rate_pct: number;
+}
+
+interface AuditEntry {
+  id: string;
+  admin_user_id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string | null;
+  created_at: string;
+}
+
 const AdminAnalytics = () => {
   const { user } = useAuth();
   const [fraudFlags, setFraudFlags] = useState<FraudFlag[]>([]);
@@ -42,7 +60,6 @@ const AdminAnalytics = () => {
   const [loading, setLoading] = useState(true);
   const [sendingAlerts, setSendingAlerts] = useState(false);
 
-  // Revenue data from claims
   const [revenueCollected, setRevenueCollected] = useState(0);
   const [pendingFees, setPendingFees] = useState(0);
   const [totalPayouts, setTotalPayouts] = useState(0);
@@ -50,6 +67,13 @@ const AdminAnalytics = () => {
   const [approvedClaimsCount, setApprovedClaimsCount] = useState(0);
   const [rejectedClaimsCount, setRejectedClaimsCount] = useState(0);
   const [pendingClaimsCount, setPendingClaimsCount] = useState(0);
+
+  // Funnel analytics
+  const [funnel, setFunnel] = useState<FunnelData>({ match_viewed: 0, claim_started: 0, claim_submitted: 0, start_rate_pct: 0, submit_rate_pct: 0 });
+  const [dailyScanners, setDailyScanners] = useState<{ day: string; scanner_count: number }[]>([]);
+  const [avgTimeToSubmit, setAvgTimeToSubmit] = useState<number | null>(null);
+  const [avgTimeToPaid, setAvgTimeToPaid] = useState<number | null>(null);
+  const [recentAudit, setRecentAudit] = useState<AuditEntry[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -83,18 +107,114 @@ const AdminAnalytics = () => {
         setRejectedClaimsCount(rejected.length);
         setPendingClaimsCount(pending.length);
 
-        // Revenue = sum of platform_fee for paid claims
         const collected = paid.reduce((a: number, c: any) => a + (Number(c.platform_fee) || 0), 0);
         setRevenueCollected(collected);
-
-        // Pending fees = platform_fee for approved (not yet paid)
         const pendFees = approved.reduce((a: number, c: any) => a + (Number(c.platform_fee) || Number(c.est_payout) * 0.15 || 0), 0);
         setPendingFees(pendFees);
-
-        // Total payouts
         const totalPaid = paid.reduce((a: number, c: any) => a + (Number(c.final_payout) || 0), 0);
         setTotalPayouts(totalPaid);
       }
+
+      // Funnel data from product_events
+      const [funnelRes, scannersRes, ttsRes, ttpRes, auditRes] = await Promise.all([
+        supabase.from("product_events")
+          .select("event_name")
+          .in("event_name", ["match_viewed", "claim_started", "claim_submitted"]),
+        supabase.from("product_events")
+          .select("user_id, created_at")
+          .eq("event_name", "scan_started")
+          .order("created_at", { ascending: false })
+          .limit(500),
+        supabase.from("product_events")
+          .select("meta, created_at")
+          .eq("event_name", "claim_started")
+          .order("created_at", { ascending: false })
+          .limit(100),
+        supabase.from("product_events")
+          .select("meta, created_at")
+          .eq("event_name", "payout_marked_paid")
+          .order("created_at", { ascending: false })
+          .limit(100),
+        supabase.from("admin_activity_logs")
+          .select("id, admin_user_id, action, entity_type, entity_id, created_at")
+          .order("created_at", { ascending: false })
+          .limit(10),
+      ]);
+
+      if (funnelRes.data) {
+        const events = funnelRes.data as any[];
+        const mv = events.filter(e => e.event_name === "match_viewed").length;
+        const cs = events.filter(e => e.event_name === "claim_started").length;
+        const csub = events.filter(e => e.event_name === "claim_submitted").length;
+        setFunnel({
+          match_viewed: mv,
+          claim_started: cs,
+          claim_submitted: csub,
+          start_rate_pct: mv > 0 ? Math.round(cs / mv * 1000) / 10 : 0,
+          submit_rate_pct: cs > 0 ? Math.round(csub / cs * 1000) / 10 : 0,
+        });
+      }
+
+      if (scannersRes.data) {
+        const byDay: Record<string, Set<string>> = {};
+        scannersRes.data.forEach((e: any) => {
+          const day = e.created_at.slice(0, 10);
+          if (!byDay[day]) byDay[day] = new Set();
+          byDay[day].add(e.user_id);
+        });
+        const arr = Object.entries(byDay).map(([day, users]) => ({ day, scanner_count: users.size })).sort((a, b) => a.day.localeCompare(b.day)).slice(-14);
+        setDailyScanners(arr);
+      }
+
+      // Compute avg time-to-submit from claim_started events
+      if (ttsRes.data && ttsRes.data.length > 0) {
+        const claimIds = ttsRes.data.map((e: any) => (e.meta as any)?.claim_id).filter(Boolean);
+        if (claimIds.length > 0) {
+          const { data: submitEvents } = await supabase.from("product_events")
+            .select("meta, created_at")
+            .eq("event_name", "claim_submitted")
+            .limit(200);
+          if (submitEvents) {
+            const submitMap: Record<string, string> = {};
+            submitEvents.forEach((e: any) => { if ((e.meta as any)?.claim_id) submitMap[(e.meta as any).claim_id] = e.created_at; });
+            let totalHours = 0, count = 0;
+            ttsRes.data.forEach((e: any) => {
+              const cid = (e.meta as any)?.claim_id;
+              if (cid && submitMap[cid]) {
+                totalHours += (new Date(submitMap[cid]).getTime() - new Date(e.created_at).getTime()) / 3600000;
+                count++;
+              }
+            });
+            if (count > 0) setAvgTimeToSubmit(Math.round(totalHours / count * 10) / 10);
+          }
+        }
+      }
+
+      // Compute avg time-to-paid
+      if (ttpRes.data && ttpRes.data.length > 0) {
+        const claimIds = ttpRes.data.map((e: any) => (e.meta as any)?.claim_id).filter(Boolean);
+        if (claimIds.length > 0) {
+          const { data: submitEvents } = await supabase.from("product_events")
+            .select("meta, created_at")
+            .eq("event_name", "claim_submitted")
+            .limit(200);
+          if (submitEvents) {
+            const submitMap: Record<string, string> = {};
+            submitEvents.forEach((e: any) => { if ((e.meta as any)?.claim_id) submitMap[(e.meta as any).claim_id] = e.created_at; });
+            let totalDays = 0, count = 0;
+            ttpRes.data.forEach((e: any) => {
+              const cid = (e.meta as any)?.claim_id;
+              if (cid && submitMap[cid]) {
+                totalDays += (new Date(e.created_at).getTime() - new Date(submitMap[cid]).getTime()) / 86400000;
+                count++;
+              }
+            });
+            if (count > 0) setAvgTimeToPaid(Math.round(totalDays * 10) / 10);
+          }
+        }
+      }
+
+      if (auditRes.data) setRecentAudit(auditRes.data as AuditEntry[]);
     } catch (error) {
       console.error("Error fetching admin data:", error);
     } finally {
@@ -131,6 +251,12 @@ const AdminAnalytics = () => {
     { name: "Paid Out to Users", value: totalPayouts || 1 },
   ];
 
+  const funnelChartData = [
+    { name: "Matches Viewed", value: funnel.match_viewed },
+    { name: "Claims Started", value: funnel.claim_started },
+    { name: "Claims Submitted", value: funnel.claim_submitted },
+  ];
+
   return (
     <div>
       <PageHeader title="Platform Intelligence" subtitle="Admin analytics dashboard">
@@ -147,6 +273,72 @@ const AdminAnalytics = () => {
         <StatCard icon={AlertTriangle} label="Fraud Flags" value={fraudFlags.length} />
         <StatCard icon={Scale} label="Settlements" value={settlementMetrics.length} variant="teal" />
       </div>
+
+      {/* Funnel Analytics */}
+      <section className="mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Activity className="h-4 w-4 text-primary" />
+          <h2 className="text-lg font-semibold">Conversion Funnel</h2>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5 mb-4">
+          <StatCard icon={BarChart3} label="Matches Viewed" value={funnel.match_viewed} />
+          <StatCard icon={FileText} label="Claims Started" value={funnel.claim_started} />
+          <StatCard icon={Shield} label="Claims Submitted" value={funnel.claim_submitted} />
+          <StatCard icon={TrendingUp} label="Start Rate" value={`${funnel.start_rate_pct}%`} variant="teal" />
+          <StatCard icon={TrendingUp} label="Submit Rate" value={`${funnel.submit_rate_pct}%`} variant="teal" />
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <div className="glass-card p-6">
+            <h3 className="text-sm font-semibold mb-3">Funnel Breakdown</h3>
+            <ResponsiveContainer width="100%" height={180}>
+              <BarChart data={funnelChartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(219, 31%, 16%)" />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(215, 16%, 60%)" }} />
+                <YAxis tick={{ fontSize: 11, fill: "hsl(215, 16%, 60%)" }} />
+                <Tooltip contentStyle={{ background: "hsl(221, 45%, 7%)", border: "1px solid hsl(219, 31%, 16%)", borderRadius: 12 }} />
+                <Bar dataKey="value" fill="hsl(172, 89%, 52%)" radius={[6, 6, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div className="glass-card p-6">
+            <h3 className="text-sm font-semibold mb-3">Timing Metrics</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-primary" />
+                  <span className="text-sm">Avg Time to Submit</span>
+                </div>
+                <span className="font-bold text-primary">{avgTimeToSubmit !== null ? `${avgTimeToSubmit}h` : "—"}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4 text-primary" />
+                  <span className="text-sm">Avg Time to Paid</span>
+                </div>
+                <span className="font-bold text-primary">{avgTimeToPaid !== null ? `${avgTimeToPaid}d` : "—"}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Daily Active Scanners */}
+      {dailyScanners.length > 0 && (
+        <section className="mb-8">
+          <h2 className="mb-4 text-lg font-semibold">Daily Active Scanners (14d)</h2>
+          <div className="glass-card p-6">
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={dailyScanners}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(219, 31%, 16%)" />
+                <XAxis dataKey="day" tick={{ fontSize: 10, fill: "hsl(215, 16%, 60%)" }} />
+                <YAxis tick={{ fontSize: 11, fill: "hsl(215, 16%, 60%)" }} />
+                <Tooltip contentStyle={{ background: "hsl(221, 45%, 7%)", border: "1px solid hsl(219, 31%, 16%)", borderRadius: 12 }} />
+                <Line type="monotone" dataKey="scanner_count" stroke="hsl(172, 89%, 52%)" strokeWidth={2} dot={{ r: 3 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      )}
 
       {/* Claims Pipeline */}
       <section className="mb-8">
@@ -169,7 +361,7 @@ const AdminAnalytics = () => {
         </div>
       </section>
 
-      {/* Revenue Operations — LIVE DATA */}
+      {/* Revenue Operations */}
       <section className="mb-8">
         <h2 className="mb-4 text-lg font-semibold">Revenue Operations</h2>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
@@ -180,7 +372,6 @@ const AdminAnalytics = () => {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* Revenue summary table */}
           <div className="lg:col-span-2 glass-card p-6">
             <h3 className="mb-4 text-sm font-semibold">Revenue Summary</h3>
             <div className="space-y-3">
@@ -206,8 +397,6 @@ const AdminAnalytics = () => {
               </div>
             </div>
           </div>
-
-          {/* Breakdown pie */}
           <div className="glass-card p-6">
             <h3 className="mb-4 text-sm font-semibold">Revenue vs Payouts</h3>
             <ResponsiveContainer width="100%" height={160}>
@@ -232,6 +421,38 @@ const AdminAnalytics = () => {
               ))}
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Admin Audit Trail */}
+      <section className="mb-8">
+        <div className="flex items-center gap-2 mb-4">
+          <Shield className="h-4 w-4 text-primary" />
+          <h2 className="text-lg font-semibold">Compliance Audit Trail</h2>
+        </div>
+        <div className="glass-card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b bg-muted/50">
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Action</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Entity</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Admin</th>
+                <th className="px-4 py-3 text-left font-medium text-muted-foreground">Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentAudit.length === 0 ? (
+                <tr><td colSpan={4} className="px-4 py-3 text-center text-muted-foreground">No audit entries yet</td></tr>
+              ) : recentAudit.map((a) => (
+                <tr key={a.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3 font-medium capitalize">{a.action.replace(/_/g, " ")}</td>
+                  <td className="px-4 py-3 text-xs">{a.entity_type} {a.entity_id ? `(${a.entity_id.slice(0, 8)})` : ""}</td>
+                  <td className="px-4 py-3 font-mono text-xs">{a.admin_user_id.slice(0, 8)}</td>
+                  <td className="px-4 py-3 text-xs">{new Date(a.created_at).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </section>
 

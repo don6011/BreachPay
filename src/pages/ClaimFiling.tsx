@@ -18,6 +18,7 @@ import {
   Clock, AlertTriangle, CheckCircle, DollarSign, Camera, X, XCircle,
   Bookmark, Eye, Send, Sparkles, ArrowRight, Loader2, ExternalLink,
 } from "lucide-react";
+import { useTrackEvent } from "@/hooks/useTrackEvent";
 
 const STEPS = ["Overview", "Identity", "Eligibility", "Documents", "Review"];
 
@@ -61,6 +62,7 @@ const ClaimFiling = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const track = useTrackEvent();
   const settlementId = searchParams.get("settlement") || "";
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -230,6 +232,7 @@ const ClaimFiling = () => {
     }
 
     setDraftClaimId(claimData.id);
+    track("claim_started", { claim_id: claimData.id, settlement_id: settlement.id });
 
     // Create claim_applications row
     await supabase.from("claim_applications").insert({
@@ -355,6 +358,8 @@ const ClaimFiling = () => {
 
       setCreatedClaimId(claimId);
       setSubmitted(true);
+      track("claim_submitted", { claim_id: claimId, settlement_id: settlement.id });
+      if (documents.length > 0) track("doc_uploaded", { claim_id: claimId, doc_count: documents.length });
       toast({ title: "Claim Filed!", description: `Your claim for ${settlement.name} has been submitted.` });
     } catch (error) {
       toast({ title: "Error", description: "Failed to file claim. Please try again.", variant: "destructive" });
