@@ -534,6 +534,41 @@ export type Database = {
           },
         ]
       }
+      csv_mapping_templates: {
+        Row: {
+          created_at: string
+          id: string
+          mapping_json: Json
+          source_id: string | null
+          template_name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          mapping_json?: Json
+          source_id?: string | null
+          template_name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          mapping_json?: Json
+          source_id?: string | null
+          template_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "csv_mapping_templates_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "settlement_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deadline_alerts_sent: {
         Row: {
           sent_at: string
@@ -1135,6 +1170,7 @@ export type Database = {
       }
       settlement_verification_queue: {
         Row: {
+          changes_diff: Json | null
           created_at: string
           id: string
           notes: string | null
@@ -1146,6 +1182,7 @@ export type Database = {
           status: string | null
         }
         Insert: {
+          changes_diff?: Json | null
           created_at?: string
           id?: string
           notes?: string | null
@@ -1157,6 +1194,7 @@ export type Database = {
           status?: string | null
         }
         Update: {
+          changes_diff?: Json | null
           created_at?: string
           id?: string
           notes?: string | null
