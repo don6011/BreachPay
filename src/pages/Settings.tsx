@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,23 +7,9 @@ import { User, Shield, Download, Trash2, FileText, ExternalLink, LogOut, Crown, 
 import { Link, useNavigate } from "react-router-dom";
 
 const Settings = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, plan } = useAuth();
   const navigate = useNavigate();
-  const [plan, setPlan] = useState<string>("free");
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!user) return;
-    supabase
-      .from("user_profiles")
-      .select("plan")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data?.plan) setPlan(data.plan);
-        setLoading(false);
-      });
-  }, [user]);
+  const loading = false;
 
   const isPremium = plan === "premium";
 

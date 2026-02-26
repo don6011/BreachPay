@@ -83,7 +83,7 @@ const Signup = () => {
               <div className="flex items-start gap-2">
                 <Checkbox id="terms" checked={terms} onCheckedChange={(v) => setTerms(!!v)} />
                 <label htmlFor="terms" className="text-sm text-muted-foreground leading-tight">
-                  I agree to the <span className="text-primary cursor-pointer">Terms of Service</span> and <span className="text-primary cursor-pointer">Privacy Policy</span>
+                  I agree to the <Link to="/terms" className="text-primary hover:underline">Terms of Service</Link> and <Link to="/privacy" className="text-primary hover:underline">Privacy Policy</Link>
                 </label>
               </div>
               <div className="flex items-start gap-2">
