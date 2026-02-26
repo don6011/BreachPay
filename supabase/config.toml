@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.dispatch-notifications]
 verify_jwt = false
+
+[functions.generate-claim-packet]
+verify_jwt = false
