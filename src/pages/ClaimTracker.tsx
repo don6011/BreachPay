@@ -10,10 +10,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowLeft, FileText, Clock, DollarSign,
-  AlertTriangle, Shield, Loader2, ExternalLink, MessageSquare, Info, Download,
+  AlertTriangle, Shield, Loader2, ExternalLink, MessageSquare, Info, Download, FilePlus, Upload,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 const PROGRESS_STEPS = [
   { key: "draft", label: "Draft" },
@@ -22,8 +23,6 @@ const PROGRESS_STEPS = [
   { key: "approved", label: "Approved" },
   { key: "paid", label: "Paid" },
 ];
-
-
 
 interface ClaimDetail {
   id: string;
@@ -60,7 +59,20 @@ interface HistoryEntry {
   created_at: string;
 }
 
-// DocEntry replaced by DocRow from EvidenceVault
+interface DocRequest {
+  id: string;
+  request_type: string;
+  message: string | null;
+  status: string;
+  created_at: string;
+  fulfilled_at: string | null;
+}
+
+interface PartnerNote {
+  id: string;
+  note: string;
+  created_at: string;
+}
 
 const ClaimTracker = () => {
   const { claimId } = useParams();
@@ -70,6 +82,8 @@ const ClaimTracker = () => {
   const [claim, setClaim] = useState<ClaimDetail | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [documents, setDocuments] = useState<DocRow[]>([]);
+  const [docRequests, setDocRequests] = useState<DocRequest[]>([]);
+  const [partnerNotes, setPartnerNotes] = useState<PartnerNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingPacket, setGeneratingPacket] = useState(false);
 
@@ -80,16 +94,11 @@ const ClaimTracker = () => {
       const { data, error } = await supabase.functions.invoke("generate-claim-packet", {
         body: { claim_id: claimId },
       });
-
       if (error) throw error;
-
-      // data is HTML string — open in new tab for print/save as PDF
       const blob = new Blob([data], { type: "text/html" });
       const url = URL.createObjectURL(blob);
       const w = window.open(url, "_blank");
-      if (w) {
-        w.onload = () => setTimeout(() => w.print(), 500);
-      }
+      if (w) { w.onload = () => setTimeout(() => w.print(), 500); }
       toast({ title: "Claim Packet Generated", description: "Use your browser's Print dialog to save as PDF." });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to generate packet", variant: "destructive" });
@@ -107,7 +116,7 @@ const ClaimTracker = () => {
     if (!claimId) return;
     setLoading(true);
 
-    const [claimRes, historyRes, docsRes] = await Promise.all([
+    const [claimRes, historyRes, docsRes, docReqRes, notesRes] = await Promise.all([
       supabase
         .from("claims")
         .select(`
@@ -126,6 +135,16 @@ const ClaimTracker = () => {
         .select("id, claim_id, file_path, file_name, file_size, mime_type, doc_type, status, user_notes, admin_notes, created_at, verified")
         .eq("claim_id", claimId)
         .order("created_at", { ascending: true }),
+      supabase
+        .from("claim_doc_requests")
+        .select("id, request_type, message, status, created_at, fulfilled_at")
+        .eq("claim_id", claimId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("claim_partner_notes")
+        .select("id, note, created_at")
+        .eq("claim_id", claimId)
+        .order("created_at", { ascending: false }),
     ]);
 
     if (claimRes.data) {
@@ -152,9 +171,24 @@ const ClaimTracker = () => {
 
     if (historyRes.data) setHistory(historyRes.data);
     if (docsRes.data) setDocuments(docsRes.data);
+    setDocRequests((docReqRes.data as DocRequest[]) || []);
+    setPartnerNotes((notesRes.data as PartnerNote[]) || []);
     setLoading(false);
   };
 
+  const handleFulfillRequest = async (requestId: string) => {
+    try {
+      const { error } = await supabase
+        .from("claim_doc_requests")
+        .update({ status: "fulfilled", fulfilled_at: new Date().toISOString() })
+        .eq("id", requestId);
+      if (error) throw error;
+      toast({ title: "Request marked as fulfilled" });
+      fetchAll();
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    }
+  };
 
   if (loading) {
     return (
@@ -178,30 +212,20 @@ const ClaimTracker = () => {
   const isDocRequired = claim.status === "documentation_required";
   const progressPercent = isRejected ? 0 : ((Math.max(0, currentStepIndex) + 1) / PROGRESS_STEPS.length) * 100;
   const effectiveDeadline = claim.settlement?.claim_deadline || claim.settlement?.deadline;
+  const openDocRequests = docRequests.filter(dr => dr.status === "open");
 
   return (
     <div>
-      <PageHeader
-        title="Claim Tracker"
-        subtitle={claim.settlement?.name || "Claim Details"}
-      />
+      <PageHeader title="Claim Tracker" subtitle={claim.settlement?.name || "Claim Details"} />
 
       <div className="mx-auto max-w-3xl space-y-6">
-        {/* Back button */}
         <Button variant="ghost" size="sm" onClick={() => navigate("/claims")} className="mb-2">
           <ArrowLeft className="h-4 w-4 mr-1" /> Back to Claims
         </Button>
 
-        {/* Generate Claim Packet */}
         {claim.status !== "draft" && (
           <div className="flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              className="rounded-xl gap-2"
-              onClick={handleGeneratePacket}
-              disabled={generatingPacket}
-            >
+            <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={handleGeneratePacket} disabled={generatingPacket}>
               {generatingPacket ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               Generate Claim Packet
             </Button>
@@ -219,7 +243,6 @@ const ClaimTracker = () => {
           </div>
         )}
 
-        {/* Verified Settlement Callout */}
         {claim.settlement?.verified && (
           <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
             <VerificationBadge
@@ -247,7 +270,6 @@ const ClaimTracker = () => {
             <StatusPill variant={claim.status as any} />
           </div>
 
-          {/* Deadline Countdown */}
           {effectiveDeadline && (() => {
             const daysLeft = Math.max(0, Math.ceil((new Date(effectiveDeadline).getTime() - Date.now()) / 86400000));
             const isUrgent = daysLeft <= 30;
@@ -255,12 +277,8 @@ const ClaimTracker = () => {
               <div className={`flex items-center gap-2 rounded-xl p-3 ${isUrgent ? "bg-destructive/10 border border-destructive/20" : "bg-muted/50"}`}>
                 {isUrgent ? <AlertTriangle className="h-4 w-4 text-destructive shrink-0" /> : <Clock className="h-4 w-4 text-muted-foreground shrink-0" />}
                 <div className="flex-1">
-                  <p className={`text-sm font-semibold ${isUrgent ? "text-destructive" : ""}`}>
-                    {daysLeft} days until filing deadline
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Filing deadline: {new Date(effectiveDeadline).toLocaleDateString()} · Enforced by settlement administrator
-                  </p>
+                  <p className={`text-sm font-semibold ${isUrgent ? "text-destructive" : ""}`}>{daysLeft} days until filing deadline</p>
+                  <p className="text-xs text-muted-foreground">Filing deadline: {new Date(effectiveDeadline).toLocaleDateString()}</p>
                 </div>
               </div>
             );
@@ -274,16 +292,9 @@ const ClaimTracker = () => {
             <div className="rounded-xl bg-muted/50 p-3">
               <div className="flex items-center gap-1 mb-1">
                 <p className="text-xs text-muted-foreground">Estimated Payout</p>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Info className="h-3 w-3 text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent className="max-w-[240px] bg-card border text-sm">
-                      Estimates are based on settlement terms. Final amounts depend on administrator review and may vary.
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <TooltipProvider><Tooltip><TooltipTrigger><Info className="h-3 w-3 text-muted-foreground" /></TooltipTrigger>
+                  <TooltipContent className="max-w-[240px] bg-card border text-sm">Estimates are based on settlement terms.</TooltipContent>
+                </Tooltip></TooltipProvider>
               </div>
               <p className="text-sm font-semibold text-primary">${claim.est_payout.toLocaleString()}</p>
             </div>
@@ -294,10 +305,7 @@ const ClaimTracker = () => {
             <div className="rounded-xl bg-muted/50 p-3">
               <p className="text-xs text-muted-foreground mb-1">Net Payout</p>
               <p className="text-sm font-semibold text-success">
-                {claim.final_payout
-                  ? `$${claim.final_payout.toLocaleString()}`
-                  : `~$${Math.round(claim.est_payout * (1 - claim.fee_percent / 100)).toLocaleString()}`
-                }
+                {claim.final_payout ? `$${claim.final_payout.toLocaleString()}` : `~$${Math.round(claim.est_payout * (1 - claim.fee_percent / 100)).toLocaleString()}`}
               </p>
             </div>
           </div>
@@ -312,9 +320,7 @@ const ClaimTracker = () => {
                 <AlertTriangle className="h-5 w-5 text-destructive" />
                 <p className="font-semibold text-destructive">Claim Rejected</p>
               </div>
-              {claim.flag_reason && (
-                <p className="text-sm text-muted-foreground">{claim.flag_reason}</p>
-              )}
+              {claim.flag_reason && <p className="text-sm text-muted-foreground">{claim.flag_reason}</p>}
               <Button variant="outline" size="sm" className="rounded-xl mt-2">
                 <MessageSquare className="h-4 w-4 mr-1" /> Contact Support
               </Button>
@@ -354,9 +360,7 @@ const ClaimTracker = () => {
                         <div className={`h-3 w-3 rounded-full ${isComplete ? "bg-primary" : "bg-muted"} ${isCurrent ? "ring-2 ring-primary/30" : ""}`} />
                         <span className={`mt-1 text-[10px] ${isComplete ? "text-primary font-medium" : "text-muted-foreground"}`}>{s.label}</span>
                       </div>
-                      {i < PROGRESS_STEPS.length - 1 && (
-                        <div className={`h-0.5 flex-1 ${i < currentStepIndex ? "bg-primary" : "bg-muted"}`} />
-                      )}
+                      {i < PROGRESS_STEPS.length - 1 && <div className={`h-0.5 flex-1 ${i < currentStepIndex ? "bg-primary" : "bg-muted"}`} />}
                     </div>
                   );
                 })}
@@ -364,6 +368,46 @@ const ClaimTracker = () => {
             </div>
           )}
         </div>
+
+        {/* Partner Document Requests */}
+        {openDocRequests.length > 0 && (
+          <div className="rounded-2xl border border-warning/30 bg-warning/5 p-6 space-y-4">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <FilePlus className="h-4 w-4 text-warning" /> Requests from Partner ({openDocRequests.length})
+            </h3>
+            <div className="space-y-3">
+              {openDocRequests.map((dr) => (
+                <div key={dr.id} className="rounded-xl border bg-card p-4 flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium capitalize">{dr.request_type.replace(/_/g, " ")}</p>
+                    {dr.message && <p className="text-xs text-muted-foreground mt-0.5">{dr.message}</p>}
+                    <span className="text-[10px] text-muted-foreground">{format(new Date(dr.created_at), "MMM d, h:mm a")}</span>
+                  </div>
+                  <Button size="sm" variant="outline" className="rounded-xl shrink-0" onClick={() => handleFulfillRequest(dr.id)}>
+                    <Upload className="h-3 w-3 mr-1" /> Mark Fulfilled
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Partner Notes (user-visible only) */}
+        {partnerNotes.length > 0 && (
+          <div className="rounded-2xl border bg-card p-6 space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <MessageSquare className="h-4 w-4 text-primary" /> Notes from Partner
+            </h3>
+            <div className="space-y-2">
+              {partnerNotes.map((n) => (
+                <div key={n.id} className="rounded-lg border p-3 text-sm">
+                  <p>{n.note}</p>
+                  <span className="text-[10px] text-muted-foreground">{format(new Date(n.created_at), "MMM d, h:mm a")}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Evidence Vault */}
         {claimId && (

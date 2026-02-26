@@ -3,13 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { PageHeader } from "@/components/PageHeader";
 import { StatCard } from "@/components/StatCard";
 import { StatusPill } from "@/components/StatusPill";
-import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, Clock, CheckCircle, XCircle, DollarSign, Loader2, AlertTriangle, Search, ListTodo } from "lucide-react";
-import { format, differenceInDays } from "date-fns";
+import { FileText, Clock, CheckCircle, DollarSign, Loader2, AlertTriangle, Search, ListTodo } from "lucide-react";
+import { differenceInDays } from "date-fns";
 
 interface WorkQueueItem {
   id: string;
@@ -21,14 +20,6 @@ interface WorkQueueItem {
   filed_at: string | null;
   updated_at: string;
   deadline: string | null;
-}
-
-interface ActivityItem {
-  id: string;
-  action: string;
-  meta: any;
-  created_at: string;
-  claim_id: string | null;
 }
 
 const statusOptions = [
@@ -48,7 +39,6 @@ const PartnerDashboard = () => {
   const [partnerOrg, setPartnerOrg] = useState<{ id: string; name: string; partner_type: string } | null>(null);
   const [counts, setCounts] = useState({ total: 0, in_progress: 0, completed: 0, approved: 0, paid: 0 });
   const [queue, setQueue] = useState<WorkQueueItem[]>([]);
-  const [activity, setActivity] = useState<ActivityItem[]>([]);
   const [statusFilter, setStatusFilter] = useState("all");
   const [settlementFilter, setSettlementFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -71,21 +61,13 @@ const PartnerDashboard = () => {
         const partner = (pu as any).partners;
         setPartnerOrg({ id: partner.id, name: partner.name, partner_type: partner.partner_type });
 
-        const [assignmentsRes, activityRes] = await Promise.all([
-          supabase
-            .from("claim_assignments")
-            .select("assignment_status, claims(id, status, est_payout, filed_at, updated_at, settlements(name, company, deadline))")
-            .eq("partner_id", partner.id)
-            .order("assigned_at", { ascending: false }),
-          supabase
-            .from("partner_activity_log")
-            .select("id, action, meta, created_at, claim_id")
-            .eq("partner_id", partner.id)
-            .order("created_at", { ascending: false })
-            .limit(10),
-        ]);
+        const { data: assignmentsData } = await supabase
+          .from("claim_assignments")
+          .select("assignment_status, claims(id, status, est_payout, filed_at, updated_at, settlements(name, company, deadline))")
+          .eq("partner_id", partner.id)
+          .order("assigned_at", { ascending: false });
 
-        const items: WorkQueueItem[] = (assignmentsRes.data || [])
+        const items: WorkQueueItem[] = (assignmentsData || [])
           .filter((a: any) => a.claims)
           .map((a: any) => ({
             id: a.claims.id,
@@ -110,7 +92,6 @@ const PartnerDashboard = () => {
           if (it.status === "paid") c.paid++;
         });
         setCounts(c);
-        setActivity((activityRes.data as ActivityItem[]) || []);
       } catch (error) {
         console.error("Error fetching partner dashboard:", error);
       } finally {
@@ -156,7 +137,7 @@ const PartnerDashboard = () => {
       </div>
 
       {/* Work Queue */}
-      <div className="mb-8">
+      <div>
         <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
           <ListTodo className="h-5 w-5 text-primary" /> Work Queue
         </h2>
@@ -245,31 +226,6 @@ const PartnerDashboard = () => {
               )}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Activity Feed */}
-      <div>
-        <h2 className="text-lg font-semibold mb-4">Recent Activity</h2>
-        <div className="rounded-2xl border bg-card overflow-hidden divide-y divide-border">
-          {activity.length === 0 ? (
-            <p className="px-4 py-8 text-center text-muted-foreground">No recent activity</p>
-          ) : (
-            activity.map((a) => (
-              <div key={a.id} className="px-4 py-3 flex items-start gap-3">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{a.action.replace(/_/g, " ")}</p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {a.claim_id ? `Case ${a.claim_id.slice(0, 8)}…` : ""}
-                    {a.meta?.notes ? ` — ${a.meta.notes}` : ""}
-                  </p>
-                  <span className="text-[10px] text-muted-foreground/60">
-                    {format(new Date(a.created_at), "MMM d, h:mm a")}
-                  </span>
-                </div>
-              </div>
-            ))
-          )}
         </div>
       </div>
     </div>

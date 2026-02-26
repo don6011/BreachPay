@@ -109,6 +109,8 @@ const AdminClaims = () => {
   const [loadingEvidence, setLoadingEvidence] = useState(false);
   const [claimApplication, setClaimApplication] = useState<any>(null);
   const [loadingApplication, setLoadingApplication] = useState(false);
+  const [partnerNotes, setPartnerNotes] = useState<{ id: string; note: string; visibility: string; created_at: string }[]>([]);
+  const [partnerDocRequests, setPartnerDocRequests] = useState<{ id: string; request_type: string; message: string | null; status: string; created_at: string; fulfilled_at: string | null }[]>([]);
 
   useEffect(() => {
     if (!user) return;
@@ -211,7 +213,7 @@ const AdminClaims = () => {
     setClaimApplication(null);
     setClaimPartnerOrgId(null);
 
-    const [docsRes, evidenceRes, appRes, assignmentRes] = await Promise.all([
+    const [docsRes, evidenceRes, appRes, assignmentRes, pNotesRes, pDocReqRes] = await Promise.all([
       supabase
         .from("claim_documents")
         .select("id, file_path, file_type, note, created_at, verified")
@@ -233,6 +235,16 @@ const AdminClaims = () => {
         .eq("claim_id", claim.id)
         .limit(1)
         .maybeSingle(),
+      supabase
+        .from("claim_partner_notes")
+        .select("id, note, visibility, created_at")
+        .eq("claim_id", claim.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("claim_doc_requests")
+        .select("id, request_type, message, status, created_at, fulfilled_at")
+        .eq("claim_id", claim.id)
+        .order("created_at", { ascending: false }),
     ]);
 
     setDocs((docsRes.data as ClaimDoc[]) || []);
@@ -254,6 +266,8 @@ const AdminClaims = () => {
     setClaimApplication(appRes.data || null);
     setLoadingApplication(false);
     setClaimPartnerOrgId(assignmentRes.data?.partner_id || null);
+    setPartnerNotes((pNotesRes.data as any[]) || []);
+    setPartnerDocRequests((pDocReqRes.data as any[]) || []);
   };
 
   const handleStatusUpdate = async () => {
@@ -728,6 +742,53 @@ const AdminClaims = () => {
                 </div>
               </div>
             </div>
+
+            {/* Partner Notes */}
+            {partnerNotes.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                  <FileText className="h-4 w-4" /> Partner Notes ({partnerNotes.length})
+                </h4>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {partnerNotes.map((n) => (
+                    <div key={n.id} className="rounded-lg border p-2.5 text-sm">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] text-muted-foreground">{new Date(n.created_at).toLocaleString()}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${n.visibility === "user_visible" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                          {n.visibility === "user_visible" ? "User visible" : "Internal"}
+                        </span>
+                      </div>
+                      <p className="text-xs">{n.note}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Partner Doc Requests */}
+            {partnerDocRequests.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                  <FileText className="h-4 w-4" /> Document Requests ({partnerDocRequests.length})
+                </h4>
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {partnerDocRequests.map((dr) => (
+                    <div key={dr.id} className={`rounded-lg border p-2.5 text-sm ${dr.status === "fulfilled" ? "border-success/30 bg-success/5" : ""}`}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium capitalize text-xs">{dr.request_type.replace(/_/g, " ")}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                          dr.status === "fulfilled" ? "bg-success/10 text-success" :
+                          dr.status === "cancelled" ? "bg-muted text-muted-foreground" :
+                          "bg-warning/10 text-warning"
+                        }`}>{dr.status}</span>
+                      </div>
+                      {dr.message && <p className="text-xs text-muted-foreground">{dr.message}</p>}
+                      <span className="text-[10px] text-muted-foreground">{new Date(dr.created_at).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div>
               <h4 className="text-sm font-semibold mb-3 flex items-center gap-1.5">
