@@ -23,6 +23,7 @@ interface InvoiceRow {
   created_at: string;
   sent_at: string | null;
   paid_at: string | null;
+  due_date: string | null;
   item_count: number;
 }
 
@@ -55,8 +56,13 @@ const AdminInvoices = () => {
   // Generate modal
   const [showGenerate, setShowGenerate] = useState(false);
   const [genPartnerId, setGenPartnerId] = useState("");
-  const [genStart, setGenStart] = useState("");
-  const [genEnd, setGenEnd] = useState("");
+  // Default to current month
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+  const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(lastDay).padStart(2, "0")}`;
+  const [genStart, setGenStart] = useState(monthStart);
+  const [genEnd, setGenEnd] = useState(monthEnd);
   const [genNotes, setGenNotes] = useState("");
   const [generating, setGenerating] = useState(false);
 
@@ -82,7 +88,7 @@ const AdminInvoices = () => {
     try {
       const { data } = await supabase
         .from("partner_invoices")
-        .select("id, partner_id, period_start, period_end, status, subtotal, notes, created_at, sent_at, paid_at, partners(name)")
+        .select("id, partner_id, period_start, period_end, status, subtotal, notes, created_at, sent_at, paid_at, due_date, partners(name)")
         .order("created_at", { ascending: false })
         .limit(100);
 
@@ -109,6 +115,7 @@ const AdminInvoices = () => {
           created_at: i.created_at,
           sent_at: i.sent_at,
           paid_at: i.paid_at,
+          due_date: i.due_date,
           item_count: countMap[i.id] || 0,
         })));
       }
@@ -211,28 +218,34 @@ const AdminInvoices = () => {
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Period</th>
               <th className="px-4 py-3 text-right font-medium text-muted-foreground">Subtotal</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Items</th>
+              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Due</th>
               <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-              <th className="px-4 py-3 text-left font-medium text-muted-foreground">Created</th>
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center"><Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center"><Loader2 className="h-5 w-5 animate-spin mx-auto text-muted-foreground" /></td></tr>
             ) : invoices.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">No invoices yet</td></tr>
+              <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">No invoices yet</td></tr>
             ) : invoices.map((inv) => (
               <tr key={inv.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer" onClick={() => openDetail(inv)}>
                 <td className="px-4 py-3 font-medium">{inv.partner_name}</td>
                 <td className="px-4 py-3 text-xs">{inv.period_start} → {inv.period_end}</td>
                 <td className="px-4 py-3 text-right font-semibold text-primary">${inv.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
                 <td className="px-4 py-3 text-xs">{inv.item_count}</td>
+                <td className="px-4 py-3 text-xs">
+                  {inv.due_date ? (
+                    <span className={inv.status !== "paid" && new Date(inv.due_date) < new Date() ? "text-destructive font-semibold" : ""}>
+                      {inv.due_date}
+                    </span>
+                  ) : "—"}
+                </td>
                 <td className="px-4 py-3">
                   <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${STATUS_COLORS[inv.status] || "bg-muted text-muted-foreground"}`}>
                     {inv.status}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-xs">{new Date(inv.created_at).toLocaleDateString()}</td>
                 <td className="px-4 py-3">
                   <Button size="sm" variant="ghost" className="rounded-lg" onClick={(e) => { e.stopPropagation(); openDetail(inv); }}>
                     <Receipt className="h-3.5 w-3.5" />
@@ -251,7 +264,7 @@ const AdminInvoices = () => {
             <DialogTitle className="flex items-center gap-2"><Plus className="h-4 w-4 text-primary" /> Generate Invoice</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-xs text-muted-foreground">Generates draft invoices for <strong>all partners</strong> with invoiceable referrals in the selected period.</p>
+            <p className="text-xs text-muted-foreground">Generates draft invoices (Net 15 terms) for <strong>all partners</strong> with paid-claim referrals in the selected monthly period. CPA rate: <strong>$5/claim</strong>.</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Period Start</Label>
@@ -298,8 +311,10 @@ const AdminInvoices = () => {
                   <p className="font-bold text-primary">${selectedInvoice.subtotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
                 </div>
                 <div className="rounded-lg bg-muted/50 p-3">
-                  <p className="text-[10px] text-muted-foreground uppercase">Items</p>
-                  <p className="font-medium">{invoiceItems.length}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase">Due Date (Net 15)</p>
+                  <p className={`font-medium ${selectedInvoice.due_date && selectedInvoice.status !== "paid" && new Date(selectedInvoice.due_date) < new Date() ? "text-destructive" : ""}`}>
+                    {selectedInvoice.due_date || "—"}
+                  </p>
                 </div>
               </div>
 
