@@ -518,6 +518,7 @@ export type Database = {
           claim_id: string
           created_at: string
           doc_type: string
+          file_hash: string | null
           file_name: string
           file_path: string
           file_size: number | null
@@ -538,6 +539,7 @@ export type Database = {
           claim_id: string
           created_at?: string
           doc_type?: string
+          file_hash?: string | null
           file_name: string
           file_path: string
           file_size?: number | null
@@ -558,6 +560,7 @@ export type Database = {
           claim_id?: string
           created_at?: string
           doc_type?: string
+          file_hash?: string | null
           file_name?: string
           file_path?: string
           file_size?: number | null
@@ -891,6 +894,7 @@ export type Database = {
           created_at: string
           decided_at: string | null
           est_payout: number | null
+          exposure_confidence: number
           fee_percent: number
           filed_at: string | null
           final_payout: number | null
@@ -913,6 +917,7 @@ export type Database = {
           created_at?: string
           decided_at?: string | null
           est_payout?: number | null
+          exposure_confidence?: number
           fee_percent?: number
           filed_at?: string | null
           final_payout?: number | null
@@ -935,6 +940,7 @@ export type Database = {
           created_at?: string
           decided_at?: string | null
           est_payout?: number | null
+          exposure_confidence?: number
           fee_percent?: number
           filed_at?: string | null
           final_payout?: number | null
@@ -1288,6 +1294,7 @@ export type Database = {
           breach_year: number | null
           created_at: string | null
           email: string
+          fraud_flag: boolean
           full_name: string | null
           id: string
           intake_type: string
@@ -1305,6 +1312,7 @@ export type Database = {
           breach_year?: number | null
           created_at?: string | null
           email: string
+          fraud_flag?: boolean
           full_name?: string | null
           id?: string
           intake_type: string
@@ -1322,6 +1330,7 @@ export type Database = {
           breach_year?: number | null
           created_at?: string | null
           email?: string
+          fraud_flag?: boolean
           full_name?: string | null
           id?: string
           intake_type?: string
@@ -1613,6 +1622,7 @@ export type Database = {
           amount_paid: number | null
           claim_id: string
           created_at: string
+          fraud_flag: boolean
           id: string
           model: string
           partner_id: string
@@ -1623,6 +1633,7 @@ export type Database = {
           amount_paid?: number | null
           claim_id: string
           created_at?: string
+          fraud_flag?: boolean
           id?: string
           model?: string
           partner_id: string
@@ -1633,6 +1644,7 @@ export type Database = {
           amount_paid?: number | null
           claim_id?: string
           created_at?: string
+          fraud_flag?: boolean
           id?: string
           model?: string
           partner_id?: string
@@ -2238,6 +2250,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_fingerprints: {
+        Row: {
+          created_at: string
+          device_hash: string | null
+          email_hash: string | null
+          id: string
+          ip_hash: string | null
+          phone_hash: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_hash?: string | null
+          email_hash?: string | null
+          id?: string
+          ip_hash?: string | null
+          phone_hash?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_hash?: string | null
+          email_hash?: string | null
+          id?: string
+          ip_hash?: string | null
+          phone_hash?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_profiles: {
         Row: {
           created_at: string
@@ -2414,6 +2456,7 @@ export type Database = {
         Args: { p_job: string; p_path: string }
         Returns: Json
       }
+      compute_fraud_score: { Args: { p_claim_id: string }; Returns: number }
       enqueue_due_scan_jobs: { Args: never; Returns: number }
       get_partner_id_for_user: { Args: { p_user_id: string }; Returns: string }
       is_admin:
