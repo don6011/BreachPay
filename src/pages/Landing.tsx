@@ -13,10 +13,10 @@ const stats = [
 ];
 
 const steps = [
-  { icon: Search, title: "Scan Your Identity", description: "Enter your email to scan 12,000+ breach databases in seconds." },
-  { icon: Shield, title: "Discover Exposures", description: "See which breaches exposed your data and your risk severity." },
-  { icon: FileText, title: "Match Settlements", description: "We automatically match you to eligible class action settlements." },
-  { icon: DollarSign, title: "File & Get Paid", description: "File claims with one click and track payouts through your wallet." },
+  { icon: Search, title: "Check Your Exposure", description: "Enter your email to scan breach databases and find your exposure." },
+  { icon: Shield, title: "See Your Opportunities", description: "Discover which settlements you may be eligible for." },
+  { icon: FileText, title: "File Your Claim", description: "We prepare and submit your claim to the settlement administrator." },
+  { icon: DollarSign, title: "Get Compensated", description: "Track your claim and receive your payout when it's approved." },
 ];
 
 const pricingPlans = [
@@ -146,13 +146,13 @@ const Landing = () => {
           </div>
 
           <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-            Your Data Was Breached.{" "}
+            You May Be Owed Money{" "}
             <span className="gradient-emerald-text">
-              You Could Be Owed Money.
+              From Data Breaches.
             </span>
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-            BreachPay scans thousands of breach databases, matches you to eligible settlements, and helps you file claims — all in one place.
+            BreachPay scans settlements and files claims on your behalf — so you get the compensation you deserve.
           </p>
           <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground/60 tracking-wide">
             Encrypted identity scan • No credit impact • Results in seconds
@@ -160,10 +160,10 @@ const Landing = () => {
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button size="lg" asChild className="rounded-xl shadow-[0_0_20px_hsl(164_100%_45%/0.25)] hover:shadow-[0_0_32px_hsl(164_100%_45%/0.4)] transition-all duration-500">
-              <Link to="/scan">Start Free Scan <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <Link to="/scan">Run My Free Scan <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
             <Button variant="outline" size="lg" asChild className="rounded-xl">
-              <Link to="/signup">Create Account</Link>
+              <Link to="/signup">See If I Qualify</Link>
             </Button>
           </div>
 
@@ -218,14 +218,14 @@ const Landing = () => {
         </div>
       </section>
 
-      {/* Trust Badge Row */}
+      {/* Trust Band */}
       <section className="py-8 bg-background">
         <div className="mx-auto max-w-4xl px-6 flex flex-wrap items-center justify-center gap-6">
           {[
-            { icon: Shield, text: "SOC 2 Compliant" },
-            { icon: Lock, text: "256-bit AES Encryption" },
-            { icon: Check, text: "GDPR & CCPA Ready" },
-            { icon: Shield, text: "Zero Data Selling" },
+            { icon: Shield, text: "Verified Settlement Database" },
+            { icon: Lock, text: "Secure Document Vault" },
+            { icon: Check, text: "Automated Eligibility Checks" },
+            { icon: FileText, text: "Partnered Claims Processing" },
           ].map((badge) => (
             <div key={badge.text} className="flex items-center gap-2 rounded-xl border border-border bg-card/50 px-4 py-2.5 text-sm text-muted-foreground">
               <badge.icon className="h-4 w-4 text-primary" />

@@ -51,13 +51,13 @@ function buildEmailHtml(
   const footer = buildUnsubscribeFooter(appBaseUrl);
 
   if (template === "new_match") {
-    const subject = `New settlement match: ${settlementName}`;
+    const subject = `You may be owed money — new settlement found`;
     const html = `
       <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
-        <h2>New settlement match found</h2>
-        <p><strong>${settlementName}</strong>${company ? ` — ${company}` : ""}</p>
-        ${payout ? `<p>Estimated payout: <strong>$${Number(payout).toFixed(2)}</strong></p>` : ""}
-        <p><a href="${detailsUrl}" style="color:#2563eb">View details →</a></p>
+        <h2>You may be eligible for compensation</h2>
+        <p>We found a new settlement match: <strong>${settlementName}</strong>${company ? ` — ${company}` : ""}</p>
+        ${payout ? `<p>Your claim could be worth <strong>$${Number(payout).toFixed(2)}</strong></p>` : ""}
+        <p><a href="${detailsUrl}" style="color:#2563eb">Check your eligibility →</a></p>
         ${footer}
       </div>
     `;
@@ -65,13 +65,13 @@ function buildEmailHtml(
   }
 
   if (template === "deadline_soon") {
-    const subject = `Claim deadline approaching: ${settlementName}`;
+    const subject = `Deadline approaching: Don't miss your payout`;
     const html = `
       <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
-        <h2>⚠️ Deadline approaching</h2>
+        <h2>⚠️ Don't miss your payout</h2>
         <p><strong>${settlementName}</strong>${company ? ` — ${company}` : ""}</p>
-        ${daysLeft !== "" ? `<p>Days left: <strong>${String(daysLeft)}</strong></p>` : ""}
-        <p><a href="${detailsUrl}" style="color:#2563eb">Review claim →</a></p>
+        ${daysLeft !== "" ? `<p>Only <strong>${String(daysLeft)} days</strong> left to file</p>` : ""}
+        <p><a href="${detailsUrl}" style="color:#2563eb">File your claim now →</a></p>
         ${footer}
       </div>
     `;
@@ -96,12 +96,12 @@ function buildEmailHtml(
 
   // claim_submitted
   if (template === "claim_submitted") {
-    const subject = `Claim submitted: ${settlementName}`;
+    const subject = `Your claim is filed — ${settlementName}`;
     const html = `
       <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
-        <h2>Claim submitted successfully</h2>
-        <p>Your claim for <strong>${settlementName}</strong>${company ? ` — ${company}` : ""} has been submitted and is being processed.</p>
-        ${payout ? `<p>Estimated payout: <strong>$${Number(payout).toFixed(2)}</strong></p>` : ""}
+        <h2>Your claim has been filed</h2>
+        <p>Your claim for <strong>${settlementName}</strong>${company ? ` — ${company}` : ""} is being processed.</p>
+        ${payout ? `<p>Your claim could be worth <strong>$${Number(payout).toFixed(2)}</strong></p>` : ""}
         <p><a href="${detailsUrl}" style="color:#2563eb">Track your claim →</a></p>
         ${footer}
       </div>
@@ -111,12 +111,12 @@ function buildEmailHtml(
 
   // claim_approved
   if (template === "claim_approved") {
-    const subject = `Claim approved: ${settlementName}`;
+    const subject = `Your claim could be worth $${payout ? Number(payout).toFixed(2) : "___"} — ${settlementName}`;
     const html = `
       <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
         <h2>🎉 Your claim has been approved</h2>
         <p><strong>${settlementName}</strong>${company ? ` — ${company}` : ""}</p>
-        ${payout ? `<p>Estimated payout: <strong>$${Number(payout).toFixed(2)}</strong></p>` : ""}
+        ${payout ? `<p>Estimated compensation: <strong>$${Number(payout).toFixed(2)}</strong></p>` : ""}
         <p>Your payout will be processed according to the settlement timeline.</p>
         <p><a href="${detailsUrl}" style="color:#2563eb">View claim details →</a></p>
         ${footer}

@@ -36,7 +36,7 @@ export function PayoutRange({ min, max, className, size = "md" }: PayoutRangePro
       <span className={cn("font-bold gradient-emerald-text", sizeClasses[size])}>
         {label}
       </span>
-      <span className="text-[10px] text-muted-foreground ml-1">estimated payout</span>
+      <span className="text-[10px] text-muted-foreground ml-1">estimated compensation</span>
     </div>
   );
 }
