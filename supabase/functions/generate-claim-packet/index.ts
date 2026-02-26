@@ -57,7 +57,8 @@ function buildPacketHtml(claim: any, settlement: any, application: any, document
 </style></head>
 <body>
   <h1>BreachPay Claim Packet</h1>
-  <p style="font-size:13px;color:#64748b;margin:-4px 0 20px">Compensation Recovery File</p>
+  <p style="font-size:13px;color:#64748b;margin:-4px 0 4px">Compensation Recovery File</p>
+  <p style="font-size:11px;margin:0 0 20px"><span class="badge" style="background:#dcfce7;color:#166534">✓ Verified Settlement</span>${settlement?.credibility_score ? ` <span class="badge" style="background:#f0fdf4;color:#166534">Credibility: ${settlement.credibility_score}/100</span>` : ""}</p>
   <p class="meta">Generated ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC · Claim ID: ${esc(claim.id?.slice(0, 8))}</p>
 
   <h2>Settlement Details</h2>
@@ -67,6 +68,7 @@ function buildPacketHtml(claim: any, settlement: any, application: any, document
     <tr><th>Breach Year</th><td>${settlement?.breach_year || "—"}</td></tr>
     <tr><th>Filing Deadline</th><td>${formatDate(settlement?.claim_deadline || settlement?.deadline)}</td></tr>
     <tr><th>Payout Range</th><td>${formatCurrency(settlement?.payout_min)} – ${formatCurrency(settlement?.payout_max)}</td></tr>
+    <tr><th>Verification</th><td>${esc(settlement?.verification_level || "verified")} · ${esc(settlement?.verification_status || "verified")}</td></tr>
     ${settlement?.administrator_name ? `<tr><th>Administrator</th><td>${esc(settlement.administrator_name)}</td></tr>` : ""}
     ${settlement?.case_number ? `<tr><th>Case Number</th><td>${esc(settlement.case_number)}</td></tr>` : ""}
     ${settlement?.jurisdiction ? `<tr><th>Jurisdiction</th><td>${esc(settlement.jurisdiction)}</td></tr>` : ""}
