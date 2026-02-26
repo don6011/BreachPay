@@ -1,4 +1,4 @@
-import { BarChart3, Users, Scale, FileText, Activity, ArrowLeft, Cog, DollarSign, Database, FolderSearch, Timer, Bell, Receipt } from "lucide-react";
+import { BarChart3, Users, Scale, FileText, Activity, ArrowLeft, Cog, DollarSign, Database, FolderSearch, Timer, Bell, Receipt, LayoutDashboard } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/logo.png";
@@ -17,6 +17,7 @@ const adminNav = [
   { title: "Cron Queue", url: "/admin/cron", icon: Timer },
   { title: "Notifications", url: "/admin/notifications", icon: Bell },
   { title: "Invoices", url: "/admin/invoices", icon: Receipt },
+  { title: "Ops Console", url: "/admin/ops", icon: LayoutDashboard },
 ];
 
 export function AdminSidebar() {

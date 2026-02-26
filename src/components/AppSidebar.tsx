@@ -1,4 +1,4 @@
-import { LayoutDashboard, Search, Scale, FileText, Shield, Settings, LogOut, ShieldAlert, Wallet, FolderLock, Banknote } from "lucide-react";
+import { LayoutDashboard, Search, Scale, FileText, Shield, Settings, LogOut, ShieldAlert, Wallet, FolderLock, Banknote, Headphones } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/logo.png";
@@ -12,6 +12,7 @@ const userNav = [
   { title: "Wallet", url: "/wallet", icon: Wallet },
   { title: "Payouts", url: "/payouts", icon: Banknote },
   { title: "Evidence Vault", url: "/vault", icon: FolderLock },
+  { title: "Support", url: "/support", icon: Headphones },
   { title: "Settings", url: "/settings", icon: Settings },
 ];
 
