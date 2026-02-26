@@ -1158,6 +1158,7 @@ export type Database = {
       partner_invoices: {
         Row: {
           created_at: string
+          due_date: string | null
           id: string
           notes: string | null
           paid_at: string | null
@@ -1170,6 +1171,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          due_date?: string | null
           id?: string
           notes?: string | null
           paid_at?: string | null
@@ -1182,6 +1184,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          due_date?: string | null
           id?: string
           notes?: string | null
           paid_at?: string | null
