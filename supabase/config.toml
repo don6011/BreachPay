@@ -21,5 +21,8 @@ verify_jwt = false
 [functions.generate-claim-packet]
 verify_jwt = false
 
-[functions.share-claim-packet]
+[functions.create-claim-share-link]
+verify_jwt = false
+
+[functions.resolve-claim-share-link]
 verify_jwt = false

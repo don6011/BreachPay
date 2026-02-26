@@ -89,8 +89,7 @@ const ClaimTracker = () => {
   const [generatingPacket, setGeneratingPacket] = useState(false);
   const [creatingShare, setCreatingShare] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [shareScope, setShareScope] = useState<string>("packet");
-  const [shareExpiry, setShareExpiry] = useState<number>(168);
+  const [shareExpiry, setShareExpiry] = useState<string>("7d");
   const [copied, setCopied] = useState(false);
   const [latestPacket, setLatestPacket] = useState<{ id: string; generated_at: string; pdf_storage_path: string | null; pdf_file_name: string | null } | null>(null);
   const [downloadingPacket, setDownloadingPacket] = useState(false);
@@ -103,10 +102,10 @@ const ClaimTracker = () => {
         body: { claim_id: claimId },
       });
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (!data?.ok) throw new Error(data?.error || "Failed to generate packet");
       toast({
         title: "Claim Packet Generated",
-        description: `Packet "${data.packet_file}" saved with ${data.document_count} evidence file(s) indexed.`,
+        description: `Packet created successfully.`,
       });
       // Refresh latest packet
       fetchLatestPacket();
@@ -151,17 +150,16 @@ const ClaimTracker = () => {
     if (!claimId) return;
     setCreatingShare(true);
     try {
-      const { data, error } = await supabase.functions.invoke("share-claim-packet", {
-        body: { claim_id: claimId, scope: shareScope, hours: shareExpiry },
+      const { data, error } = await supabase.functions.invoke("create-claim-share-link", {
+        body: { claim_id: claimId, expires_in: shareExpiry },
       });
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (!data?.ok) throw new Error(data?.error || "Failed to create share link");
 
-      const url = `${window.location.origin}/share/claim?token=${data.token}`;
-      setShareUrl(url);
+      setShareUrl(data.share_url);
       toast({
         title: "Share Link Created",
-        description: `Expires ${format(new Date(data.expires_at), "MMM d, yyyy")}. Scope: ${data.scope === "packet_and_evidence" ? "Packet + Evidence" : "Packet only"}.`,
+        description: `Expires ${format(new Date(data.expires_at), "MMM d, yyyy")}.`,
       });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to create share link", variant: "destructive" });
@@ -316,23 +314,14 @@ const ClaimTracker = () => {
 
             {/* Share Link Creation */}
             <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border">
-              <Select value={shareScope} onValueChange={setShareScope}>
-                <SelectTrigger className="h-8 w-[170px] text-xs rounded-xl">
+              <Select value={shareExpiry} onValueChange={setShareExpiry}>
+                <SelectTrigger className="h-8 w-[120px] text-xs rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="packet">Packet only</SelectItem>
-                  <SelectItem value="packet_and_evidence">Packet + Evidence</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={String(shareExpiry)} onValueChange={(v) => setShareExpiry(Number(v))}>
-                <SelectTrigger className="h-8 w-[100px] text-xs rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="24">24 hours</SelectItem>
-                  <SelectItem value="168">7 days</SelectItem>
-                  <SelectItem value="720">30 days</SelectItem>
+                  <SelectItem value="24h">24 hours</SelectItem>
+                  <SelectItem value="7d">7 days</SelectItem>
+                  <SelectItem value="30d">30 days</SelectItem>
                 </SelectContent>
               </Select>
               <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={handleCreateShareLink} disabled={creatingShare}>
@@ -343,7 +332,7 @@ const ClaimTracker = () => {
 
             {shareUrl && (
               <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2">
-                <p className="text-xs font-semibold text-primary">Share Link (expires in {shareExpiry <= 24 ? "24 hours" : shareExpiry <= 168 ? "7 days" : "30 days"})</p>
+                <p className="text-xs font-semibold text-primary">Share Link (expires in {shareExpiry === "24h" ? "24 hours" : shareExpiry === "7d" ? "7 days" : "30 days"})</p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 text-xs bg-muted rounded-lg px-3 py-2 truncate">{shareUrl}</code>
                   <Button size="sm" variant="outline" className="rounded-xl shrink-0" onClick={handleCopyShare}>
@@ -351,7 +340,7 @@ const ClaimTracker = () => {
                   </Button>
                 </div>
                 <p className="text-[10px] text-muted-foreground">
-                  Anyone with this link can view the claim packet{shareScope === "packet_and_evidence" ? " and download evidence documents" : ""}. Only the token hash is stored — no raw tokens in DB.
+                  Anyone with this link can view and download the claim packet. Only the token hash is stored — no raw tokens in DB.
                 </p>
               </div>
             )}
