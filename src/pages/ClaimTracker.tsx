@@ -90,7 +90,10 @@ const ClaimTracker = () => {
   const [creatingShare, setCreatingShare] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareScope, setShareScope] = useState<string>("packet");
+  const [shareExpiry, setShareExpiry] = useState<number>(168);
   const [copied, setCopied] = useState(false);
+  const [latestPacket, setLatestPacket] = useState<{ id: string; generated_at: string; pdf_storage_path: string | null; pdf_file_name: string | null } | null>(null);
+  const [downloadingPacket, setDownloadingPacket] = useState(false);
 
   const handleGeneratePacket = async () => {
     if (!claimId) return;
@@ -105,10 +108,42 @@ const ClaimTracker = () => {
         title: "Claim Packet Generated",
         description: `Packet "${data.packet_file}" saved with ${data.document_count} evidence file(s) indexed.`,
       });
+      // Refresh latest packet
+      fetchLatestPacket();
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to generate packet", variant: "destructive" });
     } finally {
       setGeneratingPacket(false);
+    }
+  };
+
+  const fetchLatestPacket = async () => {
+    if (!claimId) return;
+    const { data } = await supabase
+      .from("claim_packets")
+      .select("id, generated_at, pdf_storage_path, pdf_file_name")
+      .eq("claim_id", claimId)
+      .eq("status", "generated")
+      .order("generated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setLatestPacket(data);
+  };
+
+  const handleDownloadPacket = async () => {
+    if (!latestPacket?.pdf_storage_path) return;
+    setDownloadingPacket(true);
+    try {
+      const { data } = await supabase.storage
+        .from("claim-packets")
+        .createSignedUrl(latestPacket.pdf_storage_path, 600);
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, "_blank");
+      } else {
+        toast({ title: "Error", description: "Failed to generate download link", variant: "destructive" });
+      }
+    } finally {
+      setDownloadingPacket(false);
     }
   };
 
@@ -117,13 +152,12 @@ const ClaimTracker = () => {
     setCreatingShare(true);
     try {
       const { data, error } = await supabase.functions.invoke("share-claim-packet", {
-        body: { claim_id: claimId, scope: shareScope, hours: 168 },
+        body: { claim_id: claimId, scope: shareScope, hours: shareExpiry },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "zmjikithlaxeldvsmklz";
-      const url = `https://${projectId}.supabase.co/functions/v1/share-claim-packet?token=${data.token}`;
+      const url = `${window.location.origin}/share/claim?token=${data.token}`;
       setShareUrl(url);
       toast({
         title: "Share Link Created",
@@ -147,6 +181,7 @@ const ClaimTracker = () => {
   useEffect(() => {
     if (!user || !claimId) return;
     fetchAll();
+    fetchLatestPacket();
   }, [user, claimId]);
 
   const fetchAll = async () => {
@@ -265,31 +300,50 @@ const ClaimTracker = () => {
             <h3 className="text-sm font-semibold flex items-center gap-2">
               <FileText className="h-4 w-4 text-primary" /> Claim Packet & Sharing
             </h3>
+            {/* Generate Packet */}
             <div className="flex flex-wrap gap-2 items-center">
               <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={handleGeneratePacket} disabled={generatingPacket}>
-                {generatingPacket ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                {generatingPacket ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePlus className="h-4 w-4" />}
                 Generate Packet
               </Button>
-              <div className="flex items-center gap-2">
-                <Select value={shareScope} onValueChange={setShareScope}>
-                  <SelectTrigger className="h-8 w-[180px] text-xs rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="packet">Packet only</SelectItem>
-                    <SelectItem value="packet_and_evidence">Packet + Evidence</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={handleCreateShareLink} disabled={creatingShare}>
-                  {creatingShare ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
-                  Create Share Link
+              {latestPacket && (
+                <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={handleDownloadPacket} disabled={downloadingPacket}>
+                  {downloadingPacket ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                  Download ({format(new Date(latestPacket.generated_at), "MMM d")})
                 </Button>
-              </div>
+              )}
+            </div>
+
+            {/* Share Link Creation */}
+            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border">
+              <Select value={shareScope} onValueChange={setShareScope}>
+                <SelectTrigger className="h-8 w-[170px] text-xs rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="packet">Packet only</SelectItem>
+                  <SelectItem value="packet_and_evidence">Packet + Evidence</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={String(shareExpiry)} onValueChange={(v) => setShareExpiry(Number(v))}>
+                <SelectTrigger className="h-8 w-[100px] text-xs rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="24">24 hours</SelectItem>
+                  <SelectItem value="168">7 days</SelectItem>
+                  <SelectItem value="720">30 days</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={handleCreateShareLink} disabled={creatingShare}>
+                {creatingShare ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+                Create Share Link
+              </Button>
             </div>
 
             {shareUrl && (
               <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2">
-                <p className="text-xs font-semibold text-primary">Share Link (expires in 7 days)</p>
+                <p className="text-xs font-semibold text-primary">Share Link (expires in {shareExpiry <= 24 ? "24 hours" : shareExpiry <= 168 ? "7 days" : "30 days"})</p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 text-xs bg-muted rounded-lg px-3 py-2 truncate">{shareUrl}</code>
                   <Button size="sm" variant="outline" className="rounded-xl shrink-0" onClick={handleCopyShare}>

@@ -44,6 +44,7 @@ import PartnerClaims from "./pages/partner/PartnerClaims";
 import PartnerClaimDetail from "./pages/partner/PartnerClaimDetail";
 import PartnerSettings from "./pages/partner/PartnerSettings";
 import NotFound from "./pages/NotFound";
+import ShareClaim from "./pages/ShareClaim";
 
 const queryClient = new QueryClient();
 
@@ -103,6 +104,9 @@ const App = () => {
               <Route path="/partner/claims/:id" element={<PartnerClaimDetail />} />
               <Route path="/partner/settings" element={<PartnerSettings />} />
             </Route>
+
+            {/* Public share page */}
+            <Route path="/share/claim" element={<ShareClaim />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>
