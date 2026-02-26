@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowLeft, FileText, Clock, DollarSign,
-  AlertTriangle, Shield, Loader2, ExternalLink, MessageSquare, Info,
+  AlertTriangle, Shield, Loader2, ExternalLink, MessageSquare, Info, Download,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
@@ -71,6 +71,32 @@ const ClaimTracker = () => {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [documents, setDocuments] = useState<DocRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generatingPacket, setGeneratingPacket] = useState(false);
+
+  const handleGeneratePacket = async () => {
+    if (!claimId) return;
+    setGeneratingPacket(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-claim-packet", {
+        body: { claim_id: claimId },
+      });
+
+      if (error) throw error;
+
+      // data is HTML string — open in new tab for print/save as PDF
+      const blob = new Blob([data], { type: "text/html" });
+      const url = URL.createObjectURL(blob);
+      const w = window.open(url, "_blank");
+      if (w) {
+        w.onload = () => setTimeout(() => w.print(), 500);
+      }
+      toast({ title: "Claim Packet Generated", description: "Use your browser's Print dialog to save as PDF." });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || "Failed to generate packet", variant: "destructive" });
+    } finally {
+      setGeneratingPacket(false);
+    }
+  };
 
   useEffect(() => {
     if (!user || !claimId) return;
@@ -166,7 +192,21 @@ const ClaimTracker = () => {
           <ArrowLeft className="h-4 w-4 mr-1" /> Back to Claims
         </Button>
 
-        {/* Draft: prompt to continue filing */}
+        {/* Generate Claim Packet */}
+        {claim.status !== "draft" && (
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-xl gap-2"
+              onClick={handleGeneratePacket}
+              disabled={generatingPacket}
+            >
+              {generatingPacket ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              Generate Claim Packet
+            </Button>
+          </div>
+        )}
         {claim.status === "draft" && claim.settlement && (
           <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 flex items-center justify-between">
             <div>
