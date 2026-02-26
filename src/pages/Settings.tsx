@@ -1,15 +1,32 @@
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
-import { User, Shield, Download, Trash2, FileText, ExternalLink, LogOut, Crown } from "lucide-react";
-import { Link } from "react-router-dom";
-import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { User, Shield, Download, Trash2, FileText, ExternalLink, LogOut, Crown, CreditCard, Calendar, CheckCircle, ArrowRight } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
 
 const Settings = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  // TODO: read from user_profiles.plan when wired to Supabase
-  const isPremium = false;
+  const [plan, setPlan] = useState<string>("free");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("user_profiles")
+      .select("plan")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.plan) setPlan(data.plan);
+        setLoading(false);
+      });
+  }, [user]);
+
+  const isPremium = plan === "premium";
 
   const handleLogout = async () => {
     await signOut();
@@ -32,29 +49,62 @@ const Settings = () => {
         </div>
       </section>
 
-      {/* Plan */}
+      {/* Plan & Subscription */}
       <section className="mb-6 rounded-2xl border bg-card p-6">
         <div className="flex items-center gap-2 mb-4">
           <Crown className="h-4 w-4 text-primary" />
-          <h2 className="font-semibold">Plan</h2>
+          <h2 className="font-semibold">Plan & Billing</h2>
         </div>
-        {isPremium ? (
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">Premium Active</span>
-              <p className="mt-2 text-sm text-muted-foreground">$9.99/mo · Daily scans, instant alerts, priority matching</p>
+
+        {loading ? (
+          <div className="h-16 animate-pulse rounded-xl bg-muted" />
+        ) : isPremium ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Badge className="bg-primary/10 text-primary border-primary/20 font-bold">
+                  <Crown className="mr-1 h-3 w-3" /> Premium Active
+                </Badge>
+              </div>
+              <Button variant="outline" size="sm" className="rounded-xl text-xs">Manage Subscription</Button>
             </div>
-            <Button variant="outline" className="rounded-xl text-sm">Manage</Button>
+            <div className="rounded-xl bg-muted/30 p-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground flex items-center gap-1.5"><CreditCard className="h-3.5 w-3.5" /> Monthly</span>
+                <span className="font-medium">$4.99/mo</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5" /> Next billing</span>
+                <span className="text-muted-foreground">—</span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {["Daily scans", "Real-time alerts", "Dark web monitoring", "Priority matching", "Risk scoring", "Auto-claim packets"].map(f => (
+                <div key={f} className="flex items-center gap-1.5 text-muted-foreground">
+                  <CheckCircle className="h-3 w-3 text-primary" />{f}
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">Free</span>
-              <p className="mt-2 text-sm text-muted-foreground">Weekly scans, batched alerts, standard matching</p>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <Badge variant="secondary" className="font-bold">Free Plan</Badge>
+                <p className="mt-2 text-sm text-muted-foreground">Weekly scans, batched alerts, standard matching</p>
+              </div>
+              <Button asChild className="rounded-xl">
+                <Link to="/pricing">Upgrade <ArrowRight className="ml-1 h-3 w-3" /></Link>
+              </Button>
             </div>
-            <Button asChild className="rounded-xl bg-primary text-primary-foreground hover:shadow-[0_0_20px_hsl(172_89%_52%/0.3)] transition-all duration-300 text-sm">
-              <Link to="/pricing">Upgrade</Link>
-            </Button>
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Crown className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold">Premium — $4.99/mo</span>
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">50% OFF</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Daily scans · Real-time breach alerts · Dark web monitoring · Priority matching</p>
+            </div>
           </div>
         )}
       </section>

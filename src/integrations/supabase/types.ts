@@ -704,6 +704,59 @@ export type Database = {
           },
         ]
       }
+      claim_services: {
+        Row: {
+          amount: number
+          claim_id: string
+          completed_at: string | null
+          created_at: string
+          currency: string
+          id: string
+          meta: Json | null
+          purchased_at: string | null
+          service_type: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount?: number
+          claim_id: string
+          completed_at?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          meta?: Json | null
+          purchased_at?: string | null
+          service_type: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          claim_id?: string
+          completed_at?: string | null
+          created_at?: string
+          currency?: string
+          id?: string
+          meta?: Json | null
+          purchased_at?: string | null
+          service_type?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_services_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       claim_share_links: {
         Row: {
           access_count: number
@@ -2119,6 +2172,33 @@ export type Database = {
           status?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      upsell_clicks: {
+        Row: {
+          clicked_at: string
+          id: string
+          partner_name: string | null
+          placement: string | null
+          upsell_type: string
+          user_id: string | null
+        }
+        Insert: {
+          clicked_at?: string
+          id?: string
+          partner_name?: string | null
+          placement?: string | null
+          upsell_type: string
+          user_id?: string | null
+        }
+        Update: {
+          clicked_at?: string
+          id?: string
+          partner_name?: string | null
+          placement?: string | null
+          upsell_type?: string
+          user_id?: string | null
         }
         Relationships: []
       }
