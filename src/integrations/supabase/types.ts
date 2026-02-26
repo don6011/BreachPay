@@ -500,6 +500,47 @@ export type Database = {
           },
         ]
       }
+      claim_packet_shares: {
+        Row: {
+          accessed_count: number
+          claim_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          last_accessed_at: string | null
+          token: string
+          user_id: string
+        }
+        Insert: {
+          accessed_count?: number
+          claim_id: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          last_accessed_at?: string | null
+          token?: string
+          user_id: string
+        }
+        Update: {
+          accessed_count?: number
+          claim_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          last_accessed_at?: string | null
+          token?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_packet_shares_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       claim_partner_notes: {
         Row: {
           claim_id: string
@@ -1848,6 +1889,10 @@ export type Database = {
       proc_cron_scan_jobs: { Args: { max_jobs?: number }; Returns: Json }
       proc_enqueue_due_jobs: { Args: { max_jobs?: number }; Returns: number }
       proc_run_scheduled_jobs: { Args: { max_jobs?: number }; Returns: number }
+      rpc_create_packet_share: {
+        Args: { p_claim_id: string; p_hours?: number }
+        Returns: Json
+      }
       rpc_partner_add_claim_note: {
         Args: { p_claim_id: string; p_note: string; p_visibility?: string }
         Returns: undefined

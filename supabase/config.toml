@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.generate-claim-packet]
 verify_jwt = false
+
+[functions.share-claim-packet]
+verify_jwt = false
