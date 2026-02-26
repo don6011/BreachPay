@@ -589,6 +589,41 @@ export type Database = {
           },
         ]
       }
+      claim_payout_events: {
+        Row: {
+          claim_id: string
+          created_at: string
+          created_by: string | null
+          event_type: string
+          id: string
+          meta: Json | null
+        }
+        Insert: {
+          claim_id: string
+          created_at?: string
+          created_by?: string | null
+          event_type: string
+          id?: string
+          meta?: Json | null
+        }
+        Update: {
+          claim_id?: string
+          created_at?: string
+          created_by?: string | null
+          event_type?: string
+          id?: string
+          meta?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_payout_events_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       claim_share_links: {
         Row: {
           access_count: number
@@ -1078,6 +1113,95 @@ export type Database = {
         }
         Relationships: []
       }
+      partner_invoice_items: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          id: string
+          invoice_id: string
+          referral_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          invoice_id: string
+          referral_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          id?: string
+          invoice_id?: string
+          referral_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "partner_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_invoice_items_referral_id_fkey"
+            columns: ["referral_id"]
+            isOneToOne: false
+            referencedRelation: "referrals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_invoices: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          paid_at: string | null
+          partner_id: string
+          period_end: string
+          period_start: string
+          sent_at: string | null
+          status: string
+          subtotal: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          partner_id: string
+          period_end: string
+          period_start: string
+          sent_at?: string | null
+          status?: string
+          subtotal?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          paid_at?: string | null
+          partner_id?: string
+          period_end?: string
+          period_start?: string
+          sent_at?: string | null
+          status?: string
+          subtotal?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_invoices_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_profiles: {
         Row: {
           created_at: string
@@ -1178,7 +1302,9 @@ export type Database = {
           claim_id: string
           created_at: string
           currency: string
+          external_ref: string | null
           id: string
+          method: string | null
           paid_at: string | null
           status: string
           stripe_ref: string | null
@@ -1190,7 +1316,9 @@ export type Database = {
           claim_id: string
           created_at?: string
           currency?: string
+          external_ref?: string | null
           id?: string
+          method?: string | null
           paid_at?: string | null
           status?: string
           stripe_ref?: string | null
@@ -1202,7 +1330,9 @@ export type Database = {
           claim_id?: string
           created_at?: string
           currency?: string
+          external_ref?: string | null
           id?: string
+          method?: string | null
           paid_at?: string | null
           status?: string
           stripe_ref?: string | null
@@ -1213,7 +1343,7 @@ export type Database = {
           {
             foreignKeyName: "payouts_claim_id_fkey"
             columns: ["claim_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "claims"
             referencedColumns: ["id"]
           },
@@ -1939,6 +2069,15 @@ export type Database = {
       proc_cron_scan_jobs: { Args: { max_jobs?: number }; Returns: Json }
       proc_enqueue_due_jobs: { Args: { max_jobs?: number }; Returns: number }
       proc_run_scheduled_jobs: { Args: { max_jobs?: number }; Returns: number }
+      rpc_admin_mark_claim_paid: {
+        Args: {
+          p_amount: number
+          p_claim_id: string
+          p_external_ref?: string
+          p_method?: string
+        }
+        Returns: undefined
+      }
       rpc_partner_add_claim_note: {
         Args: { p_claim_id: string; p_note: string; p_visibility?: string }
         Returns: undefined
