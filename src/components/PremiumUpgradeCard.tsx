@@ -1,6 +1,9 @@
 import { Crown, Shield, Zap, Bell, Activity, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PremiumUpgradeCardProps {
   placement?: "post_scan" | "dashboard" | "monitoring" | "breach_alert";
@@ -15,6 +18,22 @@ const features = [
 ];
 
 export const PremiumUpgradeCard = ({ placement = "dashboard", compact = false }: PremiumUpgradeCardProps) => {
+  const { user } = useAuth();
+  const [isPremium, setIsPremium] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("user_profiles")
+      .select("plan")
+      .eq("user_id", user.id)
+      .maybeSingle()
+      .then(({ data }) => setIsPremium(data?.plan === "premium"));
+  }, [user]);
+
+  // Don't render for premium users
+  if (isPremium) return null;
+
   if (compact) {
     return (
       <div className="glass-card-glow p-4 flex items-center justify-between gap-3">
