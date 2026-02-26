@@ -61,10 +61,10 @@ const Monitoring = () => {
         // User profile
         const { data: profileData } = await supabase
           .from("user_profiles")
-          .select("monitoring_enabled, last_scan_at, next_scan_at, scan_frequency_days, plan, email_alerts, deadline_alerts, push_alerts")
+          .select("monitoring_enabled, last_scan_at, next_scan_at, scan_frequency_days, email_alerts, deadline_alerts, push_alerts")
           .eq("user_id", user.id)
           .maybeSingle();
-        if (profileData) setProfile(profileData);
+        if (profileData) setProfile({ ...profileData, plan: "" });
 
         // Alerts
         const { data: alertsData } = await supabase
@@ -122,7 +122,8 @@ const Monitoring = () => {
     fetchAll();
   }, [user]);
 
-  const isPremium = profile?.plan === "premium";
+  const { plan } = useAuth();
+  const isPremium = plan === "premium";
   const scanFreqLabel = isPremium ? "Daily (Premium)" : `Every ${profile?.scan_frequency_days || 7} days (Free Plan)`;
 
   const handleToggle = async (field: "email_alerts" | "deadline_alerts" | "monitoring_enabled", value: boolean) => {

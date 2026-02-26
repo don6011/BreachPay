@@ -60,6 +60,7 @@ import BreachCompany from "./pages/BreachCompany";
 import CheckEligibility from "./pages/CheckEligibility";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
 
@@ -80,6 +81,7 @@ const App = () => {
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* User App - Protected */}
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
