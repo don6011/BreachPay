@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
-import { Mail, Bell, RefreshCw, RotateCcw, Trash2, Send, CheckCircle, XCircle, Clock, Loader2 } from "lucide-react";
+import { Mail, Bell, RefreshCw, RotateCcw, Trash2, Send, CheckCircle, XCircle, Clock, Loader2, Activity, AlertTriangle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 
 const statusColors: Record<string, string> = {
@@ -103,7 +103,25 @@ export default function AdminNotifications() {
     }
   };
 
-  // Compute stats
+  // Outbox health metrics (global, not filtered)
+  const { data: healthMetrics } = useQuery({
+    queryKey: ["admin-outbox-health"],
+    queryFn: async () => {
+      const [pendingRes, failedRes, lastDispatchRes] = await Promise.all([
+        supabase.from("notification_outbox").select("id", { count: "exact", head: true }).eq("status", "pending"),
+        supabase.from("notification_outbox").select("id", { count: "exact", head: true }).eq("status", "failed").gte("created_at", new Date(Date.now() - 86400000).toISOString()),
+        supabase.from("notification_outbox").select("sent_at").eq("status", "sent").order("sent_at", { ascending: false }).limit(1),
+      ]);
+      return {
+        pendingCount: pendingRes.count ?? 0,
+        failedLast24h: failedRes.count ?? 0,
+        lastDispatchAt: lastDispatchRes.data?.[0]?.sent_at ?? null,
+      };
+    },
+    refetchInterval: 30000,
+  });
+
+  // Compute stats from current filtered view
   const stats = {
     pending: rows?.filter((r) => r.status === "pending").length ?? 0,
     sent: rows?.filter((r) => r.status === "sent").length ?? 0,
@@ -114,6 +132,37 @@ export default function AdminNotifications() {
   return (
     <div>
       <PageHeader title="Notification Outbox" subtitle="Browse and manage queued notifications" />
+
+      {/* System Health Widget */}
+      <div className="mb-6 rounded-2xl border border-primary/20 bg-primary/5 p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Activity className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold">Dispatcher Health</h3>
+        </div>
+        <div className="grid grid-cols-3 gap-4 text-sm">
+          <div>
+            <p className="text-xs text-muted-foreground">Pending (global)</p>
+            <p className={`text-lg font-bold ${(healthMetrics?.pendingCount ?? 0) > 50 ? "text-warning" : "text-foreground"}`}>
+              {healthMetrics?.pendingCount ?? "—"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Failed (24h)</p>
+            <p className={`text-lg font-bold ${(healthMetrics?.failedLast24h ?? 0) > 0 ? "text-destructive" : "text-foreground"}`}>
+              {healthMetrics?.failedLast24h ?? "—"}
+              {(healthMetrics?.failedLast24h ?? 0) > 0 && <AlertTriangle className="inline ml-1 h-3.5 w-3.5 text-destructive" />}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Last Dispatch</p>
+            <p className="text-sm font-medium">
+              {healthMetrics?.lastDispatchAt
+                ? new Date(healthMetrics.lastDispatchAt).toLocaleString()
+                : "Never"}
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Stats row */}
       <div className="mb-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
