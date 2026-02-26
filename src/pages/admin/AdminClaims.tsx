@@ -64,6 +64,12 @@ interface PartnerOption {
   email: string;
 }
 
+interface PartnerOrgOption {
+  id: string;
+  name: string;
+  partner_type: string;
+}
+
 interface ClaimDoc {
   id: string;
   file_path: string;
@@ -96,7 +102,9 @@ const AdminClaims = () => {
 
   const [partnerOptions, setPartnerOptions] = useState<PartnerOption[]>([]);
   const [firmOptions, setFirmOptions] = useState<FirmOption[]>([]);
+  const [partnerOrgOptions, setPartnerOrgOptions] = useState<PartnerOrgOption[]>([]);
   const [assigningPartner, setAssigningPartner] = useState(false);
+  const [claimPartnerOrgId, setClaimPartnerOrgId] = useState<string | null>(null);
   const [breachEvidence, setBreachEvidence] = useState<BreachEvidence[]>([]);
   const [loadingEvidence, setLoadingEvidence] = useState(false);
   const [claimApplication, setClaimApplication] = useState<any>(null);
@@ -107,7 +115,13 @@ const AdminClaims = () => {
     fetchClaims();
     fetchPartners();
     fetchFirms();
+    fetchPartnerOrgs();
   }, [user]);
+
+  const fetchPartnerOrgs = async () => {
+    const { data } = await supabase.from("partners").select("id, name, partner_type").eq("is_active", true).order("name");
+    setPartnerOrgOptions(data || []);
+  };
 
   const fetchPartners = async () => {
     const { data: roles } = await supabase.from("user_roles").select("user_id").eq("role", "partner");
@@ -195,8 +209,9 @@ const AdminClaims = () => {
     setLoadingApplication(true);
     setBreachEvidence([]);
     setClaimApplication(null);
+    setClaimPartnerOrgId(null);
 
-    const [docsRes, evidenceRes, appRes] = await Promise.all([
+    const [docsRes, evidenceRes, appRes, assignmentRes] = await Promise.all([
       supabase
         .from("claim_documents")
         .select("id, file_path, file_type, note, created_at, verified")
@@ -211,6 +226,12 @@ const AdminClaims = () => {
         .from("claim_applications")
         .select("*")
         .eq("claim_id", claim.id)
+        .maybeSingle(),
+      supabase
+        .from("claim_assignments")
+        .select("partner_id")
+        .eq("claim_id", claim.id)
+        .limit(1)
         .maybeSingle(),
     ]);
 
@@ -232,6 +253,7 @@ const AdminClaims = () => {
     setLoadingEvidence(false);
     setClaimApplication(appRes.data || null);
     setLoadingApplication(false);
+    setClaimPartnerOrgId(assignmentRes.data?.partner_id || null);
   };
 
   const handleStatusUpdate = async () => {
@@ -623,15 +645,65 @@ const AdminClaims = () => {
               )}
             </div>
 
-            {/* Partner & Firm Assignment */}
+            {/* Partner Organization Assignment */}
             <div>
               <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                <UserCheck className="h-4 w-4" /> Assign Partner
+                <UserCheck className="h-4 w-4" /> Assign Partner Organization
               </h4>
               <div className="space-y-3">
-                {/* Firm */}
                 <div>
-                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Partner Firm</label>
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Partner Org</label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <select
+                      value={claimPartnerOrgId || ""}
+                      onChange={async (e) => {
+                        const orgId = e.target.value || null;
+                        setAssigningPartner(true);
+                        try {
+                          if (orgId) {
+                            // Upsert claim_assignments
+                            const { error } = await supabase.from("claim_assignments").upsert(
+                              { claim_id: selectedClaim!.id, partner_id: orgId, assignment_status: "assigned" },
+                              { onConflict: "claim_id,partner_id" }
+                            );
+                            if (error) throw error;
+                          } else if (claimPartnerOrgId) {
+                            // Remove assignment
+                            await supabase.from("claim_assignments").delete().eq("claim_id", selectedClaim!.id).eq("partner_id", claimPartnerOrgId);
+                          }
+                          await supabase.from("claim_status_history").insert({
+                            claim_id: selectedClaim!.id, status: selectedClaim!.status,
+                            note: orgId ? `Assigned to partner org` : "Partner org removed",
+                            updated_by: user?.email || "admin",
+                          });
+                          await supabase.from("admin_activity_logs").insert({
+                            admin_user_id: user?.id,
+                            action: orgId ? "assign_partner_org" : "unassign_partner_org",
+                            entity_type: "claim", entity_id: selectedClaim!.id,
+                            meta: { partner_org_id: orgId },
+                          });
+                          setClaimPartnerOrgId(orgId);
+                          toast.success(orgId ? "Partner org assigned" : "Partner org removed");
+                        } catch (err: any) {
+                          toast.error(err.message || "Failed to assign partner org");
+                        } finally {
+                          setAssigningPartner(false);
+                        }
+                      }}
+                      disabled={assigningPartner}
+                      className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="">— No partner org —</option>
+                      {partnerOrgOptions.map((o) => (
+                        <option key={o.id} value={o.id}>{o.name} ({o.partner_type.replace("_", " ")})</option>
+                      ))}
+                    </select>
+                    {assigningPartner && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                  </div>
+                </div>
+                {/* Legacy: Partner Firm */}
+                <div>
+                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Legacy Partner Firm</label>
                   <select
                     value={selectedClaim?.partner_firm_id || ""}
                     onChange={async (e) => {
@@ -639,8 +711,6 @@ const AdminClaims = () => {
                       setAssigningPartner(true);
                       try {
                         await supabase.from("claims").update({ partner_firm_id: firmId, updated_at: new Date().toISOString() }).eq("id", selectedClaim!.id);
-                        await supabase.from("claim_status_history").insert({ claim_id: selectedClaim!.id, status: selectedClaim!.status, note: firmId ? `Assigned to partner firm` : "Partner firm removed", updated_by: user?.email || "admin" });
-                        await supabase.from("admin_activity_logs").insert({ admin_user_id: user?.id, action: firmId ? "assign_firm" : "unassign_firm", entity_type: "claim", entity_id: selectedClaim!.id, meta: { firm_id: firmId } });
                         setClaims((prev) => prev.map((c) => c.id === selectedClaim!.id ? { ...c, partner_firm_id: firmId } : c));
                         setSelectedClaim((prev) => prev ? { ...prev, partner_firm_id: firmId } : prev);
                         toast.success(firmId ? "Firm assigned" : "Firm removed");
@@ -655,45 +725,6 @@ const AdminClaims = () => {
                       <option key={f.id} value={f.id}>{f.name}</option>
                     ))}
                   </select>
-                </div>
-                {/* Partner User */}
-                <div>
-                  <label className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold">Partner User</label>
-                  <div className="flex items-center gap-2 mt-1">
-                    <select
-                      value={selectedClaim?.partner_id || ""}
-                      onChange={async (e) => {
-                        const partnerId = e.target.value || null;
-                        setAssigningPartner(true);
-                        try {
-                          await supabase.from("claims").update({ partner_id: partnerId, updated_at: new Date().toISOString() }).eq("id", selectedClaim!.id);
-                          await supabase.from("claim_status_history").insert({ claim_id: selectedClaim!.id, status: selectedClaim!.status, note: partnerId ? `Assigned to partner for review` : "Partner unassigned", updated_by: user?.email || "admin" });
-                          await supabase.from("admin_activity_logs").insert({ admin_user_id: user?.id, action: partnerId ? "assign_partner" : "unassign_partner", entity_type: "claim", entity_id: selectedClaim!.id, meta: { partner_id: partnerId } });
-
-                          // Create review task for newly assigned partner
-                          if (partnerId) {
-                            await supabase.from("claim_tasks").insert({ claim_id: selectedClaim!.id, assigned_to_role: "partner", task_type: "review", details: "Review case evidence and documentation" });
-                          }
-
-                          setClaims((prev) => prev.map((c) => c.id === selectedClaim!.id ? { ...c, partner_id: partnerId } : c));
-                          setSelectedClaim((prev) => prev ? { ...prev, partner_id: partnerId } : prev);
-                          toast.success(partnerId ? "Partner assigned" : "Partner removed");
-                        } catch (err) {
-                          toast.error("Failed to assign partner");
-                        } finally {
-                          setAssigningPartner(false);
-                        }
-                      }}
-                      disabled={assigningPartner}
-                      className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm"
-                    >
-                      <option value="">— No partner —</option>
-                      {partnerOptions.map((p) => (
-                        <option key={p.user_id} value={p.user_id}>{p.email}</option>
-                      ))}
-                    </select>
-                    {assigningPartner && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-                  </div>
                 </div>
               </div>
             </div>
