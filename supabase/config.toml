@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.resolve-claim-share-link]
 verify_jwt = false
+
+[functions.generate-sitemap]
+verify_jwt = false
