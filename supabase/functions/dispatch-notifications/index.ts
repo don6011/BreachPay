@@ -79,14 +79,77 @@ function buildEmailHtml(
   }
 
   // scan_complete
-  const subject = `Your BreachPay scan is complete`;
+  if (template === "scan_complete") {
+    const subject = `Your BreachPay scan is complete`;
+    const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
+        <h2>Scan complete</h2>
+        <p>Your scheduled scan finished successfully.</p>
+        ${payload.breaches ? `<p>Exposures found: <strong>${payload.breaches}</strong></p>` : ""}
+        ${payload.score ? `<p>Risk score: <strong>${payload.score}/100</strong></p>` : ""}
+        <p><a href="${appBaseUrl.replace(/\/$/, "")}/dashboard" style="color:#2563eb">Open dashboard →</a></p>
+        ${footer}
+      </div>
+    `;
+    return { subject, html };
+  }
+
+  // claim_submitted
+  if (template === "claim_submitted") {
+    const subject = `Claim submitted: ${settlementName}`;
+    const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
+        <h2>Claim submitted successfully</h2>
+        <p>Your claim for <strong>${settlementName}</strong>${company ? ` — ${company}` : ""} has been submitted and is being processed.</p>
+        ${payout ? `<p>Estimated payout: <strong>$${Number(payout).toFixed(2)}</strong></p>` : ""}
+        <p><a href="${detailsUrl}" style="color:#2563eb">Track your claim →</a></p>
+        ${footer}
+      </div>
+    `;
+    return { subject, html };
+  }
+
+  // claim_approved
+  if (template === "claim_approved") {
+    const subject = `Claim approved: ${settlementName}`;
+    const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
+        <h2>🎉 Your claim has been approved</h2>
+        <p><strong>${settlementName}</strong>${company ? ` — ${company}` : ""}</p>
+        ${payout ? `<p>Estimated payout: <strong>$${Number(payout).toFixed(2)}</strong></p>` : ""}
+        <p>Your payout will be processed according to the settlement timeline.</p>
+        <p><a href="${detailsUrl}" style="color:#2563eb">View claim details →</a></p>
+        ${footer}
+      </div>
+    `;
+    return { subject, html };
+  }
+
+  // claim_paid
+  if (template === "claim_paid") {
+    const finalPayout = payload.final_payout ?? payout;
+    const subject = `Payout processed: ${settlementName}`;
+    const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
+        <h2>💰 Your payout has been processed</h2>
+        <p><strong>${settlementName}</strong>${company ? ` — ${company}` : ""}</p>
+        ${finalPayout ? `<p>Amount: <strong>$${Number(finalPayout).toFixed(2)}</strong></p>` : ""}
+        <p>Funds will appear in your account within 3-5 business days.</p>
+        <p><a href="${appBaseUrl.replace(/\/$/, "")}/wallet" style="color:#2563eb">View wallet →</a></p>
+        ${footer}
+      </div>
+    `;
+    return { subject, html };
+  }
+
+  // fallback: generic claim_update / claim_rejected
+  const subject = `Claim update: ${settlementName}`;
   const html = `
     <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
-      <h2>Scan complete</h2>
-      <p>Your scheduled scan finished successfully.</p>
-      ${payload.breaches ? `<p>Exposures found: <strong>${payload.breaches}</strong></p>` : ""}
-      ${payload.score ? `<p>Risk score: <strong>${payload.score}/100</strong></p>` : ""}
-      <p><a href="${appBaseUrl.replace(/\/$/, "")}/dashboard" style="color:#2563eb">Open dashboard →</a></p>
+      <h2>Claim status update</h2>
+      <p>Your claim for <strong>${settlementName}</strong>${company ? ` — ${company}` : ""} has been updated.</p>
+      <p>New status: <strong>${String(payload.new_status ?? "updated")}</strong></p>
+      <p><a href="${detailsUrl}" style="color:#2563eb">View details →</a></p>
       ${footer}
     </div>
   `;
