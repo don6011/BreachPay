@@ -4,7 +4,7 @@ import { StatCard } from "@/components/StatCard";
 import { StatusPill } from "@/components/StatusPill";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { FileText, Clock, CheckCircle, XCircle, ListTodo, Loader2, AlertTriangle } from "lucide-react";
+import { FileText, Clock, CheckCircle, XCircle, ListTodo, Loader2, AlertTriangle, DollarSign } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 
 interface DeadlineItem {
@@ -16,17 +16,17 @@ interface DeadlineItem {
 
 interface ActivityItem {
   id: string;
-  status: string;
-  note: string | null;
+  action: string;
+  meta: any;
   created_at: string;
-  updated_by: string | null;
-  claim_id: string;
+  claim_id: string | null;
 }
 
 const PartnerDashboard = () => {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
-  const [counts, setCounts] = useState({ total: 0, submitted: 0, under_review: 0, documentation_required: 0, approved: 0, rejected: 0, paid: 0, open_tasks: 0 });
+  const [partnerOrg, setPartnerOrg] = useState<{ id: string; name: string; partner_type: string } | null>(null);
+  const [counts, setCounts] = useState({ total: 0, assigned: 0, in_progress: 0, completed: 0, submitted: 0, under_review: 0, approved: 0, rejected: 0, paid: 0 });
   const [deadlines, setDeadlines] = useState<DeadlineItem[]>([]);
   const [activity, setActivity] = useState<ActivityItem[]>([]);
 
@@ -35,25 +35,30 @@ const PartnerDashboard = () => {
 
     const fetchData = async () => {
       try {
-        const [claimsRes, tasksRes] = await Promise.all([
-          supabase
-            .from("claims")
-            .select("id, status, settlement_id, settlements(name, deadline)")
-            .eq("partner_id", user.id),
-          supabase
-            .from("claim_tasks")
-            .select("id, status, claim_id")
-            .eq("status", "open"),
-        ]);
+        // Get partner org
+        const { data: pu } = await supabase
+          .from("partner_users")
+          .select("partner_id, partners(id, name, partner_type)")
+          .eq("user_id", user.id)
+          .limit(1)
+          .maybeSingle();
 
-        const claims = claimsRes.data || [];
-        const claimIds = claims.map((c: any) => c.id);
+        if (!pu) { setLoading(false); return; }
 
-        // Count tasks for partner's claims only
-        const openTasks = (tasksRes.data || []).filter((t: any) => claimIds.includes(t.claim_id)).length;
+        const partner = (pu as any).partners;
+        setPartnerOrg({ id: partner.id, name: partner.name, partner_type: partner.partner_type });
 
-        const c = { total: claims.length, submitted: 0, under_review: 0, documentation_required: 0, approved: 0, rejected: 0, paid: 0, open_tasks: openTasks };
+        // Get claim assignments for this partner org
+        const { data: assignments } = await supabase
+          .from("claim_assignments")
+          .select("claim_id, assignment_status, claims(id, status, est_payout, settlement_id, settlements(name, deadline, company))")
+          .eq("partner_id", partner.id);
+
+        const claims = (assignments || []).map((a: any) => ({ ...a.claims, assignment_status: a.assignment_status }));
+
+        const c = { total: claims.length, assigned: 0, in_progress: 0, completed: 0, submitted: 0, under_review: 0, approved: 0, rejected: 0, paid: 0 };
         claims.forEach((cl: any) => {
+          if (cl.assignment_status in c) (c as any)[cl.assignment_status]++;
           if (cl.status in c) (c as any)[cl.status]++;
         });
         setCounts(c);
@@ -72,16 +77,15 @@ const PartnerDashboard = () => {
         });
         setDeadlines(Object.values(deadlineMap).sort((a, b) => a.days_left - b.days_left).slice(0, 5));
 
-        // Activity feed
-        if (claimIds.length > 0) {
-          const { data: historyData } = await supabase
-            .from("claim_status_history")
-            .select("id, status, note, created_at, updated_by, claim_id")
-            .in("claim_id", claimIds)
-            .order("created_at", { ascending: false })
-            .limit(10);
-          setActivity((historyData as ActivityItem[]) || []);
-        }
+        // Activity feed from partner_activity_log
+        const { data: activityData } = await supabase
+          .from("partner_activity_log")
+          .select("id, action, meta, created_at, claim_id")
+          .eq("partner_id", partner.id)
+          .order("created_at", { ascending: false })
+          .limit(10);
+
+        setActivity((activityData as ActivityItem[]) || []);
       } catch (error) {
         console.error("Error fetching partner dashboard:", error);
       } finally {
@@ -102,15 +106,18 @@ const PartnerDashboard = () => {
 
   return (
     <div>
-      <PageHeader title="Case Management" subtitle="Overview of assigned cases, tasks, and upcoming deadlines" />
+      <PageHeader
+        title="Case Management"
+        subtitle={partnerOrg ? `${partnerOrg.name} · ${partnerOrg.partner_type === "law_firm" ? "Law Firm" : "Claims Administrator"}` : "Overview of assigned cases"}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 mb-8">
         <StatCard icon={FileText} label="Total Assigned" value={counts.total} variant="teal" />
-        <StatCard icon={ListTodo} label="Open Tasks" value={counts.open_tasks} />
-        <StatCard icon={AlertTriangle} label="Docs Required" value={counts.documentation_required} />
-        <StatCard icon={Clock} label="Under Review" value={counts.under_review} />
+        <StatCard icon={Clock} label="In Progress" value={counts.in_progress} />
+        <StatCard icon={AlertTriangle} label="Under Review" value={counts.under_review} />
         <StatCard icon={CheckCircle} label="Approved" value={counts.approved} variant="teal" />
         <StatCard icon={XCircle} label="Rejected" value={counts.rejected} />
+        <StatCard icon={DollarSign} label="Paid" value={counts.paid} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -158,14 +165,14 @@ const PartnerDashboard = () => {
             ) : (
               activity.map((a) => (
                 <div key={a.id} className="px-4 py-3 flex items-start gap-3">
-                  <StatusPill variant={a.status as any} />
                   <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{a.action.replace(/_/g, " ")}</p>
                     <p className="text-xs text-muted-foreground truncate">
-                      Case {a.claim_id.slice(0, 8)}… — {a.note || `Status changed to ${a.status}`}
+                      {a.claim_id ? `Case ${a.claim_id.slice(0, 8)}…` : ""}
+                      {a.meta?.notes ? ` — ${a.meta.notes}` : ""}
                     </p>
                     <span className="text-[10px] text-muted-foreground/60">
                       {format(new Date(a.created_at), "MMM d, h:mm a")}
-                      {a.updated_by && ` · ${a.updated_by}`}
                     </span>
                   </div>
                 </div>

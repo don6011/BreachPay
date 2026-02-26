@@ -11,14 +11,28 @@ export const PartnerRoute = ({ children }: { children: React.ReactNode }) => {
     if (!user) return;
 
     const checkPartner = async () => {
+      // Check new partner_users table first, fall back to user_roles
       const { data, error } = await supabase
+        .from("partner_users")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (!error && data) {
+        setIsPartner(true);
+        return;
+      }
+
+      // Fallback: check user_roles for legacy partner role
+      const { data: roleData } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
         .eq("role", "partner")
         .maybeSingle();
 
-      setIsPartner(!error && !!data);
+      setIsPartner(!!roleData);
     };
 
     checkPartner();
@@ -32,13 +46,8 @@ export const PartnerRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (!isPartner) {
-    return <Navigate to="/dashboard" replace />;
-  }
+  if (!user) return <Navigate to="/login" replace />;
+  if (!isPartner) return <Navigate to="/dashboard" replace />;
 
   return <>{children}</>;
 };
