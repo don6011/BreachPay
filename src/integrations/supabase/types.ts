@@ -804,6 +804,53 @@ export type Database = {
           },
         ]
       }
+      claim_review_queue: {
+        Row: {
+          assigned_to: string | null
+          claim_id: string
+          created_at: string | null
+          id: string
+          notes: string | null
+          priority: number | null
+          queue_type: string
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          claim_id: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          priority?: number | null
+          queue_type: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          claim_id?: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          priority?: number | null
+          queue_type?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_review_queue_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       claim_services: {
         Row: {
           amount: number
@@ -1177,6 +1224,56 @@ export type Database = {
             columns: ["settlement_id"]
             isOneToOne: false
             referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_ai_analysis: {
+        Row: {
+          analysis_model: string | null
+          completeness_score: number | null
+          confidence_score: number | null
+          created_at: string | null
+          doc_type_detected: string | null
+          document_id: string
+          extracted_text: Json | null
+          fraud_flag: boolean | null
+          fraud_reasons: string[] | null
+          id: string
+          name_match_score: number | null
+        }
+        Insert: {
+          analysis_model?: string | null
+          completeness_score?: number | null
+          confidence_score?: number | null
+          created_at?: string | null
+          doc_type_detected?: string | null
+          document_id: string
+          extracted_text?: Json | null
+          fraud_flag?: boolean | null
+          fraud_reasons?: string[] | null
+          id?: string
+          name_match_score?: number | null
+        }
+        Update: {
+          analysis_model?: string | null
+          completeness_score?: number | null
+          confidence_score?: number | null
+          created_at?: string | null
+          doc_type_detected?: string | null
+          document_id?: string
+          extracted_text?: Json | null
+          fraud_flag?: boolean | null
+          fraud_reasons?: string[] | null
+          id?: string
+          name_match_score?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_ai_analysis_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "claim_documents"
             referencedColumns: ["id"]
           },
         ]
@@ -1567,6 +1664,50 @@ export type Database = {
             columns: ["firm_id"]
             isOneToOne: false
             referencedRelation: "partner_firms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partner_sla_metrics: {
+        Row: {
+          avg_processing_time_hours: number | null
+          claims_breached_sla: number | null
+          claims_processed: number | null
+          created_at: string | null
+          id: string
+          partner_id: string
+          period_end: string
+          period_start: string
+          sla_target_hours: number | null
+        }
+        Insert: {
+          avg_processing_time_hours?: number | null
+          claims_breached_sla?: number | null
+          claims_processed?: number | null
+          created_at?: string | null
+          id?: string
+          partner_id: string
+          period_end: string
+          period_start: string
+          sla_target_hours?: number | null
+        }
+        Update: {
+          avg_processing_time_hours?: number | null
+          claims_breached_sla?: number | null
+          claims_processed?: number | null
+          created_at?: string | null
+          id?: string
+          partner_id?: string
+          period_end?: string
+          period_start?: string
+          sla_target_hours?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_sla_metrics_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
             referencedColumns: ["id"]
           },
         ]
@@ -2316,6 +2457,107 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      support_ticket_messages: {
+        Row: {
+          created_at: string | null
+          id: string
+          message: string
+          sender_type: string
+          ticket_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message: string
+          sender_type?: string
+          ticket_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message?: string
+          sender_type?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_ticket_messages_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_tickets: {
+        Row: {
+          ai_resolved: boolean | null
+          ai_response: string | null
+          assigned_to: string | null
+          category: string | null
+          created_at: string | null
+          id: string
+          message: string | null
+          priority: number | null
+          related_claim_id: string | null
+          related_settlement_id: string | null
+          resolved_at: string | null
+          status: string | null
+          subject: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          ai_resolved?: boolean | null
+          ai_response?: string | null
+          assigned_to?: string | null
+          category?: string | null
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          priority?: number | null
+          related_claim_id?: string | null
+          related_settlement_id?: string | null
+          resolved_at?: string | null
+          status?: string | null
+          subject: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          ai_resolved?: boolean | null
+          ai_response?: string | null
+          assigned_to?: string | null
+          category?: string | null
+          created_at?: string | null
+          id?: string
+          message?: string | null
+          priority?: number | null
+          related_claim_id?: string | null
+          related_settlement_id?: string | null
+          resolved_at?: string | null
+          status?: string | null
+          subject?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_related_claim_id_fkey"
+            columns: ["related_claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_related_settlement_id_fkey"
+            columns: ["related_settlement_id"]
+            isOneToOne: false
+            referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       upsell_clicks: {
         Row: {

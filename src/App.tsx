@@ -41,6 +41,7 @@ import AdminCron from "./pages/admin/AdminCron";
 import AdminDocuments from "./pages/admin/AdminDocuments";
 import AdminNotifications from "./pages/admin/AdminNotifications";
 import AdminInvoices from "./pages/admin/AdminInvoices";
+import AdminOpsConsole from "./pages/admin/AdminOpsConsole";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import PartnerClaims from "./pages/partner/PartnerClaims";
 import PartnerClaimDetail from "./pages/partner/PartnerClaimDetail";
@@ -50,6 +51,8 @@ import PartnerIntake from "./pages/partner/PartnerIntake";
 import PartnerRevenue from "./pages/partner/PartnerRevenue";
 import PartnerIntegrations from "./pages/partner/PartnerIntegrations";
 import PartnerApiAccess from "./pages/partner/PartnerApiAccess";
+import PartnerSLA from "./pages/partner/PartnerSLA";
+import Support from "./pages/Support";
 import NotFound from "./pages/NotFound";
 import ShareClaim from "./pages/ShareClaim";
 import SettlementPublic from "./pages/SettlementPublic";
@@ -91,6 +94,7 @@ const App = () => {
               <Route path="/wallet" element={<Wallet />} />
               <Route path="/payouts" element={<Payouts />} />
               <Route path="/vault" element={<Vault />} />
+              <Route path="/support" element={<Support />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
 
@@ -109,6 +113,7 @@ const App = () => {
               <Route path="/admin/documents" element={<AdminDocuments />} />
               <Route path="/admin/notifications" element={<AdminNotifications />} />
               <Route path="/admin/invoices" element={<AdminInvoices />} />
+              <Route path="/admin/ops" element={<AdminOpsConsole />} />
             </Route>
 
             {/* Partner Portal - Protected */}
@@ -121,6 +126,7 @@ const App = () => {
               <Route path="/partner/revenue" element={<PartnerRevenue />} />
               <Route path="/partner/integrations" element={<PartnerIntegrations />} />
               <Route path="/partner/api" element={<PartnerApiAccess />} />
+              <Route path="/partner/sla" element={<PartnerSLA />} />
               <Route path="/partner/settings" element={<PartnerSettings />} />
             </Route>
 

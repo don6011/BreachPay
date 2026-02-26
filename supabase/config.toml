@@ -41,3 +41,9 @@ verify_jwt = false
 
 [functions.enterprise-api]
 verify_jwt = false
+
+[functions.ai-document-review]
+verify_jwt = false
+
+[functions.ai-support]
+verify_jwt = false
