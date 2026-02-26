@@ -706,6 +706,11 @@ const AdminClaims = () => {
                               { onConflict: "claim_id,partner_id" }
                             );
                             if (error) throw error;
+                            // Create referral with deterministic amount_expected at assignment time
+                            await supabase.from("referrals").upsert(
+                              { claim_id: selectedClaim!.id, partner_id: orgId, model: "cpa", amount_expected: 5, status: "pending" },
+                              { onConflict: "claim_id,partner_id" }
+                            );
                           } else if (claimPartnerOrgId) {
                             // Remove assignment
                             await supabase.from("claim_assignments").delete().eq("claim_id", selectedClaim!.id).eq("partner_id", claimPartnerOrgId);
