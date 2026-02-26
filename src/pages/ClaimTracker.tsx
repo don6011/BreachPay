@@ -10,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowLeft, FileText, Clock, DollarSign,
-  AlertTriangle, Shield, Loader2, ExternalLink, MessageSquare, Info, Download, FilePlus, Upload,
+  AlertTriangle, Shield, Loader2, ExternalLink, MessageSquare, Info, Download, FilePlus, Upload, Link2, Copy, Check,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
@@ -86,6 +86,9 @@ const ClaimTracker = () => {
   const [partnerNotes, setPartnerNotes] = useState<PartnerNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [generatingPacket, setGeneratingPacket] = useState(false);
+  const [creatingShare, setCreatingShare] = useState(false);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const handleGeneratePacket = async () => {
     if (!claimId) return;
@@ -105,6 +108,35 @@ const ClaimTracker = () => {
     } finally {
       setGeneratingPacket(false);
     }
+  };
+
+  const handleCreateShareLink = async () => {
+    if (!claimId) return;
+    setCreatingShare(true);
+    try {
+      const { data, error } = await supabase.rpc("rpc_create_packet_share", {
+        p_claim_id: claimId,
+        p_hours: 72,
+      });
+      if (error) throw error;
+      const result = data as any;
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "zmjikithlaxeldvsmklz";
+      const url = `https://${projectId}.supabase.co/functions/v1/share-claim-packet?token=${result.token}`;
+      setShareUrl(url);
+      toast({ title: "Share Link Created", description: "Link expires in 72 hours." });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || "Failed to create share link", variant: "destructive" });
+    } finally {
+      setCreatingShare(false);
+    }
+  };
+
+  const handleCopyShare = async () => {
+    if (!shareUrl) return;
+    await navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast({ title: "Copied to clipboard" });
   };
 
   useEffect(() => {
@@ -224,11 +256,28 @@ const ClaimTracker = () => {
         </Button>
 
         {claim.status !== "draft" && (
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2 flex-wrap">
             <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={handleGeneratePacket} disabled={generatingPacket}>
               {generatingPacket ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               Generate Claim Packet
             </Button>
+            <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={handleCreateShareLink} disabled={creatingShare}>
+              {creatingShare ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+              Create Share Link
+            </Button>
+          </div>
+        )}
+
+        {shareUrl && (
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2">
+            <p className="text-xs font-semibold text-primary">Share Link (expires in 72 hours)</p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-xs bg-muted rounded-lg px-3 py-2 truncate">{shareUrl}</code>
+              <Button size="sm" variant="outline" className="rounded-xl shrink-0" onClick={handleCopyShare}>
+                {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+              </Button>
+            </div>
+            <p className="text-[10px] text-muted-foreground">Anyone with this link can view the claim packet. Do not share with unauthorized parties.</p>
           </div>
         )}
         {claim.status === "draft" && claim.settlement && (
