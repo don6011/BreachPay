@@ -371,6 +371,64 @@ export type Database = {
           },
         ]
       }
+      claim_doc_requests: {
+        Row: {
+          claim_id: string
+          created_at: string
+          fulfilled_at: string | null
+          id: string
+          message: string | null
+          partner_id: string
+          partner_user_id: string | null
+          request_type: string
+          status: string
+        }
+        Insert: {
+          claim_id: string
+          created_at?: string
+          fulfilled_at?: string | null
+          id?: string
+          message?: string | null
+          partner_id: string
+          partner_user_id?: string | null
+          request_type: string
+          status?: string
+        }
+        Update: {
+          claim_id?: string
+          created_at?: string
+          fulfilled_at?: string | null
+          id?: string
+          message?: string | null
+          partner_id?: string
+          partner_user_id?: string | null
+          request_type?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_doc_requests_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "claim_doc_requests_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "claim_doc_requests_partner_user_id_fkey"
+            columns: ["partner_user_id"]
+            isOneToOne: false
+            referencedRelation: "partner_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       claim_documents: {
         Row: {
           admin_notes: string | null
@@ -449,6 +507,8 @@ export type Database = {
           id: string
           note: string
           partner_id: string
+          partner_user_id: string | null
+          visibility: string
         }
         Insert: {
           claim_id: string
@@ -456,6 +516,8 @@ export type Database = {
           id?: string
           note: string
           partner_id: string
+          partner_user_id?: string | null
+          visibility?: string
         }
         Update: {
           claim_id?: string
@@ -463,6 +525,8 @@ export type Database = {
           id?: string
           note?: string
           partner_id?: string
+          partner_user_id?: string | null
+          visibility?: string
         }
         Relationships: [
           {
@@ -470,6 +534,13 @@ export type Database = {
             columns: ["claim_id"]
             isOneToOne: false
             referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "claim_partner_notes_partner_user_id_fkey"
+            columns: ["partner_user_id"]
+            isOneToOne: false
+            referencedRelation: "partner_users"
             referencedColumns: ["id"]
           },
         ]
@@ -1777,9 +1848,17 @@ export type Database = {
       proc_cron_scan_jobs: { Args: { max_jobs?: number }; Returns: Json }
       proc_enqueue_due_jobs: { Args: { max_jobs?: number }; Returns: number }
       proc_run_scheduled_jobs: { Args: { max_jobs?: number }; Returns: number }
+      rpc_partner_add_claim_note: {
+        Args: { p_claim_id: string; p_note: string; p_visibility?: string }
+        Returns: undefined
+      }
       rpc_partner_add_note: {
         Args: { p_claim_id: string; p_note: string }
         Returns: string
+      }
+      rpc_partner_request_document: {
+        Args: { p_claim_id: string; p_message?: string; p_request_type: string }
+        Returns: undefined
       }
       rpc_partner_update_assignment: {
         Args: { p_claim_id: string; p_notes?: string; p_status: string }
