@@ -93,6 +93,8 @@ const AdminClaims = () => {
   const [updating, setUpdating] = useState(false);
 
   const [payoutActual, setPayoutActual] = useState("");
+  const [payoutMethod, setPayoutMethod] = useState("unknown");
+  const [payoutRef, setPayoutRef] = useState("");
   const [initiatingPayout, setInitiatingPayout] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
 
@@ -210,6 +212,8 @@ const AdminClaims = () => {
     setNewStatus(claim.status as ClaimStatusT);
     setNote("");
     setPayoutActual("");
+    setPayoutMethod("unknown");
+    setPayoutRef("");
     setLoadingDocs(true);
     setLoadingEvidence(true);
     setLoadingApplication(true);
@@ -292,38 +296,41 @@ const AdminClaims = () => {
     if (!selectedClaim || !newStatus) return;
     setUpdating(true);
     try {
-      // If marking as paid, use the simulate-payout edge function
+      // If marking as paid, use the rpc_admin_mark_claim_paid RPC
       if (newStatus === "paid") {
-        // First update payout amounts if provided
-        if (payoutActual) {
-          const actual = parseFloat(payoutActual);
-          if (!isNaN(actual) && actual > 0) {
-            const fee = Math.round(actual * (FEE_PERCENT / 100) * 100) / 100;
-            const net = Math.round((actual - fee) * 100) / 100;
-            await supabase.from("claims").update({
-              final_payout: actual,
-              platform_fee: fee,
-              net_payout: net,
-              updated_at: new Date().toISOString(),
-            }).eq("id", selectedClaim.id);
-          }
+        const actual = parseFloat(payoutActual);
+        if (isNaN(actual) || actual <= 0) {
+          toast.error("Enter a valid payout amount");
+          setUpdating(false);
+          return;
         }
 
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const { data: { session } } = await supabase.auth.getSession();
-        const response = await fetch(`${supabaseUrl}/functions/v1/simulate-payout`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session?.access_token || ""}`,
-          },
-          body: JSON.stringify({ claim_id: selectedClaim.id }),
+        const { error: rpcError } = await supabase.rpc("rpc_admin_mark_claim_paid", {
+          p_claim_id: selectedClaim.id,
+          p_amount: actual,
+          p_method: payoutMethod || "unknown",
+          p_external_ref: payoutRef || null,
         });
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.error || "Payout failed");
+        if (rpcError) throw rpcError;
 
-        toast.success(`Payout processed — Ref: ${result.stripe_ref}`);
+        // Also log in claim_status_history
+        await supabase.from("claim_status_history").insert({
+          claim_id: selectedClaim.id,
+          status: "paid",
+          note: `Paid $${actual.toLocaleString()} via ${payoutMethod}${payoutRef ? ` (Ref: ${payoutRef})` : ""}`,
+          updated_by: user?.email || "admin",
+        });
+
+        await supabase.from("admin_activity_logs").insert({
+          admin_user_id: user?.id,
+          action: "claim_paid",
+          entity_type: "claim",
+          entity_id: selectedClaim.id,
+          meta: { amount: actual, method: payoutMethod, external_ref: payoutRef || null },
+        });
+
+        toast.success(`Claim marked paid — $${actual.toLocaleString()} via ${payoutMethod}`);
         setClaims(claims.map(c =>
           c.id === selectedClaim.id ? { ...c, status: "paid", updated_at: new Date().toISOString() } : c
         ));
@@ -933,40 +940,7 @@ const AdminClaims = () => {
               )}
             </div>
 
-            {/* Payout Actions */}
-            {selectedClaim?.status === "approved" && (
-              <div className="border-t pt-4">
-                <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                  <DollarSign className="h-4 w-4" /> Payout Actions
-                </h4>
-                <Button
-                  className="w-full"
-                  disabled={initiatingPayout}
-                  onClick={async () => {
-                    setInitiatingPayout(true);
-                    try {
-                      const { data: { session } } = await supabase.auth.getSession();
-                      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/simulate-payout`, {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token || ""}` },
-                        body: JSON.stringify({ claim_id: selectedClaim.id, action: "initiate" }),
-                      });
-                      const result = await res.json();
-                      if (!res.ok) throw new Error(result.error || "Failed");
-                      toast.success(`Payout initiated — Ref: ${result.stripe_ref}`);
-                      fetchClaims();
-                      setSelectedClaim(null);
-                    } catch (err: any) {
-                      toast.error(err.message);
-                    } finally {
-                      setInitiatingPayout(false);
-                    }
-                  }}
-                >
-                  {initiatingPayout ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Initiating...</> : <><DollarSign className="mr-2 h-4 w-4" />Initiate Payout</>}
-                </Button>
-              </div>
-            )}
+            {/* Mark Paid section removed — now handled via status dropdown + RPC */}
 
 
             <div className="border-t pt-4 space-y-3">
@@ -991,9 +965,28 @@ const AdminClaims = () => {
                     Payout Processing
                   </div>
                   <div>
-                    <Label className="mb-1.5">Actual Payout Amount ($)</Label>
+                    <Label className="mb-1.5">Payout Amount ($)</Label>
                     <Input type="number" placeholder="0.00" value={payoutActual} onChange={(e) => setPayoutActual(e.target.value)} min="0" step="0.01" />
                   </div>
+                  {newStatus === "paid" && (
+                    <>
+                      <div>
+                        <Label className="mb-1.5">Payment Method</Label>
+                        <select value={payoutMethod} onChange={(e) => setPayoutMethod(e.target.value)}
+                          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm">
+                          <option value="unknown">Unknown</option>
+                          <option value="check">Check</option>
+                          <option value="ach">ACH</option>
+                          <option value="paypal">PayPal</option>
+                          <option value="gift_card">Gift Card</option>
+                        </select>
+                      </div>
+                      <div>
+                        <Label className="mb-1.5">External Reference (optional)</Label>
+                        <Input placeholder="Check #, transaction ID, etc." value={payoutRef} onChange={(e) => setPayoutRef(e.target.value)} />
+                      </div>
+                    </>
+                  )}
                   {payoutActual && parseFloat(payoutActual) > 0 && (
                     <div className="grid grid-cols-3 gap-2 text-center">
                       <div className="rounded-lg bg-background p-2">
