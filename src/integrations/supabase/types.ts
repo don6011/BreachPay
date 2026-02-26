@@ -360,6 +360,7 @@ export type Database = {
           certifications_signed: boolean | null
           claim_id: string
           created_at: string | null
+          disclaimer_accepted_at: string | null
           documentation_available: boolean | null
           eligibility_answers: Json | null
           email: string | null
@@ -374,6 +375,7 @@ export type Database = {
           certifications_signed?: boolean | null
           claim_id: string
           created_at?: string | null
+          disclaimer_accepted_at?: string | null
           documentation_available?: boolean | null
           eligibility_answers?: Json | null
           email?: string | null
@@ -388,6 +390,7 @@ export type Database = {
           certifications_signed?: boolean | null
           claim_id?: string
           created_at?: string | null
+          disclaimer_accepted_at?: string | null
           documentation_available?: boolean | null
           eligibility_answers?: Json | null
           email?: string | null
@@ -1015,6 +1018,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      data_deletion_requests: {
+        Row: {
+          id: string
+          notes: string | null
+          processed_at: string | null
+          processed_by: string | null
+          reason: string | null
+          requested_at: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          reason?: string | null
+          requested_at?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          notes?: string | null
+          processed_at?: string | null
+          processed_by?: string | null
+          reason?: string | null
+          requested_at?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       deadline_alerts_sent: {
         Row: {
