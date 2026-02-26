@@ -69,7 +69,7 @@ const AdminAnalytics = () => {
   const [pendingClaimsCount, setPendingClaimsCount] = useState(0);
 
   // Funnel analytics
-  const [funnel, setFunnel] = useState<FunnelData>({ match_viewed: 0, claim_started: 0, claim_submitted: 0, start_rate_pct: 0, submit_rate_pct: 0 });
+  const [funnel, setFunnel] = useState<FunnelData & { scans_completed: number; matches_created: number }>({ match_viewed: 0, claim_started: 0, claim_submitted: 0, start_rate_pct: 0, submit_rate_pct: 0, scans_completed: 0, matches_created: 0 });
   const [dailyScanners, setDailyScanners] = useState<{ day: string; scanner_count: number }[]>([]);
   const [avgTimeToSubmit, setAvgTimeToSubmit] = useState<number | null>(null);
   const [avgTimeToPaid, setAvgTimeToPaid] = useState<number | null>(null);
@@ -119,7 +119,7 @@ const AdminAnalytics = () => {
       const [funnelRes, scannersRes, ttsRes, ttpRes, auditRes] = await Promise.all([
         supabase.from("product_events")
           .select("event_name")
-          .in("event_name", ["match_viewed", "claim_started", "claim_submitted"]),
+          .in("event_name", ["scan_completed", "match_created", "match_viewed", "claim_started", "claim_submitted"]),
         supabase.from("product_events")
           .select("user_id, created_at")
           .eq("event_name", "scan_started")
@@ -143,10 +143,14 @@ const AdminAnalytics = () => {
 
       if (funnelRes.data) {
         const events = funnelRes.data as any[];
+        const sc = events.filter(e => e.event_name === "scan_completed").length;
+        const mc = events.filter(e => e.event_name === "match_created").length;
         const mv = events.filter(e => e.event_name === "match_viewed").length;
         const cs = events.filter(e => e.event_name === "claim_started").length;
         const csub = events.filter(e => e.event_name === "claim_submitted").length;
         setFunnel({
+          scans_completed: sc,
+          matches_created: mc,
           match_viewed: mv,
           claim_started: cs,
           claim_submitted: csub,
@@ -252,9 +256,12 @@ const AdminAnalytics = () => {
   ];
 
   const funnelChartData = [
+    { name: "Scans Done", value: funnel.scans_completed },
+    { name: "Matches Created", value: funnel.matches_created },
     { name: "Matches Viewed", value: funnel.match_viewed },
     { name: "Claims Started", value: funnel.claim_started },
     { name: "Claims Submitted", value: funnel.claim_submitted },
+    { name: "Paid", value: paidClaimsCount },
   ];
 
   return (
@@ -280,10 +287,15 @@ const AdminAnalytics = () => {
           <Activity className="h-4 w-4 text-primary" />
           <h2 className="text-lg font-semibold">Conversion Funnel</h2>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5 mb-4">
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-4">
+          <StatCard icon={Shield} label="Scans Completed" value={funnel.scans_completed} />
+          <StatCard icon={Target} label="Matches Created" value={funnel.matches_created} />
           <StatCard icon={BarChart3} label="Matches Viewed" value={funnel.match_viewed} />
           <StatCard icon={FileText} label="Claims Started" value={funnel.claim_started} />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-4">
           <StatCard icon={Shield} label="Claims Submitted" value={funnel.claim_submitted} />
+          <StatCard icon={DollarSign} label="Paid" value={paidClaimsCount} variant="teal" />
           <StatCard icon={TrendingUp} label="Start Rate" value={`${funnel.start_rate_pct}%`} variant="teal" />
           <StatCard icon={TrendingUp} label="Submit Rate" value={`${funnel.submit_rate_pct}%`} variant="teal" />
         </div>

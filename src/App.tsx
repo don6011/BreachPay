@@ -44,6 +44,7 @@ import AdminInvoices from "./pages/admin/AdminInvoices";
 import PartnerDashboard from "./pages/partner/PartnerDashboard";
 import PartnerClaims from "./pages/partner/PartnerClaims";
 import PartnerClaimDetail from "./pages/partner/PartnerClaimDetail";
+import PartnerReporting from "./pages/partner/PartnerReporting";
 import PartnerSettings from "./pages/partner/PartnerSettings";
 import NotFound from "./pages/NotFound";
 import ShareClaim from "./pages/ShareClaim";
@@ -106,6 +107,7 @@ const App = () => {
               <Route path="/partner" element={<PartnerDashboard />} />
               <Route path="/partner/claims" element={<PartnerClaims />} />
               <Route path="/partner/claims/:id" element={<PartnerClaimDetail />} />
+              <Route path="/partner/reporting" element={<PartnerReporting />} />
               <Route path="/partner/settings" element={<PartnerSettings />} />
             </Route>
 

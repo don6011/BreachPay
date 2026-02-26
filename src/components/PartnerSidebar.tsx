@@ -1,4 +1,4 @@
-import { BarChart3, FileText, Settings, ArrowLeft, ListTodo } from "lucide-react";
+import { BarChart3, FileText, Settings, ArrowLeft, ListTodo, TrendingUp } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/logo.png";
@@ -6,6 +6,7 @@ import logo from "@/assets/logo.png";
 const partnerNav = [
   { title: "Dashboard", url: "/partner", icon: BarChart3 },
   { title: "Cases", url: "/partner/claims", icon: FileText },
+  { title: "Reports", url: "/partner/reporting", icon: TrendingUp },
   { title: "Settings", url: "/partner/settings", icon: Settings },
 ];
 
