@@ -957,6 +957,8 @@ export type Database = {
       }
       settlement_matches: {
         Row: {
+          confidence_level: string
+          confidence_score: number
           created_at: string
           id: string
           match_reason: string | null
@@ -967,6 +969,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          confidence_level?: string
+          confidence_score?: number
           created_at?: string
           id?: string
           match_reason?: string | null
@@ -977,6 +981,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          confidence_level?: string
+          confidence_score?: number
           created_at?: string
           id?: string
           match_reason?: string | null

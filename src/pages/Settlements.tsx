@@ -46,6 +46,8 @@ interface SettlementData {
   description: string | null;
   match_reason: string | null;
   payout_estimate: number | null;
+  confidence_score: number;
+  confidence_level: string;
   verified: boolean;
   verification_level: string;
   jurisdiction: string | null;
@@ -83,7 +85,7 @@ const Settlements = () => {
       try {
         const { data: matchData } = await supabase
           .from("settlement_matches")
-          .select("settlement_id, match_reason, payout_estimate, settlements(id, name, company, breach_year, status, payout_min, payout_max, deadline, description, verified, verification_level, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, claim_deadline, source_url)")
+          .select("settlement_id, match_reason, payout_estimate, confidence_score, confidence_level, settlements(id, name, company, breach_year, status, payout_min, payout_max, deadline, description, verified, verification_level, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, claim_deadline, source_url)")
           .eq("user_id", user.id);
 
         if (matchData) {
@@ -99,6 +101,8 @@ const Settlements = () => {
             description: m.settlements?.description,
             match_reason: m.match_reason,
             payout_estimate: m.payout_estimate ? Number(m.payout_estimate) : null,
+            confidence_score: m.confidence_score ?? 50,
+            confidence_level: m.confidence_level || "medium",
             verified: m.settlements?.verified || false,
             verification_level: m.settlements?.verification_level || "unverified",
             jurisdiction: m.settlements?.jurisdiction,
@@ -469,9 +473,14 @@ const Settlements = () => {
                         <Link to={`/claims/${claimMap[settlement.id]?.id}`}>Track Claim</Link>
                       </Button>
                     ) : null}
-                    {settlement.match_reason && (
-                      <span className="text-xs text-muted-foreground ml-auto">
-                        Matched via: <span className="text-primary">{settlement.match_reason}</span>
+                    {settlement.confidence_level && (
+                      <span className={`inline-flex items-center gap-1 text-xs font-medium ml-auto rounded-full px-2 py-0.5 ${
+                        settlement.confidence_level === "strong" ? "bg-success/10 text-success" :
+                        settlement.confidence_level === "medium" ? "bg-warning/10 text-warning" :
+                        "bg-muted text-muted-foreground"
+                      }`}>
+                        <Target className="h-2.5 w-2.5" />
+                        {settlement.confidence_score}% {settlement.confidence_level} match
                       </span>
                     )}
                   </div>
