@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Download, Flag, Edit2, FileText, CheckCircle, ExternalLink, Shield, Loader2, DollarSign, Filter, User, Building, Calendar, UserCheck } from "lucide-react";
+import { Download, Flag, Edit2, FileText, CheckCircle, ExternalLink, Shield, Loader2, DollarSign, Filter, User, Building, Calendar, UserCheck, Link2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 type ClaimStatusT = "draft" | "submitted" | "under_review" | "documentation_required" | "approved" | "rejected" | "paid";
@@ -99,6 +99,10 @@ const AdminClaims = () => {
   const [docs, setDocs] = useState<ClaimDoc[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
+
+  const [claimPackets, setClaimPackets] = useState<{ id: string; generated_at: string; pdf_file_name: string | null; status: string }[]>([]);
+  const [claimShareLinks, setClaimShareLinks] = useState<{ id: string; scope: string; expires_at: string; revoked_at: string | null; access_count: number; created_at: string; last_accessed_at: string | null }[]>([]);
+  const [revokingLinkId, setRevokingLinkId] = useState<string | null>(null);
 
   const [partnerOptions, setPartnerOptions] = useState<PartnerOption[]>([]);
   const [firmOptions, setFirmOptions] = useState<FirmOption[]>([]);
@@ -213,7 +217,7 @@ const AdminClaims = () => {
     setClaimApplication(null);
     setClaimPartnerOrgId(null);
 
-    const [docsRes, evidenceRes, appRes, assignmentRes, pNotesRes, pDocReqRes] = await Promise.all([
+    const [docsRes, evidenceRes, appRes, assignmentRes, pNotesRes, pDocReqRes, packetsRes, shareLinksRes] = await Promise.all([
       supabase
         .from("claim_documents")
         .select("id, file_path, file_type, note, created_at, verified")
@@ -245,6 +249,18 @@ const AdminClaims = () => {
         .select("id, request_type, message, status, created_at, fulfilled_at")
         .eq("claim_id", claim.id)
         .order("created_at", { ascending: false }),
+      supabase
+        .from("claim_packets")
+        .select("id, generated_at, pdf_file_name, status")
+        .eq("claim_id", claim.id)
+        .order("generated_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("claim_share_links")
+        .select("id, scope, expires_at, revoked_at, access_count, created_at, last_accessed_at")
+        .eq("claim_id", claim.id)
+        .order("created_at", { ascending: false })
+        .limit(20),
     ]);
 
     setDocs((docsRes.data as ClaimDoc[]) || []);
@@ -268,6 +284,8 @@ const AdminClaims = () => {
     setClaimPartnerOrgId(assignmentRes.data?.partner_id || null);
     setPartnerNotes((pNotesRes.data as any[]) || []);
     setPartnerDocRequests((pDocReqRes.data as any[]) || []);
+    setClaimPackets((packetsRes.data as any[]) || []);
+    setClaimShareLinks((shareLinksRes.data as any[]) || []);
   };
 
   const handleStatusUpdate = async () => {
@@ -824,6 +842,93 @@ const AdminClaims = () => {
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+
+            {/* Claim Packets */}
+            <div>
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                <FileText className="h-4 w-4" /> Claim Packets ({claimPackets.length})
+              </h4>
+              {claimPackets.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-3 bg-muted/30 rounded-lg">No packets generated</p>
+              ) : (
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {claimPackets.map((p) => (
+                    <div key={p.id} className={`rounded-lg border p-2.5 text-sm flex items-center justify-between ${p.status === "generated" ? "border-success/30 bg-success/5" : "border-destructive/30 bg-destructive/5"}`}>
+                      <div>
+                        <p className="text-xs font-medium">{p.pdf_file_name || "Unnamed"}</p>
+                        <span className="text-[10px] text-muted-foreground">{new Date(p.generated_at).toLocaleString()}</span>
+                      </div>
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${p.status === "generated" ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"}`}>{p.status}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Share Links */}
+            <div>
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                <Link2 className="h-4 w-4" /> Share Links ({claimShareLinks.length})
+              </h4>
+              {claimShareLinks.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-3 bg-muted/30 rounded-lg">No share links created</p>
+              ) : (
+                <div className="space-y-2 max-h-40 overflow-y-auto">
+                  {claimShareLinks.map((link) => {
+                    const isExpired = new Date(link.expires_at) < new Date();
+                    const isRevoked = !!link.revoked_at;
+                    const isActive = !isExpired && !isRevoked;
+                    return (
+                      <div key={link.id} className={`rounded-lg border p-2.5 text-sm ${isActive ? "border-primary/20" : "border-border opacity-60"}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium capitalize">{link.scope.replace(/_/g, " ")}</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                              isRevoked ? "bg-destructive/10 text-destructive" :
+                              isExpired ? "bg-muted text-muted-foreground" :
+                              "bg-primary/10 text-primary"
+                            }`}>
+                              {isRevoked ? "Revoked" : isExpired ? "Expired" : "Active"}
+                            </span>
+                          </div>
+                          {isActive && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-6 text-[10px] text-destructive hover:text-destructive px-2"
+                              disabled={revokingLinkId === link.id}
+                              onClick={async () => {
+                                setRevokingLinkId(link.id);
+                                try {
+                                  const { error } = await supabase
+                                    .from("claim_share_links")
+                                    .update({ revoked_at: new Date().toISOString() })
+                                    .eq("id", link.id);
+                                  if (error) throw error;
+                                  setClaimShareLinks(prev => prev.map(l => l.id === link.id ? { ...l, revoked_at: new Date().toISOString() } : l));
+                                  toast.success("Share link revoked");
+                                } catch (err: any) {
+                                  toast.error(err.message || "Failed to revoke");
+                                } finally {
+                                  setRevokingLinkId(null);
+                                }
+                              }}
+                            >
+                              {revokingLinkId === link.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><XCircle className="h-3 w-3 mr-0.5" /> Revoke</>}
+                            </Button>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground space-x-3">
+                          <span>Expires: {new Date(link.expires_at).toLocaleString()}</span>
+                          <span>Views: {link.access_count}</span>
+                          {link.last_accessed_at && <span>Last: {new Date(link.last_accessed_at).toLocaleString()}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
