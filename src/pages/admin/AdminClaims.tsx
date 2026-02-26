@@ -3,6 +3,7 @@ import { PageHeader } from "@/components/PageHeader";
 import { StatusPill } from "@/components/StatusPill";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -97,6 +98,7 @@ const AdminClaims = () => {
   const [payoutRef, setPayoutRef] = useState("");
   const [initiatingPayout, setInitiatingPayout] = useState(false);
   const [markingPaid, setMarkingPaid] = useState(false);
+  const [showPayConfirm, setShowPayConfirm] = useState(false);
 
   const [docs, setDocs] = useState<ClaimDoc[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
@@ -1027,7 +1029,18 @@ const AdminClaims = () => {
           <DialogFooter>
             <Button variant="outline" onClick={() => setSelectedClaim(null)}>Cancel</Button>
             <Button
-              onClick={handleStatusUpdate}
+              onClick={() => {
+                if (newStatus === "paid") {
+                  const actual = parseFloat(payoutActual);
+                  if (isNaN(actual) || actual <= 0) {
+                    toast.error("Enter a valid payout amount");
+                    return;
+                  }
+                  setShowPayConfirm(true);
+                } else {
+                  handleStatusUpdate();
+                }
+              }}
               disabled={updating || (newStatus === "rejected" && !note)}
               variant={newStatus === "rejected" ? "destructive" : "default"}
             >
@@ -1036,6 +1049,41 @@ const AdminClaims = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Payout Confirmation Dialog */}
+      <AlertDialog open={showPayConfirm} onOpenChange={setShowPayConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <DollarSign className="h-5 w-5" /> Confirm Payout
+            </AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>You are about to mark this claim as <strong>paid</strong>. This action will:</p>
+                <ul className="list-disc pl-5 space-y-1 text-sm">
+                  <li>Record a <strong>${payoutActual ? parseFloat(payoutActual).toLocaleString(undefined, { minimumFractionDigits: 2 }) : "0.00"}</strong> payout via <strong>{payoutMethod}</strong></li>
+                  <li>Notify the user by email and in-app</li>
+                  <li>Move associated referrals to invoiced status</li>
+                </ul>
+                {payoutRef && <p className="text-xs">External ref: <code className="bg-muted px-1 rounded">{payoutRef}</code></p>}
+                <p className="font-semibold text-destructive text-sm">This cannot be undone.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                setShowPayConfirm(false);
+                handleStatusUpdate();
+              }}
+            >
+              Confirm Payment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
