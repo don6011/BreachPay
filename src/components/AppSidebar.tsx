@@ -2,6 +2,9 @@ import { LayoutDashboard, Search, Scale, FileText, Shield, Settings, LogOut, Shi
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import logo from "@/assets/logo.png";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 const userNav = [
   { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
@@ -18,6 +21,19 @@ const userNav = [
 
 export function AppSidebar() {
   const location = useLocation();
+  const { user, signOut } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "admin")
+      .maybeSingle()
+      .then(({ data }) => setIsAdmin(!!data));
+  }, [user]);
 
   return (
     <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
@@ -47,19 +63,24 @@ export function AppSidebar() {
       </nav>
 
       <div className="border-t border-sidebar-border px-3 py-3 space-y-1">
-        <NavLink
-          to="/admin/analytics"
-          className={cn(
-            "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-            location.pathname.startsWith("/admin")
-              ? "bg-primary/10 text-primary"
-              : "text-sidebar-foreground hover:bg-sidebar-accent"
-          )}
+        {isAdmin && (
+          <NavLink
+            to="/admin/analytics"
+            className={cn(
+              "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+              location.pathname.startsWith("/admin")
+                ? "bg-primary/10 text-primary"
+                : "text-sidebar-foreground hover:bg-sidebar-accent"
+            )}
+          >
+            <ShieldAlert className="h-4 w-4" />
+            Admin Portal
+          </NavLink>
+        )}
+        <button
+          onClick={() => signOut()}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
         >
-          <ShieldAlert className="h-4 w-4" />
-          Admin Portal
-        </NavLink>
-        <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-foreground hover:bg-sidebar-accent transition-colors">
           <LogOut className="h-4 w-4" />
           Log Out
         </button>
