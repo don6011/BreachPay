@@ -14,6 +14,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import { useTrackEvent } from "@/hooks/useTrackEvent";
 import {
   ArrowLeft, ArrowRight, Clock, AlertTriangle, ExternalLink, Shield,
   Scale, FileCheck, Building2, MapPin, Hash,
@@ -23,6 +24,7 @@ const SettlementDetail = () => {
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const track = useTrackEvent();
 
   const [settlement, setSettlement] = useState<any>(null);
   const [claim, setClaim] = useState<any>(null);
@@ -41,6 +43,11 @@ const SettlementDetail = () => {
           .single();
 
         setSettlement(s);
+
+        // Track match_viewed when user opens a settlement detail
+        if (s) {
+          track("match_viewed", { settlement_id: s.id, settlement_name: s.name });
+        }
 
         const { data: c } = await supabase
           .from("claims")
