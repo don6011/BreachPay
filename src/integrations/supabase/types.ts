@@ -273,6 +273,59 @@ export type Database = {
           },
         ]
       }
+      claim_applications: {
+        Row: {
+          address: string | null
+          breach_experience: string | null
+          certifications_signed: boolean | null
+          claim_id: string
+          created_at: string | null
+          documentation_available: boolean | null
+          eligibility_answers: Json | null
+          email: string | null
+          full_name: string | null
+          id: string
+          phone: string | null
+          submitted_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          breach_experience?: string | null
+          certifications_signed?: boolean | null
+          claim_id: string
+          created_at?: string | null
+          documentation_available?: boolean | null
+          eligibility_answers?: Json | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          submitted_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          breach_experience?: string | null
+          certifications_signed?: boolean | null
+          claim_id?: string
+          created_at?: string | null
+          documentation_available?: boolean | null
+          eligibility_answers?: Json | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          submitted_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_applications_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       claim_documents: {
         Row: {
           admin_notes: string | null
@@ -382,6 +435,7 @@ export type Database = {
           created_at: string
           id: string
           note: string | null
+          old_status: string | null
           status: string
           updated_by: string | null
         }
@@ -390,6 +444,7 @@ export type Database = {
           created_at?: string
           id?: string
           note?: string | null
+          old_status?: string | null
           status: string
           updated_by?: string | null
         }
@@ -398,6 +453,7 @@ export type Database = {
           created_at?: string
           id?: string
           note?: string | null
+          old_status?: string | null
           status?: string
           updated_by?: string | null
         }
@@ -455,6 +511,7 @@ export type Database = {
       claims: {
         Row: {
           created_at: string
+          decided_at: string | null
           est_payout: number | null
           fee_percent: number
           filed_at: string | null
@@ -462,7 +519,9 @@ export type Database = {
           flag_reason: string | null
           flagged: boolean
           id: string
+          match_id: string | null
           net_payout: number | null
+          paid_at: string | null
           partner_firm_id: string | null
           partner_id: string | null
           platform_fee: number | null
@@ -474,6 +533,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          decided_at?: string | null
           est_payout?: number | null
           fee_percent?: number
           filed_at?: string | null
@@ -481,7 +541,9 @@ export type Database = {
           flag_reason?: string | null
           flagged?: boolean
           id?: string
+          match_id?: string | null
           net_payout?: number | null
+          paid_at?: string | null
           partner_firm_id?: string | null
           partner_id?: string | null
           platform_fee?: number | null
@@ -493,6 +555,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          decided_at?: string | null
           est_payout?: number | null
           fee_percent?: number
           filed_at?: string | null
@@ -500,7 +563,9 @@ export type Database = {
           flag_reason?: string | null
           flagged?: boolean
           id?: string
+          match_id?: string | null
           net_payout?: number | null
+          paid_at?: string | null
           partner_firm_id?: string | null
           partner_id?: string | null
           platform_fee?: number | null
@@ -511,6 +576,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "claims_match_id_fkey"
+            columns: ["match_id"]
+            isOneToOne: false
+            referencedRelation: "settlement_matches"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "claims_partner_firm_id_fkey"
             columns: ["partner_firm_id"]
@@ -1507,6 +1579,7 @@ export type Database = {
         | "payout_update"
         | "system"
       claim_status_t:
+        | "draft"
         | "submitted"
         | "under_review"
         | "documentation_required"
@@ -1652,6 +1725,7 @@ export const Constants = {
         "system",
       ],
       claim_status_t: [
+        "draft",
         "submitted",
         "under_review",
         "documentation_required",

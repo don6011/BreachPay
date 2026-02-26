@@ -208,46 +208,29 @@ const Settlements = () => {
     if (!user || filingId) return;
     setFilingId(settlement.id);
     try {
+      // Check for existing claim (draft or submitted)
       const { data: existing } = await supabase
         .from("claims")
-        .select("id")
+        .select("id, status")
         .eq("user_id", user.id)
         .eq("settlement_id", settlement.id)
         .maybeSingle();
 
       if (existing) {
-        navigate(`/claims/${existing.id}`);
+        if (existing.status === "draft") {
+          // Resume draft wizard
+          navigate(`/claims/file?settlement=${settlement.id}`);
+        } else {
+          navigate(`/claims/${existing.id}`);
+        }
         return;
       }
 
-      const estPayout = (settlement.payout_min + settlement.payout_max) / 2;
-
-      const { data: claimData, error } = await supabase
-        .from("claims")
-        .insert({
-          user_id: user.id,
-          settlement_id: settlement.id,
-          est_payout: estPayout,
-          filed_at: new Date().toISOString().split("T")[0],
-          status: "submitted",
-        })
-        .select("id")
-        .single();
-
-      if (error) throw error;
-
-      await supabase.from("claim_status_history").insert({
-        claim_id: claimData.id,
-        status: "submitted",
-        note: "Claim submitted",
-        updated_by: "user",
-      });
-
-      toast({ title: "Claim Filed", description: `Your claim for ${settlement.name} has been submitted for review.` });
-      navigate(`/claims/${claimData.id}`);
+      // Navigate to wizard — draft will be created there
+      navigate(`/claims/file?settlement=${settlement.id}`);
     } catch (err) {
       console.error("File claim error:", err);
-      toast({ title: "Error", description: "Failed to file claim. Please try again.", variant: "destructive" });
+      toast({ title: "Error", description: "Failed to start claim. Please try again.", variant: "destructive" });
     } finally {
       setFilingId(null);
     }

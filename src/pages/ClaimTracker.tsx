@@ -16,6 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { toast } from "@/hooks/use-toast";
 
 const PROGRESS_STEPS = [
+  { key: "draft", label: "Draft" },
   { key: "submitted", label: "Submitted" },
   { key: "under_review", label: "Under Review" },
   { key: "approved", label: "Approved" },
@@ -164,6 +165,19 @@ const ClaimTracker = () => {
         <Button variant="ghost" size="sm" onClick={() => navigate("/claims")} className="mb-2">
           <ArrowLeft className="h-4 w-4 mr-1" /> Back to Claims
         </Button>
+
+        {/* Draft: prompt to continue filing */}
+        {claim.status === "draft" && claim.settlement && (
+          <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-semibold text-warning">Draft — Not yet submitted</p>
+              <p className="text-xs text-muted-foreground">Complete the wizard to file this claim.</p>
+            </div>
+            <Button size="sm" className="rounded-xl" onClick={() => navigate(`/claims/file?settlement=${claim.settlement!.id}`)}>
+              Continue Filing <ArrowLeft className="ml-1 h-3 w-3 rotate-180" />
+            </Button>
+          </div>
+        )}
 
         {/* Verified Settlement Callout */}
         {claim.settlement?.verified && (

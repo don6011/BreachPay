@@ -11,10 +11,11 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Download, Flag, Edit2, FileText, CheckCircle, ExternalLink, Shield, Loader2, DollarSign, Filter, User, Building, Calendar, UserCheck } from "lucide-react";
 import { toast } from "sonner";
 
-type ClaimStatusT = "submitted" | "under_review" | "documentation_required" | "approved" | "rejected" | "paid";
+type ClaimStatusT = "draft" | "submitted" | "under_review" | "documentation_required" | "approved" | "rejected" | "paid";
 
 const STATUS_OPTIONS: { value: ClaimStatusT | "all"; label: string }[] = [
   { value: "all", label: "All" },
+  { value: "draft", label: "Draft" },
   { value: "submitted", label: "Submitted" },
   { value: "under_review", label: "Under Review" },
   { value: "documentation_required", label: "Docs Required" },
@@ -98,6 +99,8 @@ const AdminClaims = () => {
   const [assigningPartner, setAssigningPartner] = useState(false);
   const [breachEvidence, setBreachEvidence] = useState<BreachEvidence[]>([]);
   const [loadingEvidence, setLoadingEvidence] = useState(false);
+  const [claimApplication, setClaimApplication] = useState<any>(null);
+  const [loadingApplication, setLoadingApplication] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -189,9 +192,11 @@ const AdminClaims = () => {
     setPayoutActual("");
     setLoadingDocs(true);
     setLoadingEvidence(true);
+    setLoadingApplication(true);
     setBreachEvidence([]);
+    setClaimApplication(null);
 
-    const [docsRes, evidenceRes] = await Promise.all([
+    const [docsRes, evidenceRes, appRes] = await Promise.all([
       supabase
         .from("claim_documents")
         .select("id, file_path, file_type, note, created_at, verified")
@@ -202,6 +207,11 @@ const AdminClaims = () => {
         .select("source, breach_year, risk_level, exposed_fields, breach_catalog(verified, source_type, source_name, source_url)")
         .eq("user_id", claim.user_id)
         .limit(10),
+      supabase
+        .from("claim_applications")
+        .select("*")
+        .eq("claim_id", claim.id)
+        .maybeSingle(),
     ]);
 
     setDocs((docsRes.data as ClaimDoc[]) || []);
@@ -220,6 +230,8 @@ const AdminClaims = () => {
       })));
     }
     setLoadingEvidence(false);
+    setClaimApplication(appRes.data || null);
+    setLoadingApplication(false);
   };
 
   const handleStatusUpdate = async () => {
@@ -501,6 +513,60 @@ const AdminClaims = () => {
                     {selectedClaim.exposed_fields.map((f) => (
                       <span key={f} className="text-[10px] px-2 py-0.5 rounded-full bg-destructive/10 text-destructive font-medium">{f}</span>
                     ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Claim Application Answers */}
+            <div>
+              <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                <FileText className="h-4 w-4" /> Application Answers
+              </h4>
+              {loadingApplication ? (
+                <div className="flex justify-center py-3"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>
+              ) : !claimApplication ? (
+                <p className="text-sm text-muted-foreground text-center py-3 bg-muted/30 rounded-lg">No application data (legacy claim)</p>
+              ) : (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="rounded-lg bg-muted/50 p-2">
+                      <p className="text-[10px] text-muted-foreground uppercase">Name</p>
+                      <p className="font-medium">{claimApplication.full_name || "—"}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/50 p-2">
+                      <p className="text-[10px] text-muted-foreground uppercase">Email</p>
+                      <p className="font-medium truncate">{claimApplication.email || "—"}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/50 p-2">
+                      <p className="text-[10px] text-muted-foreground uppercase">Phone</p>
+                      <p className="font-medium">{claimApplication.phone || "—"}</p>
+                    </div>
+                    <div className="rounded-lg bg-muted/50 p-2">
+                      <p className="text-[10px] text-muted-foreground uppercase">Address</p>
+                      <p className="font-medium">{claimApplication.address || "—"}</p>
+                    </div>
+                  </div>
+                  {claimApplication.eligibility_answers && Object.keys(claimApplication.eligibility_answers).length > 0 && (
+                    <div className="rounded-lg border p-3 space-y-1.5">
+                      <p className="text-[10px] text-muted-foreground uppercase font-semibold">Eligibility Responses</p>
+                      {Object.entries(claimApplication.eligibility_answers).map(([key, value]) => (
+                        <div key={key} className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">{key.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase())}</span>
+                          <span className="font-medium">{typeof value === "boolean" ? (value ? "✅ Yes" : "❌ No") : String(value) || "—"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {claimApplication.breach_experience && (
+                    <div className="rounded-lg bg-muted/50 p-2">
+                      <p className="text-[10px] text-muted-foreground uppercase">Experience Description</p>
+                      <p className="text-sm">{claimApplication.breach_experience}</p>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>Certifications: {claimApplication.certifications_signed ? "✅ Signed" : "❌ Not signed"}</span>
+                    {claimApplication.submitted_at && <span>Submitted: {new Date(claimApplication.submitted_at).toLocaleString()}</span>}
                   </div>
                 </div>
               )}
