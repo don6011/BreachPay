@@ -53,7 +53,7 @@ export function PostClaimShare({ onDismiss }: Props) {
         </Button>
       </div>
       <p className="text-sm text-muted-foreground">
-        Share BreachPay with someone who was affected. Earn $5 for each friend who submits a claim.
+        Know someone affected? They could be owed money too. Earn $5 for each friend who submits a claim.
       </p>
       <div className="flex items-center gap-2">
         <code className="flex-1 text-xs bg-muted rounded-lg px-3 py-2 truncate">{shareUrl}</code>

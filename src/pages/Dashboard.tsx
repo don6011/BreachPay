@@ -129,14 +129,14 @@ const Dashboard = () => {
 
   return (
     <div>
-      <PageHeader title="Dashboard" subtitle="Your breach exposure overview" />
+      <PageHeader title="Dashboard" subtitle="Your compensation overview" />
 
       {/* Estimated Value Hero */}
       {!loading && totalEstimated > 0 && (
         <div className="mb-6 glass-card-glow p-6 text-center">
           <p className="text-sm text-muted-foreground mb-1">You may be eligible for up to</p>
           <p className="text-3xl font-bold gradient-emerald-text">${totalEstimated.toLocaleString()}</p>
-          <p className="text-sm text-muted-foreground mt-1">across {eligibleCount} active settlement{eligibleCount !== 1 ? "s" : ""}</p>
+          <p className="text-sm text-muted-foreground mt-1">in estimated compensation across {eligibleCount} opportunit{eligibleCount !== 1 ? "ies" : "y"}</p>
           <Button className="mt-4 rounded-xl" asChild>
             <Link to="/settlements">View Matches <ArrowRight className="ml-2 h-4 w-4" /></Link>
           </Button>
@@ -156,10 +156,10 @@ const Dashboard = () => {
 
         {/* Stat Cards */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <StatCard icon={ShieldAlert} label="Breaches Detected" value={loading ? "—" : breachCount} variant="teal" />
-          <StatCard icon={Scale} label="Eligible Settlements" value={loading ? "—" : eligibleCount} />
-          <StatCard icon={DollarSign} label="Estimated Value" value={loading ? "—" : `$${totalEstimated.toLocaleString()}`} variant="teal" />
-          <StatCard icon={FileText} label="Claims Filed" value={loading ? "—" : claimsCount} />
+          <StatCard icon={ShieldAlert} label="Exposure Findings" value={loading ? "—" : breachCount} variant="teal" />
+          <StatCard icon={Scale} label="Opportunities" value={loading ? "—" : eligibleCount} />
+          <StatCard icon={DollarSign} label="Estimated Compensation" value={loading ? "—" : `$${totalEstimated.toLocaleString()}`} variant="teal" />
+          <StatCard icon={FileText} label="Money Claims" value={loading ? "—" : claimsCount} />
         </div>
 
         {/* Action Buttons */}

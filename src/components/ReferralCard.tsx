@@ -64,7 +64,7 @@ export function ReferralCard() {
       </div>
 
       <p className="text-sm text-muted-foreground">
-        Others may also be eligible. Share with someone who was affected — earn <span className="text-primary font-medium">$5</span> for each friend who submits a claim.
+        Know someone affected? They could be owed money too. Earn <span className="text-primary font-medium">$5</span> for each friend who submits a claim.
       </p>
 
       <div className="flex items-center gap-2">

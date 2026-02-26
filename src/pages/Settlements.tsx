@@ -96,6 +96,8 @@ const Settlements = () => {
   const [detailSettlement, setDetailSettlement] = useState<SettlementData | null>(null);
   const [showPossible, setShowPossible] = useState(false);
 
+  // Label for weak matches section
+
   useEffect(() => {
     if (!user) return;
 
@@ -373,9 +375,11 @@ const Settlements = () => {
               >
                 {filingId === settlement.id ? (
                   <><span className="h-3 w-3 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent mr-1" /> Filing...</>
-                ) : (
-                  <>File Claim <ArrowRight className="ml-1 h-3 w-3" /></>
-                )}
+                 ) : settlement.confidence_level === "high" ? (
+                  <>Start My Claim <ArrowRight className="ml-1 h-3 w-3" /></>
+                 ) : (
+                  <>Check Eligibility <ArrowRight className="ml-1 h-3 w-3" /></>
+                 )}
               </Button>
             ) : filingStatus !== "not_filed" && filingStatus !== "paid" ? (
               <Button size="sm" variant="outline" asChild className="rounded-xl">
@@ -554,7 +558,7 @@ const Settlements = () => {
         </div>
       )}
 
-      {/* Possible Matches (hidden by default, < 40 confidence) */}
+      {/* Possible Opportunities (hidden by default, < 40 confidence) */}
       {possibleMatches.length > 0 && (
         <div className="mt-6">
           <button
@@ -562,7 +566,7 @@ const Settlements = () => {
             className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
           >
             <ChevronRight className={`h-4 w-4 transition-transform ${showPossible ? "rotate-90" : ""}`} />
-            <span>Possible matches ({possibleMatches.length})</span>
+            <span>Possible Opportunities ({possibleMatches.length})</span>
             <span className="text-xs bg-muted rounded-full px-2 py-0.5">Low confidence</span>
           </button>
           {showPossible && (
