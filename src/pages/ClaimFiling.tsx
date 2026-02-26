@@ -70,6 +70,7 @@ const ClaimFiling = () => {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [createdClaimId, setCreatedClaimId] = useState<string | null>(null);
+  const [draftClaimId, setDraftClaimId] = useState<string | null>(null);
 
   const [identity, setIdentity] = useState({ fullName: "", email: "", phone: "", address: "" });
   const [eligibility, setEligibility] = useState({
@@ -81,8 +82,44 @@ const ClaimFiling = () => {
   const [selectedDocType, setSelectedDocType] = useState(DOC_TYPES[0].label);
 
   useEffect(() => {
-    if (!settlementId) { setLoadingSettlement(false); return; }
+    if (!settlementId || !user) { setLoadingSettlement(false); return; }
     const fetchSettlement = async () => {
+      // Check for existing draft claim
+      const { data: existingClaim } = await supabase
+        .from("claims")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("settlement_id", settlementId)
+        .eq("status", "draft")
+        .maybeSingle();
+
+      if (existingClaim) {
+        setDraftClaimId(existingClaim.id);
+        // Load existing application data
+        const { data: appData } = await supabase
+          .from("claim_applications")
+          .select("*")
+          .eq("claim_id", existingClaim.id)
+          .maybeSingle();
+        if (appData) {
+          setIdentity({
+            fullName: appData.full_name || "",
+            email: appData.email || "",
+            phone: appData.phone || "",
+            address: appData.address || "",
+          });
+          const answers = (appData.eligibility_answers as any) || {};
+          setEligibility({
+            breachImpact: answers.breachImpact || false,
+            financialLoss: answers.financialLoss || false,
+            monitoringPurchase: answers.monitoringPurchase || false,
+            lossAmount: answers.lossAmount || "",
+            monitoringCost: answers.monitoringCost || "",
+            description: appData.breach_experience || "",
+          });
+        }
+      }
+
       const { data } = await supabase
         .from("settlements")
         .select("id, name, company, breach_year, description, payout_min, payout_max, deadline, status, verified, verification_level, claim_deadline, official_source_url, claims_filing_url, administrator_name, source_url")
@@ -106,7 +143,7 @@ const ClaimFiling = () => {
       setLoadingSettlement(false);
     };
     fetchSettlement();
-  }, [settlementId]);
+  }, [settlementId, user]);
 
   useEffect(() => {
     if (user?.email && !identity.email) {
@@ -152,6 +189,56 @@ const ClaimFiling = () => {
     return true;
   }, [step, identity, eligibility, consent]);
 
+  // Create or get draft claim
+  const ensureDraftClaim = async (): Promise<string | null> => {
+    if (draftClaimId) return draftClaimId;
+    if (!user || !settlement) return null;
+
+    const estPayout = (settlement.payout_min + settlement.payout_max) / 2;
+
+    // Find match_id if exists
+    const { data: matchData } = await supabase
+      .from("settlement_matches")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("settlement_id", settlement.id)
+      .maybeSingle();
+
+    const { data: claimData, error } = await supabase.from("claims").insert({
+      user_id: user.id,
+      settlement_id: settlement.id,
+      est_payout: estPayout,
+      status: "draft",
+      match_id: matchData?.id || null,
+    }).select("id").single();
+
+    if (error) {
+      // Might be unique constraint violation — check for existing
+      if (error.code === "23505") {
+        const { data: existing } = await supabase
+          .from("claims")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("settlement_id", settlement.id)
+          .maybeSingle();
+        if (existing) {
+          setDraftClaimId(existing.id);
+          return existing.id;
+        }
+      }
+      throw error;
+    }
+
+    setDraftClaimId(claimData.id);
+
+    // Create claim_applications row
+    await supabase.from("claim_applications").insert({
+      claim_id: claimData.id,
+    });
+
+    return claimData.id;
+  };
+
   const uploadDocuments = async (claimId: string) => {
     if (!user || documents.length === 0) return;
 
@@ -183,13 +270,45 @@ const ClaimFiling = () => {
 
       setDocuments(prev => prev.map((d, idx) => idx === i ? { ...d, uploading: false, uploaded: true, url: filePath } : d));
     }
+  };
 
-    await supabase.from("claim_status_history").insert({
-      claim_id: claimId,
-      status: "submitted",
-      note: `${documents.length} document(s) uploaded`,
-      updated_by: "user",
-    });
+  // Save application data on step transitions
+  const saveApplicationData = async (claimId: string) => {
+    await supabase.from("claim_applications").update({
+      full_name: identity.fullName || null,
+      email: identity.email || null,
+      phone: identity.phone || null,
+      address: identity.address || null,
+      breach_experience: eligibility.description || null,
+      documentation_available: documents.length > 0,
+      eligibility_answers: {
+        breachImpact: eligibility.breachImpact,
+        financialLoss: eligibility.financialLoss,
+        monitoringPurchase: eligibility.monitoringPurchase,
+        lossAmount: eligibility.lossAmount,
+        monitoringCost: eligibility.monitoringCost,
+      },
+    }).eq("claim_id", claimId);
+  };
+
+  // Handle step navigation with auto-save
+  const handleNextStep = async () => {
+    if (step === 0) {
+      // Create draft on "Start My Claim"
+      try {
+        const claimId = await ensureDraftClaim();
+        if (!claimId) return;
+      } catch (err) {
+        toast({ title: "Error", description: "Failed to create draft claim.", variant: "destructive" });
+        return;
+      }
+    }
+
+    if (step >= 1 && draftClaimId) {
+      await saveApplicationData(draftClaimId);
+    }
+
+    setStep(s => s + 1);
   };
 
   const handleSubmit = async () => {
@@ -197,32 +316,44 @@ const ClaimFiling = () => {
     setSubmitting(true);
 
     try {
-      const estPayout = (settlement.payout_min + settlement.payout_max) / 2;
+      let claimId = draftClaimId;
 
-      const { data: claimData, error } = await supabase.from("claims").insert({
-        user_id: user.id,
-        settlement_id: settlement.id,
-        est_payout: estPayout,
-        filed_at: new Date().toISOString().split("T")[0],
+      if (!claimId) {
+        claimId = await ensureDraftClaim();
+        if (!claimId) throw new Error("Failed to create claim");
+      }
+
+      // Save final application data
+      await saveApplicationData(claimId);
+
+      // Mark certifications signed
+      await supabase.from("claim_applications").update({
+        certifications_signed: true,
+        submitted_at: new Date().toISOString(),
+      }).eq("claim_id", claimId);
+
+      // Upload documents
+      if (documents.length > 0) {
+        await uploadDocuments(claimId);
+      }
+
+      // Transition from draft to submitted
+      await supabase.from("claims").update({
         status: "submitted",
-      }).select("id").single();
+        filed_at: new Date().toISOString().split("T")[0],
+        updated_at: new Date().toISOString(),
+      }).eq("id", claimId);
 
-      if (error) throw error;
-
-      const claimId = claimData.id;
-      setCreatedClaimId(claimId);
-
+      // Status history
       await supabase.from("claim_status_history").insert({
         claim_id: claimId,
+        old_status: "draft",
         status: "submitted",
         note: `Claim filed for ${settlement.name}`,
         updated_by: "user",
       });
 
-      if (documents.length > 0) {
-        await uploadDocuments(claimId);
-      }
-
+      setCreatedClaimId(claimId);
       setSubmitted(true);
       toast({ title: "Claim Filed!", description: `Your claim for ${settlement.name} has been submitted.` });
     } catch (error) {
@@ -397,7 +528,7 @@ const ClaimFiling = () => {
               <Button variant="outline" className="flex-1" onClick={() => navigate("/settlements")}>
                 <Bookmark className="h-4 w-4 mr-1" /> Save & Finish Later
               </Button>
-              <Button className="flex-1" onClick={() => setStep(1)}>
+              <Button className="flex-1" onClick={handleNextStep}>
                 Start My Claim <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
@@ -601,7 +732,7 @@ const ClaimFiling = () => {
               <ChevronLeft className="h-4 w-4 mr-1" /> Back
             </Button>
             {step < STEPS.length - 1 ? (
-              <Button onClick={() => setStep((s) => s + 1)} disabled={!canProceed}>
+              <Button onClick={handleNextStep} disabled={!canProceed}>
                 Continue <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             ) : (

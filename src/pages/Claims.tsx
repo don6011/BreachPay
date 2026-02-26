@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import type { ClaimStatus } from "@/types";
 
-const statusSteps: ClaimStatus[] = ["submitted", "under_review", "approved", "paid"];
+const statusSteps: ClaimStatus[] = ["draft", "submitted", "under_review", "approved", "paid"];
 
 interface PayoutData {
   id: string;
