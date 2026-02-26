@@ -963,7 +963,7 @@ export type Database = {
           payout_estimate: number | null
           scan_run_id: string | null
           settlement_id: string
-          status: Database["public"]["Enums"]["settlement_status_t"]
+          status: string
           user_id: string
         }
         Insert: {
@@ -973,7 +973,7 @@ export type Database = {
           payout_estimate?: number | null
           scan_run_id?: string | null
           settlement_id: string
-          status?: Database["public"]["Enums"]["settlement_status_t"]
+          status?: string
           user_id: string
         }
         Update: {
@@ -983,7 +983,7 @@ export type Database = {
           payout_estimate?: number | null
           scan_run_id?: string | null
           settlement_id?: string
-          status?: Database["public"]["Enums"]["settlement_status_t"]
+          status?: string
           user_id?: string
         }
         Relationships: [
@@ -1053,18 +1053,141 @@ export type Database = {
           },
         ]
       }
+      settlement_raw_ingest: {
+        Row: {
+          content_hash: string
+          created_at: string
+          fetched_at: string | null
+          id: string
+          raw_payload: Json
+          raw_url: string | null
+          source_id: string | null
+          source_record_id: string | null
+        }
+        Insert: {
+          content_hash: string
+          created_at?: string
+          fetched_at?: string | null
+          id?: string
+          raw_payload: Json
+          raw_url?: string | null
+          source_id?: string | null
+          source_record_id?: string | null
+        }
+        Update: {
+          content_hash?: string
+          created_at?: string
+          fetched_at?: string | null
+          id?: string
+          raw_payload?: Json
+          raw_url?: string | null
+          source_id?: string | null
+          source_record_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settlement_raw_ingest_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "settlement_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      settlement_sources: {
+        Row: {
+          base_url: string | null
+          created_at: string
+          fetch_strategy: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          reliability_score: number | null
+          type: string
+        }
+        Insert: {
+          base_url?: string | null
+          created_at?: string
+          fetch_strategy?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          reliability_score?: number | null
+          type: string
+        }
+        Update: {
+          base_url?: string | null
+          created_at?: string
+          fetch_strategy?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          reliability_score?: number | null
+          type?: string
+        }
+        Relationships: []
+      }
+      settlement_verification_queue: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          priority: number | null
+          reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          settlement_id: string
+          status: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          priority?: number | null
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          settlement_id: string
+          status?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          priority?: number | null
+          reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          settlement_id?: string
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settlement_verification_queue_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       settlements: {
         Row: {
           administrator_name: string | null
           breach_year: number | null
+          canonical_key: string
           case_number: string | null
+          category: string | null
           claim_deadline: string | null
+          claim_url: string | null
           claims_filing_url: string | null
           company: string
           created_at: string
           created_by: string | null
           deadline: string | null
           description: string | null
+          eligibility_summary: string | null
+          final_approval_date: string | null
           id: string
           jurisdiction: string | null
           last_verified_at: string | null
@@ -1073,10 +1196,11 @@ export type Database = {
           official_source_url: string | null
           payout_max: number | null
           payout_min: number | null
+          source_id: string | null
           source_name: string | null
           source_type: string | null
           source_url: string | null
-          status: Database["public"]["Enums"]["settlement_status_t"]
+          status: string
           tags: string[]
           updated_at: string
           url: string | null
@@ -1087,14 +1211,19 @@ export type Database = {
         Insert: {
           administrator_name?: string | null
           breach_year?: number | null
+          canonical_key: string
           case_number?: string | null
+          category?: string | null
           claim_deadline?: string | null
+          claim_url?: string | null
           claims_filing_url?: string | null
           company: string
           created_at?: string
           created_by?: string | null
           deadline?: string | null
           description?: string | null
+          eligibility_summary?: string | null
+          final_approval_date?: string | null
           id?: string
           jurisdiction?: string | null
           last_verified_at?: string | null
@@ -1103,10 +1232,11 @@ export type Database = {
           official_source_url?: string | null
           payout_max?: number | null
           payout_min?: number | null
+          source_id?: string | null
           source_name?: string | null
           source_type?: string | null
           source_url?: string | null
-          status?: Database["public"]["Enums"]["settlement_status_t"]
+          status?: string
           tags?: string[]
           updated_at?: string
           url?: string | null
@@ -1117,14 +1247,19 @@ export type Database = {
         Update: {
           administrator_name?: string | null
           breach_year?: number | null
+          canonical_key?: string
           case_number?: string | null
+          category?: string | null
           claim_deadline?: string | null
+          claim_url?: string | null
           claims_filing_url?: string | null
           company?: string
           created_at?: string
           created_by?: string | null
           deadline?: string | null
           description?: string | null
+          eligibility_summary?: string | null
+          final_approval_date?: string | null
           id?: string
           jurisdiction?: string | null
           last_verified_at?: string | null
@@ -1133,10 +1268,11 @@ export type Database = {
           official_source_url?: string | null
           payout_max?: number | null
           payout_min?: number | null
+          source_id?: string | null
           source_name?: string | null
           source_type?: string | null
           source_url?: string | null
-          status?: Database["public"]["Enums"]["settlement_status_t"]
+          status?: string
           tags?: string[]
           updated_at?: string
           url?: string | null
@@ -1144,7 +1280,15 @@ export type Database = {
           verification_notes?: string | null
           verified?: boolean
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "settlements_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "settlement_sources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       subscriptions: {
         Row: {
@@ -1282,6 +1426,7 @@ export type Database = {
       is_admin:
         | { Args: never; Returns: boolean }
         | { Args: { p_user: string }; Returns: boolean }
+      normalize_raw_ingest: { Args: { p_ingest_id: string }; Returns: string }
       proc_claim_outbox: {
         Args: { batch_size?: number }
         Returns: {
@@ -1327,7 +1472,6 @@ export type Database = {
       plan_t: "free" | "premium"
       risk_level_t: "low" | "medium" | "high" | "critical"
       scan_status_t: "queued" | "running" | "completed" | "failed"
-      settlement_status_t: "open" | "pending" | "closed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1474,7 +1618,6 @@ export const Constants = {
       plan_t: ["free", "premium"],
       risk_level_t: ["low", "medium", "high", "critical"],
       scan_status_t: ["queued", "running", "completed", "failed"],
-      settlement_status_t: ["open", "pending", "closed"],
     },
   },
 } as const

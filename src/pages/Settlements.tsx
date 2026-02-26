@@ -22,12 +22,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 type FilterTab = "all" | SettlementStatus | "filed";
 type SortOption = "payout" | "deadline" | "newest";
 
-const tabs: { label: string; value: FilterTab }[] = [
+const tabs: { label: string; value: FilterTab | "verified" | "filed" }[] = [
   { label: "All", value: "all" },
-  { label: "Open", value: "open" },
-  { label: "Pending", value: "pending" },
+  { label: "Verified", value: "verified" },
   { label: "Filed", value: "filed" },
-  { label: "Closed", value: "closed" },
 ];
 
 const sortOptions: { label: string; value: SortOption }[] = [
@@ -136,11 +134,12 @@ const Settlements = () => {
   }, [claims]);
 
   const filtered = useMemo(() => {
-    let list = [...settlements];
+    // Only show verified/open (active) settlements to users
+    let list = settlements.filter((s) => s.status === "verified" || s.status === "open");
     if (filter === "filed") {
       list = list.filter((s) => claimMap[s.id]);
-    } else if (filter !== "all") {
-      list = list.filter((s) => s.status === filter);
+    } else if (filter === "verified") {
+      list = list.filter((s) => s.verified);
     }
     list.sort((a, b) => {
       if (sort === "payout") return b.payout_max - a.payout_max;
@@ -154,7 +153,7 @@ const Settlements = () => {
     return list;
   }, [filter, sort, claimMap, settlements]);
 
-  const openSettlements = settlements.filter((s) => s.status === "open");
+  const openSettlements = settlements.filter((s) => s.status === "open" || s.status === "verified");
   const totalMin = openSettlements.reduce((a, s) => a + s.payout_min, 0);
   const totalMax = openSettlements.reduce((a, s) => a + s.payout_max, 0);
   const claimsFiled = claims.length;
@@ -363,7 +362,7 @@ const Settlements = () => {
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h3 className="font-semibold">{settlement.name}</h3>
-                        {settlement.status === "open" && (
+                        {(settlement.status === "open" || settlement.status === "verified") && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                             <CheckCircle2 className="h-2.5 w-2.5" /> ELIGIBLE
                           </span>
@@ -401,7 +400,7 @@ const Settlements = () => {
                         <ExternalLink className="h-2.5 w-2.5" /> View source
                       </a>
                     )}
-                    {settlement.status === "open" && filingStatus === "not_filed" && (
+                    {(settlement.status === "open" || settlement.status === "verified") && filingStatus === "not_filed" && (
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger>
@@ -448,7 +447,7 @@ const Settlements = () => {
                       <span className="inline-flex items-center gap-1 rounded-full border border-muted-foreground/20 bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground">
                         <XCircle className="h-3 w-3" /> Filing Closed
                       </span>
-                    ) : settlement.status === "open" && filingStatus === "not_filed" ? (
+                    ) : (settlement.status === "open" || settlement.status === "verified") && filingStatus === "not_filed" ? (
                       <Button
                         size="sm"
                         className="rounded-xl shadow-[0_0_16px_hsl(172_89%_52%/0.2)] hover:shadow-[0_0_24px_hsl(172_89%_52%/0.35)] transition-all duration-300"

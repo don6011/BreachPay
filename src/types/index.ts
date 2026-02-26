@@ -21,7 +21,7 @@ export interface BreachEvent {
   description: string;
 }
 
-export type SettlementStatus = "open" | "pending" | "closed";
+export type SettlementStatus = "open" | "pending" | "closed" | "draft" | "pending_review" | "verified" | "rejected" | "expired";
 
 export interface Settlement {
   id: string;
