@@ -20,6 +20,19 @@ function mustGetEnv(name: string): string {
   return v;
 }
 
+function buildUnsubscribeFooter(appBaseUrl: string) {
+  const settingsUrl = `${appBaseUrl.replace(/\/$/, "")}/settings`;
+  return `
+    <hr style="margin-top:32px;border:none;border-top:1px solid #e5e7eb"/>
+    <div style="font-size:11px;color:#9ca3af;margin-top:12px;line-height:1.5">
+      <p style="margin:0 0 4px 0">BreachPay alerts · <a href="${settingsUrl}" style="color:#6b7280;text-decoration:underline">Manage email preferences</a></p>
+      <p style="margin:0 0 4px 0">You are receiving this because you opted in to email alerts on BreachPay.</p>
+      <p style="margin:0">To stop receiving these emails, <a href="${settingsUrl}" style="color:#6b7280;text-decoration:underline">unsubscribe here</a>.</p>
+      <p style="margin:8px 0 0 0">BreachPay is not a law firm. All data comes from third-party sources.</p>
+    </div>
+  `;
+}
+
 function buildEmailHtml(
   template: OutboxRow["template"],
   payload: Record<string, unknown>,
@@ -31,7 +44,11 @@ function buildEmailHtml(
   const payout = payload.payout_estimate ?? payload.payout_est ?? "";
   const daysLeft = payload.days_left ?? "";
 
-  const detailsUrl = `${appBaseUrl.replace(/\/$/, "")}/settlements`;
+  const detailsUrl = settlementId
+    ? `${appBaseUrl.replace(/\/$/, "")}/settlements/${encodeURIComponent(settlementId)}`
+    : `${appBaseUrl.replace(/\/$/, "")}/settlements`;
+
+  const footer = buildUnsubscribeFooter(appBaseUrl);
 
   if (template === "new_match") {
     const subject = `New settlement match: ${settlementName}`;
@@ -41,8 +58,7 @@ function buildEmailHtml(
         <p><strong>${settlementName}</strong>${company ? ` — ${company}` : ""}</p>
         ${payout ? `<p>Estimated payout: <strong>$${Number(payout).toFixed(2)}</strong></p>` : ""}
         <p><a href="${detailsUrl}" style="color:#2563eb">View details →</a></p>
-        <hr style="margin-top:32px;border:none;border-top:1px solid #e5e7eb"/>
-        <p style="font-size:12px;color:#9ca3af">BreachPay alerts</p>
+        ${footer}
       </div>
     `;
     return { subject, html };
@@ -56,8 +72,7 @@ function buildEmailHtml(
         <p><strong>${settlementName}</strong>${company ? ` — ${company}` : ""}</p>
         ${daysLeft !== "" ? `<p>Days left: <strong>${String(daysLeft)}</strong></p>` : ""}
         <p><a href="${detailsUrl}" style="color:#2563eb">Review claim →</a></p>
-        <hr style="margin-top:32px;border:none;border-top:1px solid #e5e7eb"/>
-        <p style="font-size:12px;color:#9ca3af">BreachPay alerts</p>
+        ${footer}
       </div>
     `;
     return { subject, html };
@@ -72,8 +87,7 @@ function buildEmailHtml(
       ${payload.breaches ? `<p>Exposures found: <strong>${payload.breaches}</strong></p>` : ""}
       ${payload.score ? `<p>Risk score: <strong>${payload.score}/100</strong></p>` : ""}
       <p><a href="${appBaseUrl.replace(/\/$/, "")}/dashboard" style="color:#2563eb">Open dashboard →</a></p>
-      <hr style="margin-top:32px;border:none;border-top:1px solid #e5e7eb"/>
-      <p style="font-size:12px;color:#9ca3af">BreachPay alerts</p>
+      ${footer}
     </div>
   `;
   return { subject, html };
@@ -130,17 +144,51 @@ Deno.serve(async (req) => {
     const rows = (claimed ?? []) as OutboxRow[];
     if (rows.length === 0) {
       return new Response(
-        JSON.stringify({ ok: true, claimed: 0, sent: 0, failed: 0 }),
+        JSON.stringify({ ok: true, claimed: 0, sent: 0, failed: 0, skipped: 0 }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     let sent = 0;
     let failed = 0;
+    let skipped = 0;
+
+    // Pre-fetch email_alerts preferences for all unique users in batch
+    const uniqueUserIds = [...new Set(rows.filter(r => r.channel === "email").map(r => r.user_id))];
+    const userPrefs: Record<string, boolean> = {};
+
+    if (uniqueUserIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("user_profiles")
+        .select("user_id, email_alerts")
+        .in("user_id", uniqueUserIds);
+
+      if (profiles) {
+        for (const p of profiles) {
+          userPrefs[p.user_id] = p.email_alerts ?? true;
+        }
+      }
+    }
 
     for (const row of rows) {
       try {
         if (row.channel === "email") {
+          // ── CAN-SPAM: enforce email_alerts opt-in ──
+          const optedIn = userPrefs[row.user_id] ?? false;
+          if (!optedIn) {
+            // User has not opted in — skip and mark as sent (no retry)
+            await supabase
+              .from("notification_outbox")
+              .update({
+                status: "sent",
+                sent_at: new Date().toISOString(),
+                last_error: "skipped:email_alerts_off",
+              })
+              .eq("id", row.id);
+            skipped += 1;
+            continue;
+          }
+
           // Look up user's email via auth admin
           const { data: userRes, error: userErr } =
             await supabase.auth.admin.getUserById(row.user_id);
@@ -179,7 +227,7 @@ Deno.serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ ok: true, claimed: rows.length, sent, failed }),
+      JSON.stringify({ ok: true, claimed: rows.length, sent, failed, skipped }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {

@@ -19,6 +19,7 @@ import Pricing from "./pages/Pricing";
 import Dashboard from "./pages/Dashboard";
 import Scan from "./pages/Scan";
 import Settlements from "./pages/Settlements";
+import SettlementDetail from "./pages/SettlementDetail";
 import Claims from "./pages/Claims";
 import ClaimFiling from "./pages/ClaimFiling";
 import ClaimTracker from "./pages/ClaimTracker";
@@ -69,6 +70,7 @@ const App = () => {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/scan" element={<Scan />} />
               <Route path="/settlements" element={<Settlements />} />
+              <Route path="/settlements/:id" element={<SettlementDetail />} />
               <Route path="/claims" element={<Claims />} />
               <Route path="/claims/file" element={<ClaimFiling />} />
               <Route path="/claims/:claimId" element={<ClaimTracker />} />
