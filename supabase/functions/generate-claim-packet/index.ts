@@ -124,14 +124,25 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ ok: false, error: "method_not_allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const bucket = Deno.env.get("PACKET_BUCKET") ?? "claim-packets";
 
-    // Validate auth
+    // Auth
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const supabaseUser = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY") ?? "", {
@@ -141,29 +152,47 @@ Deno.serve(async (req) => {
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: authErr } = await supabaseUser.auth.getClaims(token);
     if (authErr || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
     const userId = claimsData.claims.sub as string;
 
     const { claim_id } = await req.json();
-    if (!claim_id) throw new Error("Missing claim_id");
+    if (!claim_id) {
+      return new Response(JSON.stringify({ ok: false, error: "missing_claim_id" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const admin = createClient(supabaseUrl, serviceKey);
 
-    // Fetch claim (verify ownership or admin)
+    // Fetch claim
     const { data: claim, error: claimErr } = await admin
       .from("claims")
       .select("*")
       .eq("id", claim_id)
       .maybeSingle();
 
-    if (claimErr || !claim) throw new Error("Claim not found");
+    if (claimErr || !claim) {
+      return new Response(JSON.stringify({ ok: false, error: "claim_not_found" }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    // Verify access: owner or admin
+    // Authorization: owner or admin
     const { data: isAdminData } = await admin.rpc("is_admin", { p_user: userId });
-    if (claim.user_id !== userId && !isAdminData) throw new Error("Access denied");
+    if (claim.user_id !== userId && !isAdminData) {
+      return new Response(JSON.stringify({ ok: false, error: "forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    // Fetch settlement, application, documents, match in parallel
+    // Fetch related data in parallel
     const [settlementRes, appRes, docsRes, matchRes] = await Promise.all([
       admin.from("settlements").select("*").eq("id", claim.settlement_id).maybeSingle(),
       admin.from("claim_applications").select("*").eq("claim_id", claim_id).maybeSingle(),
@@ -175,50 +204,66 @@ Deno.serve(async (req) => {
 
     const html = buildPacketHtml(claim, settlementRes.data, appRes.data, docsRes.data || [], matchRes.data);
 
-    // Store HTML as file in claim-packets bucket
-    const fileName = `claim-packet-${claim_id.slice(0, 8)}-${Date.now()}.html`;
-    const storagePath = `${userId}/${fileName}`;
+    // Create claim_packets row first to get packet_id
+    const { data: packet, error: packetInsertErr } = await admin
+      .from("claim_packets")
+      .insert({
+        claim_id,
+        generated_by: userId,
+        status: "generated",
+        meta: {
+          settlement_name: settlementRes.data?.name,
+          company: settlementRes.data?.company,
+          document_count: docsRes.data?.length || 0,
+          has_application: !!appRes.data,
+          has_match: !!matchRes.data,
+        },
+      })
+      .select("id")
+      .single();
 
+    if (packetInsertErr || !packet) {
+      throw new Error(`packet_insert_failed: ${packetInsertErr?.message ?? "unknown"}`);
+    }
+
+    const packetId = packet.id as string;
+    const storagePath = `${claim_id}/${packetId}.pdf`;
+
+    // Upload HTML as PDF placeholder (content is HTML, saved as .pdf for now)
     const { error: uploadErr } = await admin.storage
-      .from("claim-packets")
+      .from(bucket)
       .upload(storagePath, new TextEncoder().encode(html), {
         contentType: "text/html",
-        upsert: false,
+        upsert: true,
       });
 
-    // Insert claim_packets row
-    const docCount = docsRes.data?.length || 0;
-    const packetStatus = uploadErr ? "failed" : "generated";
+    if (uploadErr) {
+      // Mark packet as failed
+      await admin.from("claim_packets").update({
+        status: "failed",
+        last_error: uploadErr.message,
+      }).eq("id", packetId);
 
-    await admin.from("claim_packets").insert({
-      claim_id,
-      status: packetStatus,
-      pdf_storage_path: uploadErr ? null : storagePath,
-      pdf_file_name: uploadErr ? null : fileName,
-      generated_by: userId,
-      meta: {
-        settlement_name: settlementRes.data?.name,
-        company: settlementRes.data?.company,
-        document_count: docCount,
-        has_application: !!appRes.data,
-        has_match: !!matchRes.data,
-      },
-      last_error: uploadErr?.message || null,
-    });
+      throw new Error(`upload_failed: ${uploadErr.message}`);
+    }
 
-    // Return the HTML for immediate viewing
+    // Update packet with storage path
+    await admin.from("claim_packets").update({
+      pdf_storage_path: storagePath,
+      pdf_file_name: `claim-packet-${claim_id.slice(0, 8)}.pdf`,
+    }).eq("id", packetId);
+
     return new Response(JSON.stringify({
-      success: true,
-      packet_file: fileName,
-      storage_path: storagePath,
-      document_count: docCount,
+      ok: true,
+      packet_id: packetId,
+      pdf_storage_path: `${bucket}/${storagePath}`,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return new Response(JSON.stringify({ error: msg }), {
-      status: 400,
+    return new Response(JSON.stringify({ ok: false, error: msg }), {
+      status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
