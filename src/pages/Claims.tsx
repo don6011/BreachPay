@@ -40,13 +40,18 @@ const Claims = () => {
   const [payouts, setPayouts] = useState<PayoutData[]>([]);
   const [matchEstimate, setMatchEstimate] = useState(0);
   const [loading, setLoading] = useState(true);
-  const isPremium = false;
+  const [isPremium, setIsPremium] = useState(false);
 
   useEffect(() => {
     if (!user) return;
 
     const fetchData = async () => {
       try {
+        // Check plan
+        supabase.from("user_profiles").select("plan").eq("user_id", user.id).maybeSingle().then(({ data }) => {
+          if (data?.plan === "premium") setIsPremium(true);
+        });
+
         const [claimsRes, payoutsRes, matchesRes] = await Promise.all([
           supabase
             .from("claims")
