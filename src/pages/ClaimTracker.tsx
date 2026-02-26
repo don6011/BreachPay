@@ -6,6 +6,7 @@ import { VerificationBadge } from "@/components/VerificationBadge";
 import { EvidenceVault, type DocRow } from "@/components/EvidenceVault";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -88,6 +89,7 @@ const ClaimTracker = () => {
   const [generatingPacket, setGeneratingPacket] = useState(false);
   const [creatingShare, setCreatingShare] = useState(false);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareScope, setShareScope] = useState<string>("packet");
   const [copied, setCopied] = useState(false);
 
   const handleGeneratePacket = async () => {
@@ -98,11 +100,11 @@ const ClaimTracker = () => {
         body: { claim_id: claimId },
       });
       if (error) throw error;
-      const blob = new Blob([data], { type: "text/html" });
-      const url = URL.createObjectURL(blob);
-      const w = window.open(url, "_blank");
-      if (w) { w.onload = () => setTimeout(() => w.print(), 500); }
-      toast({ title: "Claim Packet Generated", description: "Use your browser's Print dialog to save as PDF." });
+      if (data?.error) throw new Error(data.error);
+      toast({
+        title: "Claim Packet Generated",
+        description: `Packet "${data.packet_file}" saved with ${data.document_count} evidence file(s) indexed.`,
+      });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to generate packet", variant: "destructive" });
     } finally {
@@ -114,16 +116,19 @@ const ClaimTracker = () => {
     if (!claimId) return;
     setCreatingShare(true);
     try {
-      const { data, error } = await supabase.rpc("rpc_create_packet_share", {
-        p_claim_id: claimId,
-        p_hours: 72,
+      const { data, error } = await supabase.functions.invoke("share-claim-packet", {
+        body: { claim_id: claimId, scope: shareScope, hours: 168 },
       });
       if (error) throw error;
-      const result = data as any;
+      if (data?.error) throw new Error(data.error);
+
       const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || "zmjikithlaxeldvsmklz";
-      const url = `https://${projectId}.supabase.co/functions/v1/share-claim-packet?token=${result.token}`;
+      const url = `https://${projectId}.supabase.co/functions/v1/share-claim-packet?token=${data.token}`;
       setShareUrl(url);
-      toast({ title: "Share Link Created", description: "Link expires in 72 hours." });
+      toast({
+        title: "Share Link Created",
+        description: `Expires ${format(new Date(data.expires_at), "MMM d, yyyy")}. Scope: ${data.scope === "packet_and_evidence" ? "Packet + Evidence" : "Packet only"}.`,
+      });
     } catch (e: any) {
       toast({ title: "Error", description: e.message || "Failed to create share link", variant: "destructive" });
     } finally {
@@ -256,30 +261,49 @@ const ClaimTracker = () => {
         </Button>
 
         {claim.status !== "draft" && (
-          <div className="flex justify-end gap-2 flex-wrap">
-            <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={handleGeneratePacket} disabled={generatingPacket}>
-              {generatingPacket ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-              Generate Claim Packet
-            </Button>
-            <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={handleCreateShareLink} disabled={creatingShare}>
-              {creatingShare ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
-              Create Share Link
-            </Button>
+          <div className="rounded-2xl border bg-card p-5 space-y-4">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <FileText className="h-4 w-4 text-primary" /> Claim Packet & Sharing
+            </h3>
+            <div className="flex flex-wrap gap-2 items-center">
+              <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={handleGeneratePacket} disabled={generatingPacket}>
+                {generatingPacket ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Generate Packet
+              </Button>
+              <div className="flex items-center gap-2">
+                <Select value={shareScope} onValueChange={setShareScope}>
+                  <SelectTrigger className="h-8 w-[180px] text-xs rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="packet">Packet only</SelectItem>
+                    <SelectItem value="packet_and_evidence">Packet + Evidence</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="sm" className="rounded-xl gap-2" onClick={handleCreateShareLink} disabled={creatingShare}>
+                  {creatingShare ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />}
+                  Create Share Link
+                </Button>
+              </div>
+            </div>
+
+            {shareUrl && (
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2">
+                <p className="text-xs font-semibold text-primary">Share Link (expires in 7 days)</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 text-xs bg-muted rounded-lg px-3 py-2 truncate">{shareUrl}</code>
+                  <Button size="sm" variant="outline" className="rounded-xl shrink-0" onClick={handleCopyShare}>
+                    {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Anyone with this link can view the claim packet{shareScope === "packet_and_evidence" ? " and download evidence documents" : ""}. Only the token hash is stored — no raw tokens in DB.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
-        {shareUrl && (
-          <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 space-y-2">
-            <p className="text-xs font-semibold text-primary">Share Link (expires in 72 hours)</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-xs bg-muted rounded-lg px-3 py-2 truncate">{shareUrl}</code>
-              <Button size="sm" variant="outline" className="rounded-xl shrink-0" onClick={handleCopyShare}>
-                {copied ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
-              </Button>
-            </div>
-            <p className="text-[10px] text-muted-foreground">Anyone with this link can view the claim packet. Do not share with unauthorized parties.</p>
-          </div>
-        )}
         {claim.status === "draft" && claim.settlement && (
           <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 flex items-center justify-between">
             <div>
