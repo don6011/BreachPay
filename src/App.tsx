@@ -46,6 +46,9 @@ import PartnerClaims from "./pages/partner/PartnerClaims";
 import PartnerClaimDetail from "./pages/partner/PartnerClaimDetail";
 import PartnerReporting from "./pages/partner/PartnerReporting";
 import PartnerSettings from "./pages/partner/PartnerSettings";
+import PartnerIntake from "./pages/partner/PartnerIntake";
+import PartnerRevenue from "./pages/partner/PartnerRevenue";
+import PartnerIntegrations from "./pages/partner/PartnerIntegrations";
 import NotFound from "./pages/NotFound";
 import ShareClaim from "./pages/ShareClaim";
 import SettlementPublic from "./pages/SettlementPublic";
@@ -111,6 +114,9 @@ const App = () => {
               <Route path="/partner/claims" element={<PartnerClaims />} />
               <Route path="/partner/claims/:id" element={<PartnerClaimDetail />} />
               <Route path="/partner/reporting" element={<PartnerReporting />} />
+              <Route path="/partner/intake" element={<PartnerIntake />} />
+              <Route path="/partner/revenue" element={<PartnerRevenue />} />
+              <Route path="/partner/integrations" element={<PartnerIntegrations />} />
               <Route path="/partner/settings" element={<PartnerSettings />} />
             </Route>
 

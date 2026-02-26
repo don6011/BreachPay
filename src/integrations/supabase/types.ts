@@ -83,6 +83,47 @@ export type Database = {
         }
         Relationships: []
       }
+      affiliate_links: {
+        Row: {
+          clicks: number | null
+          code: string
+          conversions: number | null
+          created_at: string | null
+          destination_url: string | null
+          id: string
+          is_active: boolean | null
+          partner_id: string
+        }
+        Insert: {
+          clicks?: number | null
+          code: string
+          conversions?: number | null
+          created_at?: string | null
+          destination_url?: string | null
+          id?: string
+          is_active?: boolean | null
+          partner_id: string
+        }
+        Update: {
+          clicks?: number | null
+          code?: string
+          conversions?: number | null
+          created_at?: string | null
+          destination_url?: string | null
+          id?: string
+          is_active?: boolean | null
+          partner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "affiliate_links_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alerts: {
         Row: {
           body: string | null
@@ -1151,6 +1192,68 @@ export type Database = {
           website?: string | null
         }
         Relationships: []
+      }
+      partner_intake_logs: {
+        Row: {
+          breach_company: string | null
+          breach_year: number | null
+          created_at: string | null
+          email: string
+          full_name: string | null
+          id: string
+          intake_type: string
+          meta: Json | null
+          notes: string | null
+          partner_id: string
+          processed_at: string | null
+          result_claim_id: string | null
+          result_scan_run_id: string | null
+          result_user_id: string | null
+          status: string | null
+        }
+        Insert: {
+          breach_company?: string | null
+          breach_year?: number | null
+          created_at?: string | null
+          email: string
+          full_name?: string | null
+          id?: string
+          intake_type: string
+          meta?: Json | null
+          notes?: string | null
+          partner_id: string
+          processed_at?: string | null
+          result_claim_id?: string | null
+          result_scan_run_id?: string | null
+          result_user_id?: string | null
+          status?: string | null
+        }
+        Update: {
+          breach_company?: string | null
+          breach_year?: number | null
+          created_at?: string | null
+          email?: string
+          full_name?: string | null
+          id?: string
+          intake_type?: string
+          meta?: Json | null
+          notes?: string | null
+          partner_id?: string
+          processed_at?: string | null
+          result_claim_id?: string | null
+          result_scan_run_id?: string | null
+          result_user_id?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_intake_logs_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       partner_invoice_items: {
         Row: {
