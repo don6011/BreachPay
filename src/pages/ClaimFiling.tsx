@@ -331,11 +331,12 @@ const ClaimFiling = () => {
       // Save final application data
       await saveApplicationData(claimId);
 
-      // Mark certifications signed
+      // Mark certifications signed + disclaimer accepted
       await supabase.from("claim_applications").update({
         certifications_signed: true,
         submitted_at: new Date().toISOString(),
-      }).eq("claim_id", claimId);
+        disclaimer_accepted_at: new Date().toISOString(),
+      } as any).eq("claim_id", claimId);
 
       // Upload documents
       if (documents.length > 0) {
@@ -730,12 +731,25 @@ const ClaimFiling = () => {
                 </div>
               </div>
 
+              {/* Claim Assistance Disclaimer */}
+              <div className="rounded-xl border border-warning/30 bg-warning/5 p-4 space-y-2">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-warning mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-semibold text-foreground">Claims Assistance Disclaimer</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      BreachPay assists in preparing and submitting claims but does not determine eligibility or payout amounts. Final decisions are made by settlement administrators. BreachPay is not a law firm and does not provide legal advice.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex items-start gap-3 rounded-xl bg-muted/30 p-4">
                 <Checkbox id="consent" checked={consent} onCheckedChange={(v) => setConsent(!!v)} className="mt-0.5" />
                 <div>
-                  <Label htmlFor="consent" className="font-medium cursor-pointer">I confirm this information is accurate</Label>
+                  <Label htmlFor="consent" className="font-medium cursor-pointer">I confirm this information is accurate and accept the disclaimer above</Label>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    I understand that eligibility depends on settlement administrator review and that estimated payouts may vary.
+                    I understand that eligibility depends on settlement administrator review, estimated payouts may vary, and I have read the <a href="/terms" target="_blank" className="text-primary hover:underline">Terms of Service</a> and <a href="/privacy" target="_blank" className="text-primary hover:underline">Privacy Policy</a>.
                   </p>
                 </div>
               </div>

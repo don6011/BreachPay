@@ -54,6 +54,8 @@ import ShareClaim from "./pages/ShareClaim";
 import SettlementPublic from "./pages/SettlementPublic";
 import BreachCompany from "./pages/BreachCompany";
 import CheckEligibility from "./pages/CheckEligibility";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 
 const queryClient = new QueryClient();
 
@@ -127,6 +129,10 @@ const App = () => {
             <Route path="/settlement/:slug" element={<SettlementPublic />} />
             <Route path="/breach/:company" element={<BreachCompany />} />
             <Route path="/check/:slug" element={<CheckEligibility />} />
+
+            {/* Legal pages */}
+            <Route path="/terms" element={<TermsOfService />} />
+            <Route path="/privacy" element={<PrivacyPolicy />} />
 
             <Route path="*" element={<NotFound />} />
           </Routes>

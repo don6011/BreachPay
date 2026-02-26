@@ -145,6 +145,13 @@ const ShareClaim = () => {
           )}
         </div>
 
+        {/* Compliance Disclaimer */}
+        <div className="rounded-xl border bg-muted/30 p-4 space-y-2">
+          <p className="text-[10px] text-muted-foreground leading-relaxed">
+            <strong className="text-foreground">Disclaimer:</strong> BreachPay assists in preparing and submitting claims but does not determine eligibility or payout amounts. Final decisions are made by settlement administrators. BreachPay is not a law firm and does not provide legal advice. All settlement data is sourced from third parties.
+          </p>
+        </div>
+
         {/* Footer */}
         <div className="text-center space-y-2 pt-4">
           <p className="text-xs text-muted-foreground">
@@ -153,6 +160,9 @@ const ShareClaim = () => {
           </p>
           <p className="text-[10px] text-muted-foreground">
             Powered by BreachPay · Not a law firm · No legal advice provided
+          </p>
+          <p className="text-[10px] text-muted-foreground">
+            <a href="/terms" className="text-primary hover:underline">Terms of Service</a> · <a href="/privacy" className="text-primary hover:underline">Privacy Policy</a>
           </p>
         </div>
       </main>
