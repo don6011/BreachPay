@@ -326,6 +326,51 @@ export type Database = {
           },
         ]
       }
+      claim_assignments: {
+        Row: {
+          assigned_at: string
+          assignment_status: string
+          claim_id: string
+          completed_at: string | null
+          id: string
+          notes: string | null
+          partner_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assignment_status?: string
+          claim_id: string
+          completed_at?: string | null
+          id?: string
+          notes?: string | null
+          partner_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assignment_status?: string
+          claim_id?: string
+          completed_at?: string | null
+          id?: string
+          notes?: string | null
+          partner_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_assignments_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "claim_assignments_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       claim_documents: {
         Row: {
           admin_notes: string | null
@@ -792,6 +837,58 @@ export type Database = {
         }
         Relationships: []
       }
+      partner_activity_log: {
+        Row: {
+          action: string
+          claim_id: string | null
+          created_at: string
+          id: string
+          meta: Json | null
+          partner_id: string
+          partner_user_id: string | null
+        }
+        Insert: {
+          action: string
+          claim_id?: string | null
+          created_at?: string
+          id?: string
+          meta?: Json | null
+          partner_id: string
+          partner_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          claim_id?: string | null
+          created_at?: string
+          id?: string
+          meta?: Json | null
+          partner_id?: string
+          partner_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_activity_log_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_activity_log_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_activity_log_partner_user_id_fkey"
+            columns: ["partner_user_id"]
+            isOneToOne: false
+            referencedRelation: "partner_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_firms: {
         Row: {
           contact_email: string | null
@@ -851,6 +948,68 @@ export type Database = {
           },
         ]
       }
+      partner_users: {
+        Row: {
+          created_at: string
+          id: string
+          partner_id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          partner_id: string
+          role?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          partner_id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_users_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partners: {
+        Row: {
+          contact_email: string | null
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          partner_type: string
+          website: string | null
+        }
+        Insert: {
+          contact_email?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          partner_type: string
+          website?: string | null
+        }
+        Update: {
+          contact_email?: string | null
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          partner_type?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       payouts: {
         Row: {
           amount: number
@@ -894,6 +1053,54 @@ export type Database = {
             columns: ["claim_id"]
             isOneToOne: false
             referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      referrals: {
+        Row: {
+          amount_expected: number | null
+          amount_paid: number | null
+          claim_id: string
+          created_at: string
+          id: string
+          model: string
+          partner_id: string
+          status: string
+        }
+        Insert: {
+          amount_expected?: number | null
+          amount_paid?: number | null
+          claim_id: string
+          created_at?: string
+          id?: string
+          model?: string
+          partner_id: string
+          status?: string
+        }
+        Update: {
+          amount_expected?: number | null
+          amount_paid?: number | null
+          claim_id?: string
+          created_at?: string
+          id?: string
+          model?: string
+          partner_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "referrals_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "referrals_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
             referencedColumns: ["id"]
           },
         ]
@@ -1539,6 +1746,7 @@ export type Database = {
         Returns: Json
       }
       enqueue_due_scan_jobs: { Args: never; Returns: number }
+      get_partner_id_for_user: { Args: { p_user_id: string }; Returns: string }
       is_admin:
         | { Args: never; Returns: boolean }
         | { Args: { p_user: string }; Returns: boolean }
@@ -1569,6 +1777,18 @@ export type Database = {
       proc_cron_scan_jobs: { Args: { max_jobs?: number }; Returns: Json }
       proc_enqueue_due_jobs: { Args: { max_jobs?: number }; Returns: number }
       proc_run_scheduled_jobs: { Args: { max_jobs?: number }; Returns: number }
+      rpc_partner_add_note: {
+        Args: { p_claim_id: string; p_note: string }
+        Returns: string
+      }
+      rpc_partner_update_assignment: {
+        Args: { p_claim_id: string; p_notes?: string; p_status: string }
+        Returns: undefined
+      }
+      rpc_partner_update_claim_status: {
+        Args: { p_claim_id: string; p_new_status: string; p_notes?: string }
+        Returns: undefined
+      }
     }
     Enums: {
       alert_type_t:
