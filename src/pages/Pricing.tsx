@@ -95,7 +95,7 @@ const Pricing = () => {
               <Link to="/login">Log In</Link>
             </Button>
             <Button asChild className="rounded-xl">
-              <Link to="/scan">Start Free Scan</Link>
+              <Link to="/signup">Start Free Scan</Link>
             </Button>
           </div>
         </div>
@@ -270,7 +270,7 @@ const Pricing = () => {
           <p className="text-muted-foreground mb-8">Scan for breaches in seconds. No credit card required.</p>
           <div className="flex items-center justify-center gap-4">
             <Button size="lg" asChild className="rounded-xl">
-              <Link to="/scan">Start Free Scan <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <Link to="/signup">Start Free Scan <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
             <Button variant="outline" size="lg" asChild className="rounded-xl">
               <Link to="/signup">Create Account</Link>
@@ -283,6 +283,10 @@ const Pricing = () => {
       <footer className="border-t border-border py-8 bg-background">
         <div className="mx-auto max-w-6xl px-6 text-center text-xs text-muted-foreground space-y-1">
           <p>BreachPay is not a law firm and does not provide legal advice.</p>
+          <div className="flex items-center justify-center gap-4">
+            <Link to="/terms" className="hover:text-foreground transition-colors">Terms of Service</Link>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy Policy</Link>
+          </div>
           <p>© 2026 BreachPay. All rights reserved.</p>
         </div>
       </footer>

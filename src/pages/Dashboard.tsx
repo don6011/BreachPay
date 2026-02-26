@@ -34,18 +34,18 @@ const Dashboard = () => {
 
     const fetchDashboard = async () => {
       try {
-        // Latest risk snapshot
-        const { data: snapshot } = await supabase
-          .from("user_risk_snapshots")
+        // Latest scan run for risk score + breach count
+        const { data: latestScan } = await supabase
+          .from("scan_runs")
           .select("risk_score, breaches_detected")
           .eq("user_id", user.id)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        if (snapshot) {
-          setRiskScore(snapshot.risk_score);
-          setBreachCount(snapshot.breaches_detected);
+        if (latestScan) {
+          setRiskScore(latestScan.risk_score);
+          setBreachCount(latestScan.breaches_detected);
         }
 
         // Settlement matches with settlement details

@@ -385,10 +385,6 @@ const Settlements = () => {
               <Button size="sm" variant="outline" asChild className="rounded-xl">
                 <Link to={`/claims/${claimMap[settlement.id]?.id}`}>Track Claim</Link>
               </Button>
-            ) : settlement.status === "pending" && filingStatus === "not_filed" ? (
-              <Button size="sm" variant="outline" asChild className="rounded-xl">
-                <Link to={`/claims/${claimMap[settlement.id]?.id}`}>Track Claim</Link>
-              </Button>
             ) : null}
 
             {/* Confidence badge + Why this match? */}
