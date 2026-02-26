@@ -81,6 +81,15 @@ interface PayoutEvent {
   created_at: string;
 }
 
+interface PayoutRecord {
+  id: string;
+  amount: number;
+  method: string | null;
+  paid_at: string | null;
+  external_ref: string | null;
+  status: string;
+}
+
 const ClaimTracker = () => {
   const { claimId } = useParams();
   const navigate = useNavigate();
@@ -92,6 +101,7 @@ const ClaimTracker = () => {
   const [docRequests, setDocRequests] = useState<DocRequest[]>([]);
   const [partnerNotes, setPartnerNotes] = useState<PartnerNote[]>([]);
   const [payoutEvents, setPayoutEvents] = useState<PayoutEvent[]>([]);
+  const [payoutRecord, setPayoutRecord] = useState<PayoutRecord | null>(null);
   const [loading, setLoading] = useState(true);
   const [generatingPacket, setGeneratingPacket] = useState(false);
   const [creatingShare, setCreatingShare] = useState(false);
@@ -193,7 +203,7 @@ const ClaimTracker = () => {
     if (!claimId) return;
     setLoading(true);
 
-    const [claimRes, historyRes, docsRes, docReqRes, notesRes, payoutEventsRes] = await Promise.all([
+    const [claimRes, historyRes, docsRes, docReqRes, notesRes, payoutEventsRes, payoutRes] = await Promise.all([
       supabase
         .from("claims")
         .select(`
@@ -227,6 +237,11 @@ const ClaimTracker = () => {
         .select("id, event_type, meta, created_at")
         .eq("claim_id", claimId)
         .order("created_at", { ascending: true }),
+      supabase
+        .from("payouts")
+        .select("id, amount, method, paid_at, external_ref, status")
+        .eq("claim_id", claimId)
+        .maybeSingle(),
     ]);
 
     if (claimRes.data) {
@@ -256,6 +271,14 @@ const ClaimTracker = () => {
     setDocRequests((docReqRes.data as DocRequest[]) || []);
     setPartnerNotes((notesRes.data as PartnerNote[]) || []);
     setPayoutEvents((payoutEventsRes.data as PayoutEvent[]) || []);
+    if (payoutRes.data) {
+      setPayoutRecord({
+        ...payoutRes.data,
+        amount: Number(payoutRes.data.amount),
+      });
+    } else {
+      setPayoutRecord(null);
+    }
     setLoading(false);
   };
 
@@ -534,6 +557,35 @@ const ClaimTracker = () => {
                   <span className="text-[10px] text-muted-foreground">{format(new Date(n.created_at), "MMM d, h:mm a")}</span>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {/* Payout Record (when paid) */}
+        {claim.status === "paid" && payoutRecord && (
+          <div className="rounded-2xl border border-success/30 bg-success/5 p-6 space-y-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-success" /> Payout Received
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="rounded-xl bg-card p-3">
+                <p className="text-xs text-muted-foreground mb-1">Amount</p>
+                <p className="text-sm font-bold text-success">${payoutRecord.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+              </div>
+              <div className="rounded-xl bg-card p-3">
+                <p className="text-xs text-muted-foreground mb-1">Method</p>
+                <p className="text-sm font-medium capitalize">{payoutRecord.method && payoutRecord.method !== "unknown" ? payoutRecord.method.replace(/_/g, " ") : "—"}</p>
+              </div>
+              <div className="rounded-xl bg-card p-3">
+                <p className="text-xs text-muted-foreground mb-1">Paid At</p>
+                <p className="text-sm font-medium">{payoutRecord.paid_at ? format(new Date(payoutRecord.paid_at), "MMM d, yyyy") : "—"}</p>
+              </div>
+              {payoutRecord.external_ref && (
+                <div className="rounded-xl bg-card p-3">
+                  <p className="text-xs text-muted-foreground mb-1">Reference</p>
+                  <p className="text-sm font-mono truncate">{payoutRecord.external_ref}</p>
+                </div>
+              )}
             </div>
           </div>
         )}

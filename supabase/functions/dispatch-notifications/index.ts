@@ -6,7 +6,7 @@ type OutboxRow = {
   id: string;
   user_id: string;
   channel: "email" | "sms" | "push" | "in_app";
-  template: "new_match" | "deadline_soon" | "scan_complete";
+  template: string;
   payload: Record<string, unknown>;
   status: "pending" | "sending" | "sent" | "failed";
   attempts: number;
@@ -136,6 +136,29 @@ function buildEmailHtml(
         ${finalPayout ? `<p>Amount: <strong>$${Number(finalPayout).toFixed(2)}</strong></p>` : ""}
         <p>Funds will appear in your account within 3-5 business days.</p>
         <p><a href="${appBaseUrl.replace(/\/$/, "")}/wallet" style="color:#2563eb">View wallet →</a></p>
+        ${footer}
+      </div>
+    `;
+    return { subject, html };
+  }
+
+  // payout_paid (from rpc_admin_mark_claim_paid)
+  if (template === "payout_paid") {
+    const amount = payload.amount ?? payout;
+    const method = String(payload.method ?? "").replace(/_/g, " ");
+    const claimId = String(payload.claim_id ?? "");
+    const claimUrl = claimId
+      ? `${appBaseUrl.replace(/\/$/, "")}/claims/${encodeURIComponent(claimId)}`
+      : `${appBaseUrl.replace(/\/$/, "")}/payouts`;
+    const subject = `You've been paid — $${amount ? Number(amount).toFixed(2) : "0.00"}`;
+    const html = `
+      <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
+        <h2>💰 Payout Received</h2>
+        ${amount ? `<p style="font-size:28px;font-weight:bold;color:#22c55e;margin:16px 0">$${Number(amount).toFixed(2)}</p>` : ""}
+        ${method && method !== "unknown" ? `<p>Payment method: <strong style="text-transform:capitalize">${method}</strong></p>` : ""}
+        <p>Your payout has been processed and should arrive in your account shortly.</p>
+        <p style="margin-top:20px"><a href="${claimUrl}" style="display:inline-block;background:#22c55e;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:600">View Payout Details →</a></p>
+        <p style="margin-top:16px;font-size:12px;color:#9ca3af">If you have questions about this payout, visit your <a href="${appBaseUrl.replace(/\/$/, "")}/payouts" style="color:#6b7280;text-decoration:underline">payouts page</a>.</p>
         ${footer}
       </div>
     `;

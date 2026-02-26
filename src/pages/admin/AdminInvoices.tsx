@@ -120,65 +120,32 @@ const AdminInvoices = () => {
   };
 
   const handleGenerate = async () => {
-    if (!genPartnerId || !genStart || !genEnd) {
-      toast.error("Select partner and date range");
+    if (!genStart || !genEnd) {
+      toast.error("Select date range");
       return;
     }
     setGenerating(true);
     try {
-      // Find invoiceable referrals for this partner in the period
-      const { data: referrals, error: refErr } = await supabase
-        .from("referrals")
-        .select("id, amount_expected, claim_id, claims(settlements(name))")
-        .eq("partner_id", genPartnerId)
-        .eq("status", "invoiced")
-        .gte("created_at", new Date(genStart).toISOString())
-        .lte("created_at", new Date(genEnd + "T23:59:59").toISOString());
+      const { data: count, error: rpcErr } = await supabase.rpc("rpc_admin_generate_partner_invoices", {
+        p_period_start: genStart,
+        p_period_end: genEnd,
+      });
 
-      if (refErr) throw refErr;
-      if (!referrals || referrals.length === 0) {
+      if (rpcErr) throw rpcErr;
+
+      if (count === 0) {
         toast.error("No invoiceable referrals found for this period");
-        setGenerating(false);
-        return;
+      } else {
+        toast.success(`Generated ${count} invoice(s)`);
       }
 
-      const subtotal = referrals.reduce((s, r: any) => s + (Number(r.amount_expected) || 0), 0);
-
-      // Create invoice
-      const { data: invoice, error: invErr } = await supabase
-        .from("partner_invoices")
-        .insert({
-          partner_id: genPartnerId,
-          period_start: genStart,
-          period_end: genEnd,
-          subtotal,
-          notes: genNotes || null,
-        })
-        .select("id")
-        .single();
-
-      if (invErr || !invoice) throw invErr || new Error("Failed to create invoice");
-
-      // Create invoice items
-      const items = referrals.map((r: any) => ({
-        invoice_id: invoice.id,
-        referral_id: r.id,
-        description: `Referral — ${(r.claims as any)?.settlements?.name || "Claim"}`,
-        amount: Number(r.amount_expected) || 0,
-      }));
-
-      const { error: itemsErr } = await supabase.from("partner_invoice_items").insert(items);
-      if (itemsErr) throw itemsErr;
-
-      toast.success(`Invoice generated — ${referrals.length} items, $${subtotal.toLocaleString()}`);
       setShowGenerate(false);
-      setGenPartnerId("");
       setGenStart("");
       setGenEnd("");
       setGenNotes("");
       fetchInvoices();
     } catch (err: any) {
-      toast.error(err.message || "Failed to generate invoice");
+      toast.error(err.message || "Failed to generate invoices");
     } finally {
       setGenerating(false);
     }
@@ -200,28 +167,23 @@ const AdminInvoices = () => {
     if (!selectedInvoice) return;
     setActionLoading(true);
     try {
-      const updates: Record<string, any> = {};
-      if (action === "send") {
-        updates.status = "sent";
-        updates.sent_at = new Date().toISOString();
-      } else if (action === "paid") {
-        updates.status = "paid";
-        updates.paid_at = new Date().toISOString();
-        // Also mark referrals as paid
-        const refIds = invoiceItems.map(i => i.referral_id);
-        if (refIds.length > 0) {
-          await supabase.from("referrals").update({ status: "paid", amount_paid: 0 }).in("id", refIds);
-          // Update amount_paid individually
-          for (const item of invoiceItems) {
-            await supabase.from("referrals").update({ amount_paid: item.amount }).eq("id", item.referral_id);
-          }
+      if (action === "paid") {
+        // Use the RPC to atomically mark paid + update referrals
+        const { error: rpcErr } = await supabase.rpc("rpc_admin_mark_invoice_paid", {
+          p_invoice_id: selectedInvoice.id,
+        });
+        if (rpcErr) throw rpcErr;
+      } else {
+        const updates: Record<string, any> = {};
+        if (action === "send") {
+          updates.status = "sent";
+          updates.sent_at = new Date().toISOString();
+        } else if (action === "void") {
+          updates.status = "void";
         }
-      } else if (action === "void") {
-        updates.status = "void";
+        const { error } = await supabase.from("partner_invoices").update(updates).eq("id", selectedInvoice.id);
+        if (error) throw error;
       }
-
-      const { error } = await supabase.from("partner_invoices").update(updates).eq("id", selectedInvoice.id);
-      if (error) throw error;
 
       toast.success(`Invoice ${action === "send" ? "sent" : action === "paid" ? "marked paid" : "voided"}`);
       setSelectedInvoice(null);
@@ -289,14 +251,7 @@ const AdminInvoices = () => {
             <DialogTitle className="flex items-center gap-2"><Plus className="h-4 w-4 text-primary" /> Generate Invoice</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <div>
-              <Label>Partner</Label>
-              <select value={genPartnerId} onChange={(e) => setGenPartnerId(e.target.value)}
-                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm mt-1">
-                <option value="">Select partner...</option>
-                {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
+            <p className="text-xs text-muted-foreground">Generates draft invoices for <strong>all partners</strong> with invoiceable referrals in the selected period.</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Label>Period Start</Label>
@@ -306,10 +261,6 @@ const AdminInvoices = () => {
                 <Label>Period End</Label>
                 <Input type="date" value={genEnd} onChange={(e) => setGenEnd(e.target.value)} />
               </div>
-            </div>
-            <div>
-              <Label>Notes (optional)</Label>
-              <Textarea value={genNotes} onChange={(e) => setGenNotes(e.target.value)} rows={2} />
             </div>
           </div>
           <DialogFooter>
