@@ -218,9 +218,16 @@ Deno.serve(async (req) => {
         sent += 1;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        // Exponential backoff: 5min * attempts
+        const backoffMinutes = 5 * (row.attempts + 1);
+        const nextAttemptAt = new Date(Date.now() + backoffMinutes * 60_000).toISOString();
         await supabase
           .from("notification_outbox")
-          .update({ status: "failed", last_error: msg })
+          .update({
+            status: "pending",
+            last_error: msg,
+            next_attempt_at: nextAttemptAt,
+          })
           .eq("id", row.id);
         failed += 1;
       }

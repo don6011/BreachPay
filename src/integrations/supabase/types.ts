@@ -648,6 +648,7 @@ export type Database = {
           dedupe_key: string | null
           id: string
           last_error: string | null
+          next_attempt_at: string | null
           payload: Json
           sent_at: string | null
           status: string
@@ -661,6 +662,7 @@ export type Database = {
           dedupe_key?: string | null
           id?: string
           last_error?: string | null
+          next_attempt_at?: string | null
           payload?: Json
           sent_at?: string | null
           status?: string
@@ -674,6 +676,7 @@ export type Database = {
           dedupe_key?: string | null
           id?: string
           last_error?: string | null
+          next_attempt_at?: string | null
           payload?: Json
           sent_at?: string | null
           status?: string
@@ -1288,6 +1291,7 @@ export type Database = {
           dedupe_key: string | null
           id: string
           last_error: string | null
+          next_attempt_at: string | null
           payload: Json
           sent_at: string | null
           status: string
