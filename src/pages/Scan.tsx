@@ -78,7 +78,8 @@ const Scan = () => {
   const [riskScore, setRiskScore] = useState(0);
   const [scanRunId, setScanRunId] = useState<string | null>(null);
   const [selectedCatalogBreach, setSelectedCatalogBreach] = useState<BreachCatalogEntry | null>(null);
-  const [isPremium, setIsPremium] = useState(false);
+  const { plan: userPlan } = useAuth();
+  const isPremium = userPlan === "premium";
   const [scanMeta, setScanMeta] = useState<ScanMeta>({
     lastScanAt: null,
     nextScanAt: null,
@@ -88,17 +89,16 @@ const Scan = () => {
     isScheduled: false,
   });
 
-  // Load user profile for premium status + scan schedule
+  // Load scan schedule from profile
   useEffect(() => {
     if (!user) return;
     supabase
       .from("user_profiles")
-      .select("plan, last_scan_at, next_scan_at")
+      .select("last_scan_at, next_scan_at")
       .eq("user_id", user.id)
       .maybeSingle()
       .then(({ data }) => {
         if (data) {
-          setIsPremium(data.plan === "premium");
           setScanMeta(prev => ({
             ...prev,
             lastScanAt: data.last_scan_at,

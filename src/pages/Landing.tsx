@@ -26,7 +26,7 @@ const pricingPlans = [
     period: "",
     description: "Get started with basic breach scanning",
     cta: "Start Free Scan",
-    ctaLink: "/scan",
+    ctaLink: "/signup",
     highlighted: false,
     features: [
       "1 secure scan (manual)",
@@ -39,7 +39,7 @@ const pricingPlans = [
   },
   {
     name: "Premium",
-    price: "$9.99",
+    price: "$4.99",
     period: "/mo",
     description: "Advanced monitoring and priority matching",
     cta: "Upgrade to Premium",
@@ -119,7 +119,7 @@ const Landing = () => {
               <Link to="/login">Log In</Link>
             </Button>
             <Button asChild className="rounded-xl">
-              <Link to="/scan">Start Free Scan</Link>
+              <Link to="/signup">Start Free Scan</Link>
             </Button>
           </div>
         </div>
@@ -160,7 +160,7 @@ const Landing = () => {
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button size="lg" asChild className="rounded-xl shadow-[0_0_20px_hsl(164_100%_45%/0.25)] hover:shadow-[0_0_32px_hsl(164_100%_45%/0.4)] transition-all duration-500">
-              <Link to="/scan">Run My Free Scan <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <Link to="/signup">Run My Free Scan <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
             <Button variant="outline" size="lg" asChild className="rounded-xl">
               <Link to="/signup">See If I Qualify</Link>
@@ -284,7 +284,7 @@ const Landing = () => {
               size="lg"
               className="w-full mt-6 rounded-xl"
             >
-              <Link to="/scan">Scan Now — It's Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              <Link to="/signup">Scan Now — It's Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
             </Button>
           </div>
         </div>
@@ -348,6 +348,8 @@ const Landing = () => {
             <Link to="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
             <Link to="/login" className="hover:text-foreground transition-colors">Log In</Link>
             <Link to="/signup" className="hover:text-foreground transition-colors">Sign Up</Link>
+            <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
+            <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
           </div>
           <div className="text-center text-xs text-muted-foreground space-y-1">
             <p>BreachPay is not a law firm and does not provide legal advice.</p>
