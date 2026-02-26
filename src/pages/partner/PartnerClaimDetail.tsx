@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Loader2, ArrowLeft, FileText, Send, CheckCircle, ExternalLink, ThumbsUp, Play, SquareCheck } from "lucide-react";
+import { Loader2, ArrowLeft, FileText, Send, CheckCircle, ExternalLink, ThumbsUp, Play, SquareCheck, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -22,7 +22,7 @@ interface ClaimDetail {
 }
 
 interface HistoryEntry { id: string; status: string; old_status: string | null; note: string | null; created_at: string; updated_by: string | null; }
-interface DocEntry { id: string; file_path: string; file_type: string | null; note: string | null; created_at: string; verified: boolean; }
+interface DocEntry { id: string; file_path: string; file_name: string; file_type: string | null; doc_type: string; note: string | null; created_at: string; verified: boolean; }
 interface NoteEntry { id: string; note: string; created_at: string; }
 interface BreachEvidence {
   source: string;
@@ -42,6 +42,7 @@ const PartnerClaimDetail = () => {
   const [documents, setDocuments] = useState<DocEntry[]>([]);
   const [notes, setNotes] = useState<NoteEntry[]>([]);
   const [evidence, setEvidence] = useState<BreachEvidence[]>([]);
+  const [application, setApplication] = useState<any>(null);
   const [newNote, setNewNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -53,7 +54,6 @@ const PartnerClaimDetail = () => {
 
   const fetchAll = async () => {
     try {
-      // Get partner org
       const { data: pu } = await supabase
         .from("partner_users")
         .select("partner_id")
@@ -63,7 +63,6 @@ const PartnerClaimDetail = () => {
 
       if (!pu) { setLoading(false); return; }
 
-      // Get assignment
       const { data: assignment } = await supabase
         .from("claim_assignments")
         .select("assignment_status")
@@ -73,11 +72,12 @@ const PartnerClaimDetail = () => {
 
       if (assignment) setAssignmentStatus(assignment.assignment_status);
 
-      const [claimRes, historyRes, docsRes, notesRes] = await Promise.all([
+      const [claimRes, historyRes, docsRes, notesRes, appRes] = await Promise.all([
         supabase.from("claims").select("id, status, est_payout, filed_at, updated_at, user_id, settlements(name, company, deadline, description, url)").eq("id", id!).single(),
         supabase.from("claim_status_history").select("*").eq("claim_id", id!).order("created_at", { ascending: false }),
-        supabase.from("claim_documents").select("*").eq("claim_id", id!).order("created_at", { ascending: true }),
+        supabase.from("claim_documents").select("id, file_path, file_name, file_type, doc_type, note, created_at, verified").eq("claim_id", id!).order("created_at", { ascending: true }),
         supabase.from("claim_partner_notes").select("id, note, created_at").eq("claim_id", id!).order("created_at", { ascending: false }),
+        supabase.from("claim_applications").select("*").eq("claim_id", id!).maybeSingle(),
       ]);
 
       if (claimRes.data) {
@@ -104,6 +104,7 @@ const PartnerClaimDetail = () => {
       setHistory((historyRes.data as HistoryEntry[]) || []);
       setDocuments((docsRes.data as DocEntry[]) || []);
       setNotes((notesRes.data as NoteEntry[]) || []);
+      setApplication(appRes.data || null);
     } catch (error) {
       console.error("Error fetching claim detail:", error);
     } finally {
@@ -243,6 +244,58 @@ const PartnerClaimDetail = () => {
           </div>
         </div>
 
+        {/* Eligibility Answers (read-only) */}
+        <div className="glass-card p-5 space-y-3">
+          <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+            <ClipboardList className="h-4 w-4" /> Eligibility Answers
+          </h3>
+          {!application ? (
+            <p className="text-sm text-muted-foreground">No application data on file</p>
+          ) : (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="rounded-lg bg-muted/50 p-2.5">
+                  <p className="text-[10px] text-muted-foreground uppercase">Name</p>
+                  <p className="font-medium">{application.full_name || "—"}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-2.5">
+                  <p className="text-[10px] text-muted-foreground uppercase">Email</p>
+                  <p className="font-medium truncate">{application.email || "—"}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-2.5">
+                  <p className="text-[10px] text-muted-foreground uppercase">Phone</p>
+                  <p className="font-medium">{application.phone || "—"}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-2.5">
+                  <p className="text-[10px] text-muted-foreground uppercase">Address</p>
+                  <p className="font-medium">{application.address || "—"}</p>
+                </div>
+              </div>
+              {application.eligibility_answers && Object.keys(application.eligibility_answers).length > 0 && (
+                <div className="rounded-lg border p-3 space-y-1.5">
+                  <p className="text-[10px] text-muted-foreground uppercase font-semibold">Eligibility Responses</p>
+                  {Object.entries(application.eligibility_answers).map(([key, value]) => (
+                    <div key={key} className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{key.replace(/([A-Z])/g, " $1").replace(/^./, s => s.toUpperCase())}</span>
+                      <span className="font-medium">{typeof value === "boolean" ? (value ? "✅ Yes" : "❌ No") : String(value) || "—"}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {application.breach_experience && (
+                <div className="rounded-lg bg-muted/50 p-2.5">
+                  <p className="text-[10px] text-muted-foreground uppercase">Experience Description</p>
+                  <p className="text-sm">{application.breach_experience}</p>
+                </div>
+              )}
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span>Certifications: {application.certifications_signed ? "✅ Signed" : "❌ Not signed"}</span>
+                <span>Docs available: {application.documentation_available ? "Yes" : "No"}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Breach Evidence */}
         <div className="glass-card p-5 space-y-3">
           <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Breach Evidence</h3>
@@ -278,7 +331,7 @@ const PartnerClaimDetail = () => {
           )}
         </div>
 
-        {/* Documents */}
+        {/* Evidence Documents */}
         <div className="glass-card p-5 space-y-3">
           <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Evidence Documents ({documents.length})</h3>
           {documents.length === 0 ? (
@@ -290,9 +343,9 @@ const PartnerClaimDetail = () => {
                   <div className="flex items-center gap-2 min-w-0">
                     <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-xs font-medium truncate max-w-[200px]">{doc.note || doc.file_path.split("/").pop()}</p>
+                      <p className="text-xs font-medium truncate max-w-[200px]">{doc.file_name || doc.file_path.split("/").pop()}</p>
                       <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                        {doc.file_type && <span className="bg-muted px-1.5 py-0.5 rounded">{doc.file_type}</span>}
+                        <span className="bg-muted px-1.5 py-0.5 rounded capitalize">{doc.doc_type.replace("_", " ")}</span>
                         <span>{format(new Date(doc.created_at), "MMM d")}</span>
                         {doc.verified && <span className="text-success flex items-center gap-0.5"><CheckCircle className="h-2.5 w-2.5" /> Verified</span>}
                       </div>
@@ -327,7 +380,7 @@ const PartnerClaimDetail = () => {
         </div>
 
         {/* Partner Notes */}
-        <div className="glass-card p-5 space-y-3">
+        <div className="glass-card p-5 space-y-3 lg:col-span-2">
           <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">Internal Notes</h3>
           <div className="space-y-2">
             {notes.map((n) => (
