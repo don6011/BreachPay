@@ -6,6 +6,9 @@ import { PayoutRange } from "@/components/PayoutRange";
 import { DeadlineBadge, isDeadlinePassed } from "@/components/DeadlineBadge";
 import { VerificationBadge } from "@/components/VerificationBadge";
 import logo from "@/assets/logo.png";
+import { SettlementTrustBlock } from "@/components/SettlementTrustBlock";
+import { SettlementStatusBadge } from "@/components/SettlementStatusBadge";
+import { CredibilityBadge } from "@/components/CredibilityBadge";
 import {
   ArrowRight, Clock, AlertTriangle, Shield, MapPin, Hash,
   Building2, ExternalLink, HelpCircle, ChevronDown, ChevronUp,
@@ -34,6 +37,10 @@ interface SettlementPublicData {
   status: string;
   tags: string[];
   canonical_key: string;
+  credibility_score: number | null;
+  verification_status: string | null;
+  media_references: any;
+  verification_sources: any;
 }
 
 function buildFaqItems(s: SettlementPublicData) {
@@ -82,7 +89,7 @@ const SettlementPublic = () => {
     const fetchSettlement = async () => {
       const { data } = await supabase
         .from("settlements")
-        .select("id, name, company, breach_year, description, eligibility_summary, category, payout_min, payout_max, claim_deadline, deadline, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, verified, verification_level, status, tags, canonical_key")
+        .select("id, name, company, breach_year, description, eligibility_summary, category, payout_min, payout_max, claim_deadline, deadline, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, verified, verification_level, status, tags, canonical_key, credibility_score, verification_status, media_references, verification_sources")
         .eq("verified", true)
         .or(`canonical_key.eq.${slug},canonical_key.ilike.%${slug}%`);
 
@@ -92,7 +99,7 @@ const SettlementPublic = () => {
 
         const { data: rel } = await supabase
           .from("settlements")
-          .select("id, name, company, breach_year, description, eligibility_summary, category, payout_min, payout_max, claim_deadline, deadline, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, verified, verification_level, status, tags, canonical_key")
+          .select("id, name, company, breach_year, description, eligibility_summary, category, payout_min, payout_max, claim_deadline, deadline, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, verified, verification_level, status, tags, canonical_key, credibility_score, verification_status, media_references, verification_sources")
           .eq("verified", true)
           .neq("id", match.id)
           .or(`company.eq.${match.company},category.eq.${match.category || "none"}`)
@@ -232,7 +239,9 @@ const SettlementPublic = () => {
         {/* ===== SECTION 1: ABOVE THE FOLD (CONVERSION ZONE) ===== */}
         <section className="py-12 sm:py-16">
           <div className="flex items-center gap-2 flex-wrap mb-4">
+            <SettlementStatusBadge status={settlement.verification_status || "verified"} compact />
             <VerificationBadge level={settlement.verification_level} verified={settlement.verified} compact />
+            <CredibilityBadge score={settlement.credibility_score} compact />
             <DeadlineBadge deadline={effectiveDeadline} />
             {settlement.category && (
               <span className="text-xs text-muted-foreground bg-muted rounded-full px-2.5 py-0.5">{settlement.category}</span>
@@ -506,7 +515,19 @@ const SettlementPublic = () => {
           )}
         </section>
 
-        {/* ===== SECTION 7: FAQ (SEO CRITICAL) ===== */}
+        {/* ===== TRUST & VERIFICATION BLOCK (Step 12) ===== */}
+        <section className="mb-12">
+          <SettlementTrustBlock
+            credibilityScore={settlement.credibility_score}
+            verificationLevel={settlement.verification_level}
+            verificationSources={Array.isArray(settlement.verification_sources) ? settlement.verification_sources : []}
+            mediaReferences={Array.isArray(settlement.media_references) ? settlement.media_references : []}
+            verificationStatus={settlement.verification_status || "verified"}
+            administratorName={settlement.administrator_name}
+          />
+        </section>
+
+
         <section className="mb-12">
           <h2 className="text-2xl font-semibold mb-5 flex items-center gap-2">
             <HelpCircle className="h-5 w-5 text-primary" /> Frequently Asked Questions

@@ -1865,6 +1865,7 @@ export type Database = {
           company: string
           created_at: string
           created_by: string | null
+          credibility_score: number | null
           deadline: string | null
           description: string | null
           eligibility_summary: string | null
@@ -1872,6 +1873,7 @@ export type Database = {
           id: string
           jurisdiction: string | null
           last_verified_at: string | null
+          media_references: Json | null
           name: string
           notes_internal: string | null
           official_source_url: string | null
@@ -1887,6 +1889,8 @@ export type Database = {
           url: string | null
           verification_level: string
           verification_notes: string | null
+          verification_sources: Json | null
+          verification_status: string | null
           verified: boolean
         }
         Insert: {
@@ -1901,6 +1905,7 @@ export type Database = {
           company: string
           created_at?: string
           created_by?: string | null
+          credibility_score?: number | null
           deadline?: string | null
           description?: string | null
           eligibility_summary?: string | null
@@ -1908,6 +1913,7 @@ export type Database = {
           id?: string
           jurisdiction?: string | null
           last_verified_at?: string | null
+          media_references?: Json | null
           name: string
           notes_internal?: string | null
           official_source_url?: string | null
@@ -1923,6 +1929,8 @@ export type Database = {
           url?: string | null
           verification_level?: string
           verification_notes?: string | null
+          verification_sources?: Json | null
+          verification_status?: string | null
           verified?: boolean
         }
         Update: {
@@ -1937,6 +1945,7 @@ export type Database = {
           company?: string
           created_at?: string
           created_by?: string | null
+          credibility_score?: number | null
           deadline?: string | null
           description?: string | null
           eligibility_summary?: string | null
@@ -1944,6 +1953,7 @@ export type Database = {
           id?: string
           jurisdiction?: string | null
           last_verified_at?: string | null
+          media_references?: Json | null
           name?: string
           notes_internal?: string | null
           official_source_url?: string | null
@@ -1959,6 +1969,8 @@ export type Database = {
           url?: string | null
           verification_level?: string
           verification_notes?: string | null
+          verification_sources?: Json | null
+          verification_status?: string | null
           verified?: boolean
         }
         Relationships: [
