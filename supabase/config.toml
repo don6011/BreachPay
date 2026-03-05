@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.ai-support]
 verify_jwt = false
+
+[functions.submit-claim-partner]
+verify_jwt = false
