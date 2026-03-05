@@ -6,6 +6,7 @@ import { VerificationBadge } from "@/components/VerificationBadge";
 import { DeadlineBadge, isDeadlinePassed } from "@/components/DeadlineBadge";
 import { PayoutRange } from "@/components/PayoutRange";
 import { BackToTopButton } from "@/components/BackToTopButton";
+import { SubmissionModeActions } from "@/components/SubmissionModeActions";
 import { Button } from "@/components/ui/button";
 import {
   Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink,
@@ -51,7 +52,7 @@ const SettlementDetail = () => {
 
         const { data: c } = await supabase
           .from("claims")
-          .select("id, status, est_payout, filed_at")
+          .select("id, status, est_payout, filed_at, submitted_to_admin_at, external_submission_ref")
           .eq("user_id", user.id)
           .eq("settlement_id", id)
           .maybeSingle();
@@ -180,6 +181,26 @@ const SettlementDetail = () => {
           </Button>
         )}
       </div>
+
+      {/* Submission Mode Actions */}
+      {claim && (
+        <SubmissionModeActions
+          settlementId={settlement.id}
+          settlementName={settlement.name}
+          submissionMode={settlement.submission_mode || "packet_only"}
+          claimUrl={settlement.claim_url || settlement.claims_filing_url}
+          claimId={claim.id}
+          claimStatus={claim.status}
+          submittedToAdminAt={claim.submitted_to_admin_at || null}
+          externalSubmissionRef={claim.external_submission_ref || null}
+          onClaimUpdate={() => {
+            // Re-fetch claim
+            supabase.from("claims").select("id, status, est_payout, filed_at, submitted_to_admin_at, external_submission_ref")
+              .eq("user_id", user!.id).eq("settlement_id", id!).maybeSingle()
+              .then(({ data }) => setClaim(data));
+          }}
+        />
+      )}
 
       {settlement.description && (
         <p className="text-muted-foreground mb-6">{settlement.description}</p>
