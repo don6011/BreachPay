@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Plus, Send, Zap, RefreshCw, Pencil, ExternalLink, Check, X,
   Database, FileSearch, Shield, AlertTriangle, Eye, Globe, Upload, FileJson,
+  Radar, Clock, BadgeCheck, Link2,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -183,6 +184,20 @@ const AdminSettlements = () => {
   // Actions
   const [sendingAlerts, setSendingAlerts] = useState(false);
   const [rebuildingMatches, setRebuildingMatches] = useState(false);
+  const [runningDiscovery, setRunningDiscovery] = useState(false);
+
+  // Pending settlements
+  const [pendingSettlements, setPendingSettlements] = useState<Settlement[]>([]);
+  const [pendingLoading, setPendingLoading] = useState(true);
+
+  // Verification checks
+  const [verificationChecks, setVerificationChecks] = useState<Record<string, any[]>>({});
+  const [checkDialogOpen, setCheckDialogOpen] = useState(false);
+  const [checkSettlementId, setCheckSettlementId] = useState<string | null>(null);
+  const [checkForm, setCheckForm] = useState({ check_type: "official_site", pass: true, evidence_url: "" });
+
+  // Admin alerts
+  const [adminAlerts, setAdminAlerts] = useState({ pending: 0, deadlineSoon: 0 });
 
   // ── Fetchers ──────────────────────────────────────────
   const fetchQueue = async () => {
@@ -243,6 +258,81 @@ const AdminSettlements = () => {
     if (data) setSavedTemplates(data as any);
   };
 
+  const fetchPending = async () => {
+    setPendingLoading(true);
+    const { data } = await supabase
+      .from("settlements")
+      .select("*")
+      .in("status", ["pending_review", "pending"])
+      .eq("is_demo", false)
+      .order("discovered_at", { ascending: false });
+    if (data) setPendingSettlements(data as Settlement[]);
+    setPendingLoading(false);
+  };
+
+  const fetchAdminAlerts = async () => {
+    const { count: pendingCount } = await supabase
+      .from("settlements")
+      .select("*", { count: "exact", head: true })
+      .in("status", ["pending_review", "pending"]);
+
+    const in14Days = new Date();
+    in14Days.setDate(in14Days.getDate() + 14);
+    const { count: deadlineCount } = await supabase
+      .from("settlements")
+      .select("*", { count: "exact", head: true })
+      .eq("status", "verified")
+      .lte("claim_deadline", in14Days.toISOString().split("T")[0])
+      .gte("claim_deadline", new Date().toISOString().split("T")[0]);
+
+    setAdminAlerts({ pending: pendingCount || 0, deadlineSoon: deadlineCount || 0 });
+  };
+
+  const fetchVerificationChecks = async (settlementId: string) => {
+    const { data } = await supabase
+      .from("settlement_verification_checks")
+      .select("*")
+      .eq("settlement_id", settlementId)
+      .order("created_at", { ascending: false });
+    setVerificationChecks(prev => ({ ...prev, [settlementId]: data || [] }));
+  };
+
+  const handleAddCheck = async () => {
+    if (!checkSettlementId) return;
+    try {
+      const { error } = await supabase.from("settlement_verification_checks").insert({
+        settlement_id: checkSettlementId,
+        check_type: checkForm.check_type,
+        pass: checkForm.pass,
+        evidence: { url: checkForm.evidence_url },
+      });
+      if (error) throw error;
+      toast({ title: "Verification check added" });
+      fetchVerificationChecks(checkSettlementId);
+      setCheckDialogOpen(false);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleAdminVerify = async (settlementId: string, decision: "approve" | "reject") => {
+    try {
+      const { error } = await supabase.rpc("rpc_admin_verify_settlement", {
+        p_settlement_id: settlementId,
+        p_decision: decision,
+        p_notes: `Verified by admin via UI`,
+      });
+      if (error) throw error;
+      toast({ title: decision === "approve" ? "Settlement verified" : "Settlement rejected" });
+      fetchPending();
+      fetchSettlements();
+      fetchQueue();
+      fetchAdminAlerts();
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
     fetchQueue();
@@ -250,6 +340,8 @@ const AdminSettlements = () => {
     fetchSources();
     fetchRawIngest();
     fetchTemplates();
+    fetchPending();
+    fetchAdminAlerts();
   }, [user]);
 
   // ── Queue Actions ──────────────────────────────────────
@@ -634,10 +726,37 @@ const AdminSettlements = () => {
         <Button size="sm" variant="outline" className="rounded-xl" onClick={() => callEdgeFunction("rebuild-settlement-matches", setRebuildingMatches)} disabled={rebuildingMatches}>
           <RefreshCw className="mr-1 h-3 w-3" />{rebuildingMatches ? "Rebuilding..." : "Rebuild Matches"}
         </Button>
+        <Button size="sm" variant="secondary" className="rounded-xl" onClick={() => callEdgeFunction("run-settlement-discovery", setRunningDiscovery)} disabled={runningDiscovery}>
+          <Radar className="mr-1 h-3 w-3" />{runningDiscovery ? "Discovering..." : "Run Discovery"}
+        </Button>
       </PageHeader>
+
+      {/* Admin Alerts Bar */}
+      {(adminAlerts.pending > 0 || adminAlerts.deadlineSoon > 0) && (
+        <div className="mb-4 flex flex-wrap gap-3">
+          {adminAlerts.pending > 0 && (
+            <div className="glass-card px-4 py-2 flex items-center gap-2 text-sm">
+              <AlertTriangle className="h-4 w-4 text-warning" />
+              <span className="font-medium">{adminAlerts.pending}</span>
+              <span className="text-muted-foreground">pending settlements</span>
+            </div>
+          )}
+          {adminAlerts.deadlineSoon > 0 && (
+            <div className="glass-card px-4 py-2 flex items-center gap-2 text-sm">
+              <Clock className="h-4 w-4 text-critical" />
+              <span className="font-medium">{adminAlerts.deadlineSoon}</span>
+              <span className="text-muted-foreground">deadlines within 14 days</span>
+            </div>
+          )}
+        </div>
+      )}
 
       <Tabs value={tab} onValueChange={setTab}>
         <TabsList className="mb-4 bg-muted/50 rounded-xl">
+          <TabsTrigger value="pending" className="rounded-lg gap-1.5">
+            <Radar className="h-3.5 w-3.5" /> Pending
+            {pendingSettlements.length > 0 && <Badge variant="destructive" className="ml-1 h-5 px-1.5 text-[10px]">{pendingSettlements.length}</Badge>}
+          </TabsTrigger>
           <TabsTrigger value="queue" className="rounded-lg gap-1.5">
             <AlertTriangle className="h-3.5 w-3.5" /> Review Queue
             {queueItems.length > 0 && <Badge variant="destructive" className="ml-1 h-5 px-1.5 text-[10px]">{queueItems.length}</Badge>}
@@ -646,6 +765,86 @@ const AdminSettlements = () => {
           <TabsTrigger value="sources" className="rounded-lg gap-1.5"><Globe className="h-3.5 w-3.5" /> Sources</TabsTrigger>
           <TabsTrigger value="raw" className="rounded-lg gap-1.5"><Database className="h-3.5 w-3.5" /> Raw Ingest</TabsTrigger>
         </TabsList>
+
+        {/* ── PENDING SETTLEMENTS (Discovery) ────── */}
+        <TabsContent value="pending">
+          <div className="rounded-2xl border bg-card overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Settlement</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Source</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Payout</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Deadline</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Checks</th>
+                  <th className="px-4 py-3 text-left font-medium text-muted-foreground">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pendingLoading ? (
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Loading...</td></tr>
+                ) : pendingSettlements.length === 0 ? (
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">No pending settlements. Run discovery to find new ones.</td></tr>
+                ) : (
+                  pendingSettlements.map((s) => {
+                    const checks = verificationChecks[s.id] || [];
+                    const passCount = checks.filter(c => c.pass).length;
+                    return (
+                      <tr key={s.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="font-medium">{s.name}</div>
+                          <div className="text-xs text-muted-foreground">{s.company} · {s.breach_year || "—"}</div>
+                          {s.claim_url && (
+                            <a href={s.claim_url} target="_blank" rel="noreferrer" className="text-[10px] text-primary hover:underline flex items-center gap-0.5 mt-0.5">
+                              <Link2 className="h-2.5 w-2.5" /> {new URL(s.claim_url).hostname}
+                            </a>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <Badge variant="outline" className="text-[10px] capitalize">{s.source_type || "unknown"}</Badge>
+                          {s.source_url && (
+                            <a href={s.source_url} target="_blank" rel="noreferrer" className="block text-[10px] text-primary hover:underline mt-0.5 truncate max-w-32">
+                              <ExternalLink className="h-2.5 w-2.5 inline mr-0.5" />source
+                            </a>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-primary text-xs">${s.payout_min || 0}–${(s.payout_max || 0).toLocaleString()}</td>
+                        <td className="px-4 py-3 text-xs">{effectiveDeadline(s) || "—"}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            <span className={`text-xs font-mono ${passCount >= 2 ? "text-success" : passCount >= 1 ? "text-warning" : "text-muted-foreground"}`}>
+                              {passCount} pass
+                            </span>
+                            <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={() => {
+                              fetchVerificationChecks(s.id);
+                              setCheckSettlementId(s.id);
+                              setCheckDialogOpen(true);
+                            }}>
+                              + Add
+                            </Button>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1">
+                            <Button size="sm" variant="ghost" className="h-7 gap-1 text-success hover:text-success" onClick={() => handleAdminVerify(s.id, "approve")}>
+                              <BadgeCheck className="h-3.5 w-3.5" /> Verify
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 gap-1 text-critical hover:text-critical" onClick={() => handleAdminVerify(s.id, "reject")}>
+                              <X className="h-3.5 w-3.5" /> Reject
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 gap-1" onClick={() => openEdit(s)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
 
         {/* ── REVIEW QUEUE ─────────────────────────── */}
         <TabsContent value="queue">
@@ -1174,6 +1373,58 @@ const AdminSettlements = () => {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Verification Check Dialog ─────────────── */}
+      <Dialog open={checkDialogOpen} onOpenChange={setCheckDialogOpen}>
+        <DialogContent className="bg-card rounded-2xl max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Verification Check</DialogTitle>
+            <DialogDescription>Add a verification check for this settlement to meet approval requirements.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Select value={checkForm.check_type} onValueChange={(v) => setCheckForm(f => ({ ...f, check_type: v }))}>
+              <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="official_site">Official Site Verified</SelectItem>
+                <SelectItem value="claims_admin">Claims Administrator</SelectItem>
+                <SelectItem value="court_reference">Court Reference</SelectItem>
+                <SelectItem value="deadline_present">Deadline Present</SelectItem>
+                <SelectItem value="payout_present">Payout Info Present</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              placeholder="Evidence URL"
+              className="rounded-xl"
+              value={checkForm.evidence_url}
+              onChange={(e) => setCheckForm(f => ({ ...f, evidence_url: e.target.value }))}
+            />
+            <div className="flex items-center justify-between">
+              <Label>Pass</Label>
+              <Switch checked={checkForm.pass} onCheckedChange={(v) => setCheckForm(f => ({ ...f, pass: v }))} />
+            </div>
+            {/* Show existing checks */}
+            {checkSettlementId && verificationChecks[checkSettlementId]?.length > 0 && (
+              <div className="space-y-1 rounded-xl border p-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase">Existing Checks</p>
+                {verificationChecks[checkSettlementId].map((c: any) => (
+                  <div key={c.id} className="flex items-center gap-2 text-xs">
+                    {c.pass ? <Check className="h-3 w-3 text-success" /> : <X className="h-3 w-3 text-critical" />}
+                    <span className="capitalize">{c.check_type.replace(/_/g, " ")}</span>
+                    {c.evidence?.url && (
+                      <a href={c.evidence.url} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                        <ExternalLink className="h-2.5 w-2.5" />
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <Button className="w-full rounded-xl" onClick={handleAddCheck}>
+              Add Check
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
 
