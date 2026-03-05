@@ -58,6 +58,8 @@ interface SettlementData {
   claims_filing_url: string | null;
   claim_deadline: string | null;
   source_url: string | null;
+  lifecycle_status: string;
+  closed_at: string | null;
 }
 
 interface ClaimData {
@@ -95,6 +97,7 @@ const Settlements = () => {
   const [filingId, setFilingId] = useState<string | null>(null);
   const [detailSettlement, setDetailSettlement] = useState<SettlementData | null>(null);
   const [showPossible, setShowPossible] = useState(false);
+  const [showClosed, setShowClosed] = useState(false);
 
   // Label for weak matches section
 
@@ -105,34 +108,38 @@ const Settlements = () => {
       try {
         const { data: matchData } = await supabase
           .from("settlement_matches")
-          .select("settlement_id, match_reason, payout_estimate, confidence_score, confidence_level, settlements(id, name, company, breach_year, status, payout_min, payout_max, deadline, description, verified, verification_level, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, claim_deadline, source_url)")
+          .select("settlement_id, match_reason, payout_estimate, confidence_score, confidence_level, settlements(id, name, company, breach_year, status, payout_min, payout_max, deadline, description, verified, verification_level, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, claim_deadline, source_url, lifecycle_status, closed_at, is_demo, is_test)")
           .eq("user_id", user.id);
 
         if (matchData) {
-          setSettlements(matchData.map((m: any) => ({
-            id: m.settlements?.id || m.settlement_id,
-            name: m.settlements?.name || "Unknown",
-            company: m.settlements?.company || "",
-            breach_year: m.settlements?.breach_year,
-            status: m.settlements?.status || "open",
-            payout_min: Number(m.settlements?.payout_min) || 0,
-            payout_max: Number(m.settlements?.payout_max) || 0,
-            deadline: m.settlements?.deadline || "",
-            description: m.settlements?.description,
-            match_reason: m.match_reason,
-            payout_estimate: m.payout_estimate ? Number(m.payout_estimate) : null,
-            confidence_score: m.confidence_score ?? 50,
-            confidence_level: m.confidence_level || "medium",
-            verified: m.settlements?.verified || false,
-            verification_level: m.settlements?.verification_level || "unverified",
-            jurisdiction: m.settlements?.jurisdiction,
-            case_number: m.settlements?.case_number,
-            administrator_name: m.settlements?.administrator_name,
-            official_source_url: m.settlements?.official_source_url,
-            claims_filing_url: m.settlements?.claims_filing_url,
-            claim_deadline: m.settlements?.claim_deadline,
-            source_url: m.settlements?.source_url,
-          })));
+          setSettlements(matchData
+            .filter((m: any) => m.settlements && !m.settlements.is_demo && !m.settlements.is_test)
+            .map((m: any) => ({
+              id: m.settlements?.id || m.settlement_id,
+              name: m.settlements?.name || "Unknown",
+              company: m.settlements?.company || "",
+              breach_year: m.settlements?.breach_year,
+              status: m.settlements?.status || "open",
+              payout_min: Number(m.settlements?.payout_min) || 0,
+              payout_max: Number(m.settlements?.payout_max) || 0,
+              deadline: m.settlements?.deadline || "",
+              description: m.settlements?.description,
+              match_reason: m.match_reason,
+              payout_estimate: m.payout_estimate ? Number(m.payout_estimate) : null,
+              confidence_score: m.confidence_score ?? 50,
+              confidence_level: m.confidence_level || "medium",
+              verified: m.settlements?.verified || false,
+              verification_level: m.settlements?.verification_level || "unverified",
+              jurisdiction: m.settlements?.jurisdiction,
+              case_number: m.settlements?.case_number,
+              administrator_name: m.settlements?.administrator_name,
+              official_source_url: m.settlements?.official_source_url,
+              claims_filing_url: m.settlements?.claims_filing_url,
+              claim_deadline: m.settlements?.claim_deadline,
+              source_url: m.settlements?.source_url,
+              lifecycle_status: m.settlements?.lifecycle_status || "active",
+              closed_at: m.settlements?.closed_at || null,
+            })));
         }
 
         const { data: claimsData } = await supabase
@@ -157,19 +164,37 @@ const Settlements = () => {
     return map;
   }, [claims]);
 
-  // Primary matches: verified/open AND confidence >= 40
+  // Active settlements (not closed/archived, deadline not passed)
+  const activeSettlementsList = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    return settlements.filter((s) => {
+      if (s.lifecycle_status !== "active") return false;
+      if (s.claim_deadline && s.claim_deadline < today) return false;
+      return true;
+    });
+  }, [settlements]);
+
+  // Closed settlements
+  const closedSettlementsList = useMemo(() => {
+    const today = new Date().toISOString().split("T")[0];
+    return settlements.filter((s) => {
+      return s.lifecycle_status !== "active" || (s.claim_deadline && s.claim_deadline < today);
+    });
+  }, [settlements]);
+
+  // Primary matches: active + verified/open AND confidence >= 40
   const primaryMatches = useMemo(() => {
-    return settlements.filter(
+    return activeSettlementsList.filter(
       (s) => (s.status === "verified" || s.status === "open") && s.confidence_score >= 40
     );
-  }, [settlements]);
+  }, [activeSettlementsList]);
 
   // Hidden/possible matches: confidence < 40 (or non-verified)
   const possibleMatches = useMemo(() => {
-    return settlements.filter(
+    return activeSettlementsList.filter(
       (s) => (s.status === "verified" || s.status === "open") && s.confidence_score < 40
     );
-  }, [settlements]);
+  }, [activeSettlementsList]);
 
   const filtered = useMemo(() => {
     let list = [...primaryMatches];
@@ -275,17 +300,21 @@ const Settlements = () => {
         )}
 
         <div className={`glass-card p-6 transition-all duration-300 hover:translate-y-[-1px] ${
-          settlement.status === "closed" ? "" : filingStatus === "approved" || filingStatus === "paid" ? "!border-success/30" : settlement.status === "open" ? "hover:border-primary/25" : ""
+          settlement.lifecycle_status !== "active" || settlement.status === "closed" ? "opacity-60" : filingStatus === "approved" || filingStatus === "paid" ? "!border-success/30" : settlement.status === "open" ? "hover:border-primary/25" : ""
         }`}>
           <div className="flex items-start justify-between mb-3">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <h3 className="font-semibold">{settlement.name}</h3>
-                {(settlement.status === "open" || settlement.status === "verified") && (
+                {settlement.lifecycle_status !== "active" || isDeadlinePassed(effectiveDeadline) ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                    <XCircle className="h-2.5 w-2.5" /> CLOSED
+                  </span>
+                ) : (settlement.status === "open" || settlement.status === "verified") ? (
                   <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
                     <CheckCircle2 className="h-2.5 w-2.5" /> ELIGIBLE
                   </span>
-                )}
+                ) : null}
                 <VerificationBadge
                   level={settlement.verification_level}
                   verified={settlement.verified}
@@ -362,9 +391,10 @@ const Settlements = () => {
             <Button size="sm" variant="ghost" className="rounded-xl text-xs" onClick={() => setDetailSettlement(settlement)}>
               Details
             </Button>
-            {settlement.status === "closed" || isDeadlinePassed(effectiveDeadline) ? (
+            {settlement.lifecycle_status !== "active" || settlement.status === "closed" || isDeadlinePassed(effectiveDeadline) ? (
               <span className="inline-flex items-center gap-1 rounded-full border border-muted-foreground/20 bg-muted/50 px-3 py-1 text-xs font-medium text-muted-foreground">
                 <XCircle className="h-3 w-3" /> Filing Closed
+                {settlement.closed_at && <span className="ml-1 text-[10px]">({new Date(settlement.closed_at).toLocaleDateString()})</span>}
               </span>
             ) : (settlement.status === "open" || settlement.status === "verified") && filingStatus === "not_filed" ? (
               <Button
@@ -568,6 +598,25 @@ const Settlements = () => {
           {showPossible && (
             <div className="space-y-3 opacity-75">
               {possibleMatches.map((s, i) => renderSettlementCard(s, i, false))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Closed Settlements Toggle */}
+      {closedSettlementsList.length > 0 && (
+        <div className="mt-6">
+          <button
+            onClick={() => setShowClosed(!showClosed)}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
+          >
+            <ChevronRight className={`h-4 w-4 transition-transform ${showClosed ? "rotate-90" : ""}`} />
+            <span>Closed Settlements ({closedSettlementsList.length})</span>
+            <span className="text-xs bg-muted rounded-full px-2 py-0.5">Filing ended</span>
+          </button>
+          {showClosed && (
+            <div className="space-y-3 opacity-60">
+              {closedSettlementsList.map((s, i) => renderSettlementCard(s, i, false))}
             </div>
           )}
         </div>

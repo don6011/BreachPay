@@ -133,7 +133,7 @@ const SettlementDetail = () => {
     ? Math.max(0, Math.ceil((new Date(effectiveDeadline).getTime() - Date.now()) / 86400000))
     : null;
   const isUrgent = daysLeft !== null && daysLeft <= 30;
-  const isClosed = settlement.status === "closed" || isDeadlinePassed(effectiveDeadline);
+  const isClosed = settlement.status === "closed" || settlement.lifecycle_status === "closed" || settlement.lifecycle_status === "archived" || isDeadlinePassed(effectiveDeadline);
 
   return (
     <div>

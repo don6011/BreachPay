@@ -186,6 +186,13 @@ export type Database = {
             referencedRelation: "settlements"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "alerts_related_settlement_id_fkey"
+            columns: ["related_settlement_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_settlements"
+            referencedColumns: ["id"]
+          },
         ]
       }
       api_keys: {
@@ -1144,6 +1151,13 @@ export type Database = {
             referencedRelation: "settlements"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "claims_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_settlements"
+            referencedColumns: ["id"]
+          },
         ]
       }
       csv_mapping_templates: {
@@ -1239,6 +1253,13 @@ export type Database = {
             columns: ["settlement_id"]
             isOneToOne: false
             referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deadline_alerts_sent_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_settlements"
             referencedColumns: ["id"]
           },
         ]
@@ -2133,6 +2154,13 @@ export type Database = {
             referencedRelation: "settlements"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "settlement_matches_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_settlements"
+            referencedColumns: ["id"]
+          },
         ]
       }
       settlement_performance_metrics: {
@@ -2181,6 +2209,13 @@ export type Database = {
             columns: ["settlement_id"]
             isOneToOne: true
             referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "settlement_performance_metrics_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: true
+            referencedRelation: "v_active_settlements"
             referencedColumns: ["id"]
           },
         ]
@@ -2310,6 +2345,13 @@ export type Database = {
             referencedRelation: "settlements"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "settlement_verification_checks_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_settlements"
+            referencedColumns: ["id"]
+          },
         ]
       }
       settlement_verification_queue: {
@@ -2357,6 +2399,13 @@ export type Database = {
             referencedRelation: "settlements"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "settlement_verification_queue_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_settlements"
+            referencedColumns: ["id"]
+          },
         ]
       }
       settlements: {
@@ -2369,6 +2418,7 @@ export type Database = {
           claim_deadline: string | null
           claim_url: string | null
           claims_filing_url: string | null
+          closed_at: string | null
           company: string
           created_at: string
           created_by: string | null
@@ -2384,6 +2434,7 @@ export type Database = {
           jurisdiction: string | null
           last_checked_at: string | null
           last_verified_at: string | null
+          lifecycle_status: string
           media_references: Json | null
           name: string
           notes_internal: string | null
@@ -2414,6 +2465,7 @@ export type Database = {
           claim_deadline?: string | null
           claim_url?: string | null
           claims_filing_url?: string | null
+          closed_at?: string | null
           company: string
           created_at?: string
           created_by?: string | null
@@ -2429,6 +2481,7 @@ export type Database = {
           jurisdiction?: string | null
           last_checked_at?: string | null
           last_verified_at?: string | null
+          lifecycle_status?: string
           media_references?: Json | null
           name: string
           notes_internal?: string | null
@@ -2459,6 +2512,7 @@ export type Database = {
           claim_deadline?: string | null
           claim_url?: string | null
           claims_filing_url?: string | null
+          closed_at?: string | null
           company?: string
           created_at?: string
           created_by?: string | null
@@ -2474,6 +2528,7 @@ export type Database = {
           jurisdiction?: string | null
           last_checked_at?: string | null
           last_verified_at?: string | null
+          lifecycle_status?: string
           media_references?: Json | null
           name?: string
           notes_internal?: string | null
@@ -2638,6 +2693,13 @@ export type Database = {
             columns: ["related_settlement_id"]
             isOneToOne: false
             referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_related_settlement_id_fkey"
+            columns: ["related_settlement_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_settlements"
             referencedColumns: ["id"]
           },
         ]
@@ -2824,6 +2886,158 @@ export type Database = {
       }
     }
     Views: {
+      v_active_settlements: {
+        Row: {
+          administrator_name: string | null
+          breach_year: number | null
+          canonical_key: string | null
+          case_number: string | null
+          category: string | null
+          claim_deadline: string | null
+          claim_url: string | null
+          claims_filing_url: string | null
+          closed_at: string | null
+          company: string | null
+          created_at: string | null
+          created_by: string | null
+          credibility_score: number | null
+          deadline: string | null
+          description: string | null
+          discovered_at: string | null
+          eligibility_summary: string | null
+          final_approval_date: string | null
+          id: string | null
+          is_demo: boolean | null
+          is_test: boolean | null
+          jurisdiction: string | null
+          last_checked_at: string | null
+          last_verified_at: string | null
+          lifecycle_status: string | null
+          media_references: Json | null
+          name: string | null
+          notes_internal: string | null
+          official_source_url: string | null
+          payout_max: number | null
+          payout_min: number | null
+          source_id: string | null
+          source_name: string | null
+          source_type: string | null
+          source_url: string | null
+          status: string | null
+          submission_mode: string | null
+          tags: string[] | null
+          updated_at: string | null
+          url: string | null
+          verification_level: string | null
+          verification_notes: string | null
+          verification_sources: Json | null
+          verification_status: string | null
+          verified: boolean | null
+        }
+        Insert: {
+          administrator_name?: string | null
+          breach_year?: number | null
+          canonical_key?: string | null
+          case_number?: string | null
+          category?: string | null
+          claim_deadline?: string | null
+          claim_url?: string | null
+          claims_filing_url?: string | null
+          closed_at?: string | null
+          company?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          credibility_score?: number | null
+          deadline?: string | null
+          description?: string | null
+          discovered_at?: string | null
+          eligibility_summary?: string | null
+          final_approval_date?: string | null
+          id?: string | null
+          is_demo?: boolean | null
+          is_test?: boolean | null
+          jurisdiction?: string | null
+          last_checked_at?: string | null
+          last_verified_at?: string | null
+          lifecycle_status?: string | null
+          media_references?: Json | null
+          name?: string | null
+          notes_internal?: string | null
+          official_source_url?: string | null
+          payout_max?: number | null
+          payout_min?: number | null
+          source_id?: string | null
+          source_name?: string | null
+          source_type?: string | null
+          source_url?: string | null
+          status?: string | null
+          submission_mode?: string | null
+          tags?: string[] | null
+          updated_at?: string | null
+          url?: string | null
+          verification_level?: string | null
+          verification_notes?: string | null
+          verification_sources?: Json | null
+          verification_status?: string | null
+          verified?: boolean | null
+        }
+        Update: {
+          administrator_name?: string | null
+          breach_year?: number | null
+          canonical_key?: string | null
+          case_number?: string | null
+          category?: string | null
+          claim_deadline?: string | null
+          claim_url?: string | null
+          claims_filing_url?: string | null
+          closed_at?: string | null
+          company?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          credibility_score?: number | null
+          deadline?: string | null
+          description?: string | null
+          discovered_at?: string | null
+          eligibility_summary?: string | null
+          final_approval_date?: string | null
+          id?: string | null
+          is_demo?: boolean | null
+          is_test?: boolean | null
+          jurisdiction?: string | null
+          last_checked_at?: string | null
+          last_verified_at?: string | null
+          lifecycle_status?: string | null
+          media_references?: Json | null
+          name?: string | null
+          notes_internal?: string | null
+          official_source_url?: string | null
+          payout_max?: number | null
+          payout_min?: number | null
+          source_id?: string | null
+          source_name?: string | null
+          source_type?: string | null
+          source_url?: string | null
+          status?: string | null
+          submission_mode?: string | null
+          tags?: string[] | null
+          updated_at?: string | null
+          url?: string | null
+          verification_level?: string | null
+          verification_notes?: string | null
+          verification_sources?: Json | null
+          verification_status?: string | null
+          verified?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settlements_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "settlement_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       v_daily_active_scanners: {
         Row: {
           day: string | null
@@ -2887,6 +3101,7 @@ export type Database = {
         | { Args: never; Returns: boolean }
         | { Args: { p_user: string }; Returns: boolean }
       normalize_raw_ingest: { Args: { p_ingest_id: string }; Returns: string }
+      proc_archive_expired_settlements: { Args: never; Returns: number }
       proc_claim_outbox: {
         Args: { batch_size?: number }
         Returns: {
