@@ -48,14 +48,22 @@ const Dashboard = () => {
           setBreachCount(latestScan.breaches_detected);
         }
 
-        // Settlement matches with settlement details
+        // Settlement matches with settlement details - only active verified settlements
         const { data: matches } = await supabase
           .from("settlement_matches")
-          .select("settlement_id, payout_estimate, settlements(status, payout_max)")
+          .select("settlement_id, payout_estimate, settlements(status, payout_max, is_demo, is_test, lifecycle_status, claim_deadline)")
           .eq("user_id", user.id);
 
         if (matches) {
-          const open = matches.filter((m: any) => m.settlements?.status === "open" || m.settlements?.status === "verified");
+          const today = new Date().toISOString().split("T")[0];
+          const open = matches.filter((m: any) => {
+            const s = m.settlements;
+            if (!s) return false;
+            if (s.is_demo || s.is_test) return false;
+            if (s.lifecycle_status !== 'active') return false;
+            if (s.claim_deadline && s.claim_deadline < today) return false;
+            return s.status === "verified" || s.status === "open";
+          });
           setEligibleCount(open.length);
           setTotalEstimated(open.reduce((a: number, m: any) => a + (m.settlements?.payout_max || 0), 0));
         }
