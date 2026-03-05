@@ -37,6 +37,8 @@ const CheckEligibility = () => {
         .from("settlements")
         .select("id, name, company, breach_year, payout_min, payout_max, claim_deadline, deadline, canonical_key")
         .eq("verified", true)
+        .eq("is_demo", false)
+        .eq("is_test", false)
         .or(`canonical_key.eq.${slug},canonical_key.ilike.%${slug}%`)
         .limit(1);
 

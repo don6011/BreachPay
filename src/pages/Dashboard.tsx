@@ -55,7 +55,7 @@ const Dashboard = () => {
           .eq("user_id", user.id);
 
         if (matches) {
-          const open = matches.filter((m: any) => m.settlements?.status === "open");
+          const open = matches.filter((m: any) => m.settlements?.status === "open" || m.settlements?.status === "verified");
           setEligibleCount(open.length);
           setTotalEstimated(open.reduce((a: number, m: any) => a + (m.settlements?.payout_max || 0), 0));
         }
