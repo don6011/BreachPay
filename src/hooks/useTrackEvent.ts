@@ -12,7 +12,9 @@ type EventName =
   | "doc_uploaded"
   | "packet_generated"
   | "share_link_created"
-  | "payout_marked_paid";
+  | "payout_marked_paid"
+  | "redirect_official"
+  | "partner_api_submitted";
 
 export const useTrackEvent = () => {
   const { user } = useAuth();
