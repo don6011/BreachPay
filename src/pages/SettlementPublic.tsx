@@ -91,6 +91,8 @@ const SettlementPublic = () => {
         .from("settlements")
         .select("id, name, company, breach_year, description, eligibility_summary, category, payout_min, payout_max, claim_deadline, deadline, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, verified, verification_level, status, tags, canonical_key, credibility_score, verification_status, media_references, verification_sources")
         .eq("verified", true)
+        .eq("is_demo", false)
+        .eq("is_test", false)
         .or(`canonical_key.eq.${slug},canonical_key.ilike.%${slug}%`);
 
       const match = data?.[0] as SettlementPublicData | undefined;
@@ -101,6 +103,8 @@ const SettlementPublic = () => {
           .from("settlements")
           .select("id, name, company, breach_year, description, eligibility_summary, category, payout_min, payout_max, claim_deadline, deadline, jurisdiction, case_number, administrator_name, official_source_url, claims_filing_url, verified, verification_level, status, tags, canonical_key, credibility_score, verification_status, media_references, verification_sources")
           .eq("verified", true)
+          .eq("is_demo", false)
+          .eq("is_test", false)
           .neq("id", match.id)
           .or(`company.eq.${match.company},category.eq.${match.category || "none"}`)
           .limit(4);

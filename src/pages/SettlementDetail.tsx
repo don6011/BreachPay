@@ -41,6 +41,8 @@ const SettlementDetail = () => {
           .from("settlements")
           .select("*")
           .eq("id", id)
+          .eq("is_demo", false)
+          .eq("is_test", false)
           .single();
 
         setSettlement(s);
