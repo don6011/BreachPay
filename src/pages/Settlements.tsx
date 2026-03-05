@@ -603,6 +603,25 @@ const Settlements = () => {
         </div>
       )}
 
+      {/* Closed Settlements Toggle */}
+      {closedSettlementsList.length > 0 && (
+        <div className="mt-6">
+          <button
+            onClick={() => setShowClosed(!showClosed)}
+            className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors mb-3"
+          >
+            <ChevronRight className={`h-4 w-4 transition-transform ${showClosed ? "rotate-90" : ""}`} />
+            <span>Closed Settlements ({closedSettlementsList.length})</span>
+            <span className="text-xs bg-muted rounded-full px-2 py-0.5">Filing ended</span>
+          </button>
+          {showClosed && (
+            <div className="space-y-3 opacity-60">
+              {closedSettlementsList.map((s, i) => renderSettlementCard(s, i, false))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Settlement Detail Dialog */}
       <Dialog open={!!detailSettlement} onOpenChange={(open) => !open && setDetailSettlement(null)}>
         <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">

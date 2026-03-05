@@ -211,7 +211,7 @@ const SettlementPublic = () => {
     ? Math.max(0, Math.ceil((new Date(effectiveDeadline).getTime() - Date.now()) / 86400000))
     : null;
   const isUrgent = daysLeft !== null && daysLeft <= 30;
-  const isClosed = settlement.status === "closed" || isDeadlinePassed(effectiveDeadline);
+  const isClosed = settlement.status === "closed" || (settlement as any).lifecycle_status === "closed" || (settlement as any).lifecycle_status === "archived" || isDeadlinePassed(effectiveDeadline);
   const faqItems = buildFaqItems(settlement);
   const checkUrl = `/check/${settlement.canonical_key}`;
 
