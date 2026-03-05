@@ -153,7 +153,7 @@ const AdminClaims = () => {
     try {
       const { data } = await supabase
         .from("claims")
-        .select(`id, status, est_payout, filed_at, updated_at, user_id, settlement_id, partner_id, partner_firm_id, flagged, flag_reason, exposure_confidence, settlements(name, company, breach_year)`)
+        .select(`id, status, est_payout, filed_at, updated_at, user_id, settlement_id, partner_id, partner_firm_id, flagged, flag_reason, exposure_confidence, submission_channel, submitted_to_admin_at, external_submission_ref, packet_generated_at, settlements(name, company, breach_year)`)
         .order("created_at", { ascending: false })
         .limit(200);
 
@@ -876,8 +876,27 @@ const AdminClaims = () => {
             {/* Claim Packets */}
             <div>
               <h4 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
-                <FileText className="h-4 w-4" /> Claim Packets ({claimPackets.length})
+                <FileText className="h-4 w-4" /> Submission & Packets
               </h4>
+              <div className="grid grid-cols-2 gap-2 text-sm mb-3">
+                <div className="rounded-lg bg-muted/50 p-2">
+                  <p className="text-[10px] text-muted-foreground uppercase">Submission Channel</p>
+                  <p className="font-medium capitalize">{(selectedClaim as any)?.submission_channel?.replace(/_/g, " ") || "packet_only"}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-2">
+                  <p className="text-[10px] text-muted-foreground uppercase">Packet Generated</p>
+                  <p className="font-medium">{(selectedClaim as any)?.packet_generated_at ? new Date((selectedClaim as any).packet_generated_at).toLocaleString() : "—"}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-2">
+                  <p className="text-[10px] text-muted-foreground uppercase">Submitted to Admin</p>
+                  <p className="font-medium">{(selectedClaim as any)?.submitted_to_admin_at ? new Date((selectedClaim as any).submitted_to_admin_at).toLocaleString() : "—"}</p>
+                </div>
+                <div className="rounded-lg bg-muted/50 p-2">
+                  <p className="text-[10px] text-muted-foreground uppercase">External Ref</p>
+                  <p className="font-medium font-mono truncate">{(selectedClaim as any)?.external_submission_ref || "—"}</p>
+                </div>
+              </div>
+              <h4 className="text-sm font-semibold mb-2">Packets ({claimPackets.length})</h4>
               {claimPackets.length === 0 ? (
                 <p className="text-sm text-muted-foreground text-center py-3 bg-muted/30 rounded-lg">No packets generated</p>
               ) : (
