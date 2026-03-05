@@ -2190,31 +2190,43 @@ export type Database = {
           content_hash: string
           created_at: string
           fetched_at: string | null
+          fingerprint: string | null
           id: string
+          normalized: Json | null
+          raw_html: string | null
           raw_payload: Json
           raw_url: string | null
           source_id: string | null
           source_record_id: string | null
+          status: string
         }
         Insert: {
           content_hash: string
           created_at?: string
           fetched_at?: string | null
+          fingerprint?: string | null
           id?: string
+          normalized?: Json | null
+          raw_html?: string | null
           raw_payload: Json
           raw_url?: string | null
           source_id?: string | null
           source_record_id?: string | null
+          status?: string
         }
         Update: {
           content_hash?: string
           created_at?: string
           fetched_at?: string | null
+          fingerprint?: string | null
           id?: string
+          normalized?: Json | null
+          raw_html?: string | null
           raw_payload?: Json
           raw_url?: string | null
           source_id?: string | null
           source_record_id?: string | null
+          status?: string
         }
         Relationships: [
           {
@@ -2234,6 +2246,8 @@ export type Database = {
           id: string
           is_active: boolean | null
           name: string
+          parser_type: string | null
+          refresh_frequency: string | null
           reliability_score: number | null
           type: string
         }
@@ -2244,6 +2258,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name: string
+          parser_type?: string | null
+          refresh_frequency?: string | null
           reliability_score?: number | null
           type: string
         }
@@ -2254,10 +2270,47 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           name?: string
+          parser_type?: string | null
+          refresh_frequency?: string | null
           reliability_score?: number | null
           type?: string
         }
         Relationships: []
+      }
+      settlement_verification_checks: {
+        Row: {
+          check_type: string
+          created_at: string
+          evidence: Json | null
+          id: string
+          pass: boolean
+          settlement_id: string
+        }
+        Insert: {
+          check_type: string
+          created_at?: string
+          evidence?: Json | null
+          id?: string
+          pass?: boolean
+          settlement_id: string
+        }
+        Update: {
+          check_type?: string
+          created_at?: string
+          evidence?: Json | null
+          id?: string
+          pass?: boolean
+          settlement_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settlement_verification_checks_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       settlement_verification_queue: {
         Row: {
@@ -2322,11 +2375,14 @@ export type Database = {
           credibility_score: number | null
           deadline: string | null
           description: string | null
+          discovered_at: string | null
           eligibility_summary: string | null
           final_approval_date: string | null
           id: string
+          is_demo: boolean
           is_test: boolean
           jurisdiction: string | null
+          last_checked_at: string | null
           last_verified_at: string | null
           media_references: Json | null
           name: string
@@ -2364,11 +2420,14 @@ export type Database = {
           credibility_score?: number | null
           deadline?: string | null
           description?: string | null
+          discovered_at?: string | null
           eligibility_summary?: string | null
           final_approval_date?: string | null
           id?: string
+          is_demo?: boolean
           is_test?: boolean
           jurisdiction?: string | null
+          last_checked_at?: string | null
           last_verified_at?: string | null
           media_references?: Json | null
           name: string
@@ -2406,11 +2465,14 @@ export type Database = {
           credibility_score?: number | null
           deadline?: string | null
           description?: string | null
+          discovered_at?: string | null
           eligibility_summary?: string | null
           final_approval_date?: string | null
           id?: string
+          is_demo?: boolean
           is_test?: boolean
           jurisdiction?: string | null
+          last_checked_at?: string | null
           last_verified_at?: string | null
           media_references?: Json | null
           name?: string
@@ -2809,6 +2871,7 @@ export type Database = {
       }
     }
     Functions: {
+      auto_archive_expired_settlements: { Args: never; Returns: number }
       call_edge_function: {
         Args: { p_job: string; p_path: string }
         Returns: Json
@@ -2865,6 +2928,10 @@ export type Database = {
       }
       rpc_admin_mark_invoice_paid: {
         Args: { p_invoice_id: string }
+        Returns: undefined
+      }
+      rpc_admin_verify_settlement: {
+        Args: { p_decision: string; p_notes?: string; p_settlement_id: string }
         Returns: undefined
       }
       rpc_partner_add_claim_note: {
