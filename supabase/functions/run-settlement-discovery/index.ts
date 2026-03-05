@@ -5,15 +5,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface SourceConfig {
-  id: string;
-  name: string;
-  type: string;
-  base_url: string | null;
-  parser_type: string;
-  is_active: boolean;
-}
-
 interface CandidateSettlement {
   name: string;
   company: string;
@@ -47,7 +38,6 @@ async function parseTopClassActions(): Promise<CandidateSettlement[]> {
     if (!res.ok) return candidates;
     const html = await res.text();
 
-    // Extract article blocks - look for settlement entries
     const articleRegex = /<article[^>]*>[\s\S]*?<\/article>/gi;
     const articles = html.match(articleRegex) || [];
 
@@ -59,14 +49,10 @@ async function parseTopClassActions(): Promise<CandidateSettlement[]> {
       const rawTitle = titleMatch[2].replace(/<[^>]*>/g, "").trim();
       if (!rawTitle || rawTitle.length < 10) continue;
 
-      // Try to extract company name from title
       const companyMatch = rawTitle.match(/^([\w\s&.'-]+?)\s+(class action|settlement|data breach)/i);
       const company = companyMatch ? companyMatch[1].trim() : rawTitle.split(/\s+(settlement|class action)/i)[0]?.trim() || rawTitle;
 
-      // Extract deadline if present
       const deadlineMatch = article.match(/deadline[:\s]*([\w]+\s+\d{1,2},?\s*\d{4})/i);
-
-      // Extract payout if present
       const payoutMatch = article.match(/\$(\d[\d,.]*)\s*(?:[-–to]+\s*\$(\d[\d,.]*))?/i);
 
       candidates.push({
@@ -96,42 +82,16 @@ async function parseClassActionOrg(): Promise<CandidateSettlement[]> {
     if (!res.ok) return candidates;
     const html = await res.text();
 
-    const articleRegex = /<article[^>]*>[\s\S]*?<\/article>/gi;
     const linkRegex = /<a[^>]*href="(\/settlements\/[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
-    const articles = html.match(articleRegex) || [];
-
-    // Fallback: extract from links directly
-    if (articles.length === 0) {
-      let m;
-      while ((m = linkRegex.exec(html)) !== null) {
-        const url = "https://www.classaction.org" + m[1];
-        const rawTitle = m[2].replace(/<[^>]*>/g, "").trim();
-        if (!rawTitle || rawTitle.length < 10) continue;
-
-        const company = rawTitle.split(/\s+(settlement|class action)/i)[0]?.trim() || rawTitle;
-        candidates.push({
-          name: rawTitle.substring(0, 200),
-          company: company.substring(0, 100),
-          source_url: url,
-          source_type: "classaction_org",
-          category: rawTitle.toLowerCase().includes("data breach") ? "data_breach" : "general",
-        });
-        if (candidates.length >= 20) break;
-      }
-      return candidates;
-    }
-
-    for (const article of articles.slice(0, 20)) {
-      const titleMatch = article.match(/<h[23][^>]*>\s*<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/i);
-      if (!titleMatch) continue;
-
-      const url = titleMatch[1].startsWith("http") ? titleMatch[1] : "https://www.classaction.org" + titleMatch[1];
-      const rawTitle = titleMatch[2].replace(/<[^>]*>/g, "").trim();
-      if (!rawTitle) continue;
+    let m;
+    while ((m = linkRegex.exec(html)) !== null) {
+      const url = "https://www.classaction.org" + m[1];
+      const rawTitle = m[2].replace(/<[^>]*>/g, "").trim();
+      if (!rawTitle || rawTitle.length < 10) continue;
 
       const company = rawTitle.split(/\s+(settlement|class action)/i)[0]?.trim() || rawTitle;
-      const deadlineMatch = article.match(/deadline[:\s]*([\w]+\s+\d{1,2},?\s*\d{4})/i);
-      const payoutMatch = article.match(/\$(\d[\d,.]*)\s*(?:[-–to]+\s*\$(\d[\d,.]*))?/i);
+      const deadlineMatch = rawTitle.match(/deadline[:\s]*([\w]+\s+\d{1,2},?\s*\d{4})/i);
+      const payoutMatch = rawTitle.match(/\$(\d[\d,.]*)\s*(?:[-–to]+\s*\$(\d[\d,.]*))?/i);
 
       candidates.push({
         name: rawTitle.substring(0, 200),
@@ -143,6 +103,7 @@ async function parseClassActionOrg(): Promise<CandidateSettlement[]> {
         payout_max: payoutMatch?.[2] ? parseFloat(payoutMatch[2].replace(/,/g, "")) : undefined,
         category: rawTitle.toLowerCase().includes("data breach") ? "data_breach" : "general",
       });
+      if (candidates.length >= 20) break;
     }
   } catch (e) {
     console.error("ClassAction.org parse error:", e);
@@ -160,8 +121,7 @@ async function parseKroll(): Promise<CandidateSettlement[]> {
     if (!res.ok) return candidates;
     const html = await res.text();
 
-    // Kroll lists cases on their homepage with links
-    const linkRegex = /<a[^>]*href="(https?:\/\/[^"]*kroll[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
+    const linkRegex = /<a[^>]*href="(https?:\/\/[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
     let m;
     const seen = new Set<string>();
     while ((m = linkRegex.exec(html)) !== null) {
@@ -170,8 +130,8 @@ async function parseKroll(): Promise<CandidateSettlement[]> {
       if (!rawTitle || rawTitle.length < 5 || seen.has(url)) continue;
       seen.add(url);
 
-      // Skip navigation/utility links
-      if (rawTitle.toLowerCase().includes("privacy") || rawTitle.toLowerCase().includes("contact")) continue;
+      if (rawTitle.toLowerCase().includes("privacy") || rawTitle.toLowerCase().includes("contact") || rawTitle.toLowerCase().includes("cookie")) continue;
+      if (!url.includes("kroll") && !url.includes("settlement")) continue;
 
       candidates.push({
         name: rawTitle.substring(0, 200),
@@ -185,6 +145,89 @@ async function parseKroll(): Promise<CandidateSettlement[]> {
     }
   } catch (e) {
     console.error("Kroll parse error:", e);
+  }
+  return candidates;
+}
+
+// ── Epiq Parser ──
+async function parseEpiq(): Promise<CandidateSettlement[]> {
+  const candidates: CandidateSettlement[] = [];
+  try {
+    const res = await fetch("https://www.epiqglobal.com/en-us/cases", {
+      headers: { "User-Agent": "BreachPay-SettlementBot/1.0" },
+    });
+    if (!res.ok) return candidates;
+    const html = await res.text();
+
+    // Epiq lists cases as links to individual case pages
+    const linkRegex = /<a[^>]*href="([^"]*\/cases\/[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
+    let m;
+    const seen = new Set<string>();
+    while ((m = linkRegex.exec(html)) !== null) {
+      let url = m[1];
+      if (!url.startsWith("http")) url = "https://www.epiqglobal.com" + url;
+      const rawTitle = m[2].replace(/<[^>]*>/g, "").trim();
+      if (!rawTitle || rawTitle.length < 5 || seen.has(url)) continue;
+      seen.add(url);
+
+      // Skip nav/utility links
+      if (rawTitle.toLowerCase().includes("back to") || rawTitle.toLowerCase().includes("view all")) continue;
+
+      const company = rawTitle.split(/\s+(settlement|class action|litigation|case)/i)[0]?.trim() || rawTitle;
+
+      candidates.push({
+        name: rawTitle.substring(0, 200),
+        company: company.substring(0, 100),
+        source_url: url,
+        source_type: "epiq",
+        administrator_name: "Epiq Global",
+        category: rawTitle.toLowerCase().includes("data breach") || rawTitle.toLowerCase().includes("breach") ? "data_breach" : "general",
+      });
+      if (candidates.length >= 25) break;
+    }
+  } catch (e) {
+    console.error("Epiq parse error:", e);
+  }
+  return candidates;
+}
+
+// ── JND Legal Administration Parser ──
+async function parseJND(): Promise<CandidateSettlement[]> {
+  const candidates: CandidateSettlement[] = [];
+  try {
+    const res = await fetch("https://www.jndla.com/cases", {
+      headers: { "User-Agent": "BreachPay-SettlementBot/1.0" },
+    });
+    if (!res.ok) return candidates;
+    const html = await res.text();
+
+    // JND lists case links on their cases page
+    const linkRegex = /<a[^>]*href="([^"]*\/cases\/[^"]*)"[^>]*>([\s\S]*?)<\/a>/gi;
+    let m;
+    const seen = new Set<string>();
+    while ((m = linkRegex.exec(html)) !== null) {
+      let url = m[1];
+      if (!url.startsWith("http")) url = "https://www.jndla.com" + url;
+      const rawTitle = m[2].replace(/<[^>]*>/g, "").trim();
+      if (!rawTitle || rawTitle.length < 5 || seen.has(url)) continue;
+      seen.add(url);
+
+      if (rawTitle.toLowerCase().includes("back") || rawTitle.toLowerCase().includes("view all") || rawTitle.toLowerCase().includes("learn more")) continue;
+
+      const company = rawTitle.split(/\s+(settlement|class action|litigation|case)/i)[0]?.trim() || rawTitle;
+
+      candidates.push({
+        name: rawTitle.substring(0, 200),
+        company: company.substring(0, 100),
+        source_url: url,
+        source_type: "jnd",
+        administrator_name: "JND Legal Administration",
+        category: rawTitle.toLowerCase().includes("data breach") || rawTitle.toLowerCase().includes("breach") ? "data_breach" : "general",
+      });
+      if (candidates.length >= 25) break;
+    }
+  } catch (e) {
+    console.error("JND parse error:", e);
   }
   return candidates;
 }
@@ -213,29 +256,35 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Run parsers based on source type
-    let allCandidates: CandidateSettlement[] = [];
+    // Parser registry
+    const parserMap: Record<string, () => Promise<CandidateSettlement[]>> = {
+      topclassactions: parseTopClassActions,
+      classaction_org: parseClassActionOrg,
+      kroll: parseKroll,
+      epiq: parseEpiq,
+      jnd: parseJND,
+    };
 
-    for (const source of sources) {
+    // Run all parsers in parallel
+    const parserJobs = sources.map(async (source: any) => {
       results.sources_checked++;
+      const parserType = source.parser_type || source.type;
+      const parserFn = parserMap[parserType];
+      if (!parserFn) {
+        console.warn(`No parser for type: ${parserType}`);
+        return [];
+      }
       try {
-        let candidates: CandidateSettlement[] = [];
-        const parserType = source.parser_type || source.type;
-
-        if (parserType === "topclassactions" || source.name?.toLowerCase().includes("topclass")) {
-          candidates = await parseTopClassActions();
-        } else if (parserType === "classaction_org" || source.name?.toLowerCase().includes("classaction.org")) {
-          candidates = await parseClassActionOrg();
-        } else if (parserType === "kroll" || source.name?.toLowerCase().includes("kroll")) {
-          candidates = await parseKroll();
-        }
-        // Tag each candidate with source_id
-        candidates.forEach((c) => (c as any)._source_id = source.id);
-        allCandidates = allCandidates.concat(candidates);
+        const candidates = await parserFn();
+        return candidates.map((c) => ({ ...c, _source_id: source.id }));
       } catch (e: any) {
         results.errors.push(`Source ${source.name}: ${e.message}`);
+        return [];
       }
-    }
+    });
+
+    const allResults = await Promise.all(parserJobs);
+    const allCandidates = allResults.flat();
 
     // Dedupe and ingest
     for (const candidate of allCandidates) {
@@ -281,7 +330,6 @@ Deno.serve(async (req) => {
           });
 
         if (ingestError) {
-          // Likely duplicate fingerprint race condition
           if (ingestError.message?.includes("duplicate")) {
             results.duplicates++;
           } else {
@@ -341,7 +389,6 @@ Deno.serve(async (req) => {
 
           results.discovered++;
         } else {
-          // Update last_checked_at
           await supabase
             .from("settlements")
             .update({ last_checked_at: new Date().toISOString() })
