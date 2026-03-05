@@ -688,6 +688,7 @@ export type Database = {
           id: string
           last_error: string | null
           meta: Json | null
+          packet_url: string | null
           pdf_file_name: string | null
           pdf_storage_path: string | null
           status: string
@@ -699,6 +700,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           meta?: Json | null
+          packet_url?: string | null
           pdf_file_name?: string | null
           pdf_storage_path?: string | null
           status?: string
@@ -710,6 +712,7 @@ export type Database = {
           id?: string
           last_error?: string | null
           meta?: Json | null
+          packet_url?: string | null
           pdf_file_name?: string | null
           pdf_storage_path?: string | null
           status?: string
@@ -1036,6 +1039,7 @@ export type Database = {
           decided_at: string | null
           est_payout: number | null
           exposure_confidence: number
+          external_submission_ref: string | null
           fee_percent: number
           filed_at: string | null
           final_payout: number | null
@@ -1044,6 +1048,7 @@ export type Database = {
           id: string
           match_id: string | null
           net_payout: number | null
+          packet_generated_at: string | null
           paid_at: string | null
           partner_firm_id: string | null
           partner_id: string | null
@@ -1051,6 +1056,8 @@ export type Database = {
           scan_run_id: string | null
           settlement_id: string
           status: Database["public"]["Enums"]["claim_status_t"]
+          submission_channel: string
+          submitted_to_admin_at: string | null
           updated_at: string
           user_id: string
         }
@@ -1059,6 +1066,7 @@ export type Database = {
           decided_at?: string | null
           est_payout?: number | null
           exposure_confidence?: number
+          external_submission_ref?: string | null
           fee_percent?: number
           filed_at?: string | null
           final_payout?: number | null
@@ -1067,6 +1075,7 @@ export type Database = {
           id?: string
           match_id?: string | null
           net_payout?: number | null
+          packet_generated_at?: string | null
           paid_at?: string | null
           partner_firm_id?: string | null
           partner_id?: string | null
@@ -1074,6 +1083,8 @@ export type Database = {
           scan_run_id?: string | null
           settlement_id: string
           status?: Database["public"]["Enums"]["claim_status_t"]
+          submission_channel?: string
+          submitted_to_admin_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1082,6 +1093,7 @@ export type Database = {
           decided_at?: string | null
           est_payout?: number | null
           exposure_confidence?: number
+          external_submission_ref?: string | null
           fee_percent?: number
           filed_at?: string | null
           final_payout?: number | null
@@ -1090,6 +1102,7 @@ export type Database = {
           id?: string
           match_id?: string | null
           net_payout?: number | null
+          packet_generated_at?: string | null
           paid_at?: string | null
           partner_firm_id?: string | null
           partner_id?: string | null
@@ -1097,6 +1110,8 @@ export type Database = {
           scan_run_id?: string | null
           settlement_id?: string
           status?: Database["public"]["Enums"]["claim_status_t"]
+          submission_channel?: string
+          submitted_to_admin_at?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -2310,6 +2325,7 @@ export type Database = {
           eligibility_summary: string | null
           final_approval_date: string | null
           id: string
+          is_test: boolean
           jurisdiction: string | null
           last_verified_at: string | null
           media_references: Json | null
@@ -2323,6 +2339,7 @@ export type Database = {
           source_type: string | null
           source_url: string | null
           status: string
+          submission_mode: string
           tags: string[]
           updated_at: string
           url: string | null
@@ -2350,6 +2367,7 @@ export type Database = {
           eligibility_summary?: string | null
           final_approval_date?: string | null
           id?: string
+          is_test?: boolean
           jurisdiction?: string | null
           last_verified_at?: string | null
           media_references?: Json | null
@@ -2363,6 +2381,7 @@ export type Database = {
           source_type?: string | null
           source_url?: string | null
           status?: string
+          submission_mode?: string
           tags?: string[]
           updated_at?: string
           url?: string | null
@@ -2390,6 +2409,7 @@ export type Database = {
           eligibility_summary?: string | null
           final_approval_date?: string | null
           id?: string
+          is_test?: boolean
           jurisdiction?: string | null
           last_verified_at?: string | null
           media_references?: Json | null
@@ -2403,6 +2423,7 @@ export type Database = {
           source_type?: string | null
           source_url?: string | null
           status?: string
+          submission_mode?: string
           tags?: string[]
           updated_at?: string
           url?: string | null
