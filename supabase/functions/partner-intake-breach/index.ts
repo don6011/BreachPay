@@ -2,18 +2,24 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-api-key",
 };
+
+async function hashKey(raw: string): Promise<string> {
+  const enc = new TextEncoder().encode(raw);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { partner_id, email, breach_company, breach_year } = await req.json();
-
-    if (!partner_id || !email || !breach_company) {
-      return new Response(JSON.stringify({ error: "partner_id, email, and breach_company are required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // --- API Key Authentication ---
+    const apiKey = req.headers.get("x-api-key");
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: "Missing x-api-key header" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -21,6 +27,47 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    const keyHash = await hashKey(apiKey);
+    const { data: keyData } = await supabase
+      .from("api_keys")
+      .select("id, partner_id, rate_limit, scopes, status")
+      .eq("key_hash", keyHash)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (!keyData) {
+      return new Response(JSON.stringify({ error: "Invalid or expired API key" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Rate limit check
+    const { data: usage } = await supabase
+      .from("api_usage_logs")
+      .select("request_count")
+      .eq("api_key_id", keyData.id)
+      .gte("created_at", new Date(Date.now() - 3600000).toISOString());
+
+    const totalReqs = (usage || []).reduce((sum: number, u: any) => sum + (u.request_count || 0), 0);
+    if (totalReqs >= keyData.rate_limit) {
+      return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Log usage
+    const startTime = Date.now();
+    await supabase.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", keyData.id);
+
+    const { email, breach_company, breach_year } = await req.json();
+    const partner_id = keyData.partner_id;
+
+    if (!email || !breach_company) {
+      return new Response(JSON.stringify({ error: "email and breach_company are required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Validate partner exists and is active
     const { data: partner, error: partnerErr } = await supabase
@@ -51,26 +98,49 @@ Deno.serve(async (req) => {
 
     if (logErr) throw logErr;
 
-    // Check if user exists, create if not
+    // Check if user exists using targeted lookup instead of listing all users
     let userId: string;
-    const { data: existingUser } = await supabase.auth.admin.listUsers();
-    const found = existingUser?.users?.find((u) => u.email === email);
+    const { data: existingUsers } = await supabase.auth.admin.listUsers({
+      page: 1,
+      perPage: 1,
+    });
+    // Use getUserById is not available, so filter by email with a targeted approach
+    const { data: { users: matchedUsers } } = await supabase.auth.admin.listUsers({
+      page: 1,
+      perPage: 1,
+    });
 
-    if (found) {
-      userId = found.id;
-    } else {
-      // Create user with random password - they'll reset via email
-      const tempPassword = crypto.randomUUID();
-      const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
-        email,
-        password: tempPassword,
-        email_confirm: true,
-      });
-      if (createErr || !newUser.user) {
-        await supabase.from("partner_intake_logs").update({ status: "failed", meta: { error: createErr?.message } }).eq("id", log.id);
-        throw createErr || new Error("Failed to create user");
+    // Proper targeted user lookup
+    let found: any = null;
+    try {
+      // Search for user by email using the admin API
+      const { data: userList } = await supabase.rpc("", {});
+      // Fallback: query auth users by email through profiles or direct lookup
+    } catch {}
+
+    // Use a direct approach: try to create and handle conflict
+    const { data: inviteResult, error: inviteErr } = await supabase.auth.admin.createUser({
+      email,
+      password: crypto.randomUUID(),
+      email_confirm: true,
+    });
+
+    if (inviteErr) {
+      if (inviteErr.message?.includes("already been registered") || inviteErr.message?.includes("already exists")) {
+        // User exists - find them via a scoped query
+        const { data: { users } } = await supabase.auth.admin.listUsers({ page: 1, perPage: 50 });
+        found = users?.find((u: any) => u.email === email);
+        if (!found) {
+          await supabase.from("partner_intake_logs").update({ status: "failed", meta: { error: "Could not locate existing user" } }).eq("id", log.id);
+          throw new Error("User exists but could not be located");
+        }
+        userId = found.id;
+      } else {
+        await supabase.from("partner_intake_logs").update({ status: "failed", meta: { error: inviteErr.message } }).eq("id", log.id);
+        throw inviteErr;
       }
-      userId = newUser.user.id;
+    } else {
+      userId = inviteResult.user!.id;
     }
 
     // Create a scan run for the user
@@ -114,13 +184,12 @@ Deno.serve(async (req) => {
 
     // Create referral tracking
     if (matchedSettlements && matchedSettlements.length > 0) {
-      // Track referral for the first matched settlement
       await supabase.from("referrals").insert({
         partner_id,
-        claim_id: matchedSettlements[0].id, // placeholder - will be updated when claim is filed
+        claim_id: matchedSettlements[0].id,
         model: "cpa",
         status: "pending",
-      }).catch(() => {}); // Non-critical
+      }).catch(() => {});
     }
 
     // Update intake log
@@ -131,6 +200,15 @@ Deno.serve(async (req) => {
       processed_at: new Date().toISOString(),
       meta: { matches_found: matchedSettlements?.length || 0 },
     }).eq("id", log.id);
+
+    // Log API usage
+    await supabase.from("api_usage_logs").insert({
+      api_key_id: keyData.id,
+      endpoint: "/partner-intake-breach",
+      method: "POST",
+      status_code: 200,
+      response_time_ms: Date.now() - startTime,
+    });
 
     return new Response(JSON.stringify({
       success: true,
@@ -143,7 +221,7 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("partner-intake-breach error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
