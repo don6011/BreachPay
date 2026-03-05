@@ -97,6 +97,7 @@ const Settlements = () => {
   const [filingId, setFilingId] = useState<string | null>(null);
   const [detailSettlement, setDetailSettlement] = useState<SettlementData | null>(null);
   const [showPossible, setShowPossible] = useState(false);
+  const [showClosed, setShowClosed] = useState(false);
 
   // Label for weak matches section
 
