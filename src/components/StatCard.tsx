@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 
@@ -10,7 +11,7 @@ interface StatCardProps {
   className?: string;
 }
 
-export function StatCard({ icon: Icon, label, value, subtitle, variant = "default", className }: StatCardProps) {
+export const StatCard = forwardRef<HTMLDivElement, StatCardProps>(({ icon: Icon, label, value, subtitle, variant = "default", className }, ref) => {
   return (
     <div className={cn(
       "p-6 transition-all duration-300",
@@ -30,4 +31,5 @@ export function StatCard({ icon: Icon, label, value, subtitle, variant = "defaul
       {subtitle && <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>}
     </div>
   );
-}
+});
+StatCard.displayName = "StatCard";
