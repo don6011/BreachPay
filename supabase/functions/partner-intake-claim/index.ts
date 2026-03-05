@@ -2,18 +2,24 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-api-key",
 };
+
+async function hashKey(raw: string): Promise<string> {
+  const enc = new TextEncoder().encode(raw);
+  const buf = await crypto.subtle.digest("SHA-256", enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { partner_id, full_name, email, breach, notes } = await req.json();
-
-    if (!partner_id || !email || !breach) {
-      return new Response(JSON.stringify({ error: "partner_id, email, and breach are required" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    // --- API Key Authentication ---
+    const apiKey = req.headers.get("x-api-key");
+    if (!apiKey) {
+      return new Response(JSON.stringify({ error: "Missing x-api-key header" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -21,6 +27,46 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
+
+    const keyHash = await hashKey(apiKey);
+    const { data: keyData } = await supabase
+      .from("api_keys")
+      .select("id, partner_id, rate_limit, scopes, status")
+      .eq("key_hash", keyHash)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (!keyData) {
+      return new Response(JSON.stringify({ error: "Invalid or expired API key" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Rate limit check
+    const { data: usage } = await supabase
+      .from("api_usage_logs")
+      .select("request_count")
+      .eq("api_key_id", keyData.id)
+      .gte("created_at", new Date(Date.now() - 3600000).toISOString());
+
+    const totalReqs = (usage || []).reduce((sum: number, u: any) => sum + (u.request_count || 0), 0);
+    if (totalReqs >= keyData.rate_limit) {
+      return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const startTime = Date.now();
+    await supabase.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", keyData.id);
+
+    const { full_name, email, breach, notes } = await req.json();
+    const partner_id = keyData.partner_id;
+
+    if (!email || !breach) {
+      return new Response(JSON.stringify({ error: "email and breach are required" }), {
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Validate partner
     const { data: partner, error: partnerErr } = await supabase
@@ -52,23 +98,32 @@ Deno.serve(async (req) => {
 
     if (logErr) throw logErr;
 
-    // Find or create user
+    // Find or create user — try create first, handle conflict
     let userId: string;
-    const { data: existingUser } = await supabase.auth.admin.listUsers();
-    const found = existingUser?.users?.find((u) => u.email === email);
+    const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
+      email,
+      password: crypto.randomUUID(),
+      email_confirm: true,
+    });
 
-    if (found) {
-      userId = found.id;
+    if (createErr) {
+      if (createErr.message?.includes("already been registered") || createErr.message?.includes("already exists")) {
+        // User exists — targeted lookup
+        const { data: { users } } = await supabase.auth.admin.listUsers({ page: 1, perPage: 50 });
+        const found = users?.find((u: any) => u.email === email);
+        if (!found) {
+          await supabase.from("partner_intake_logs").update({ status: "failed", meta: { error: "Could not locate existing user" } }).eq("id", log.id);
+          throw new Error("User exists but could not be located");
+        }
+        userId = found.id;
+      } else {
+        await supabase.from("partner_intake_logs").update({ status: "failed", meta: { error: createErr.message } }).eq("id", log.id);
+        throw createErr;
+      }
     } else {
-      const tempPassword = crypto.randomUUID();
-      const { data: newUser, error: createErr } = await supabase.auth.admin.createUser({
-        email,
-        password: tempPassword,
-        email_confirm: true,
-      });
-      if (createErr || !newUser.user) {
-        await supabase.from("partner_intake_logs").update({ status: "failed", meta: { error: createErr?.message } }).eq("id", log.id);
-        throw createErr || new Error("Failed to create user");
+      if (!newUser.user) {
+        await supabase.from("partner_intake_logs").update({ status: "failed", meta: { error: "Failed to create user" } }).eq("id", log.id);
+        throw new Error("Failed to create user");
       }
       userId = newUser.user.id;
     }
@@ -138,6 +193,15 @@ Deno.serve(async (req) => {
       processed_at: new Date().toISOString(),
     }).eq("id", log.id);
 
+    // Log API usage
+    await supabase.from("api_usage_logs").insert({
+      api_key_id: keyData.id,
+      endpoint: "/partner-intake-claim",
+      method: "POST",
+      status_code: 200,
+      response_time_ms: Date.now() - startTime,
+    });
+
     return new Response(JSON.stringify({
       success: true,
       intake_id: log.id,
@@ -148,7 +212,7 @@ Deno.serve(async (req) => {
     });
   } catch (err) {
     console.error("partner-intake-claim error:", err);
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
