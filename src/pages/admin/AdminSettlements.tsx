@@ -48,6 +48,8 @@ interface Settlement {
   eligibility_summary: string | null;
   claim_url: string | null;
   canonical_key: string;
+  submission_mode: string;
+  is_test: boolean;
 }
 
 interface QueueItem {
@@ -116,6 +118,7 @@ const emptyForm = () => ({
   claim_deadline: "", notes_internal: "",
   source_type: "", source_name: "", source_url: "",
   verification_notes: "", eligibility_summary: "", claim_url: "", category: "data_breach",
+  submission_mode: "packet_only", is_test: false,
 });
 
 // ── Component ──────────────────────────────────────────
@@ -323,6 +326,8 @@ const AdminSettlements = () => {
       eligibility_summary: s.eligibility_summary || "",
       claim_url: s.claim_url || "",
       category: s.category || "data_breach",
+      submission_mode: s.submission_mode || "packet_only",
+      is_test: s.is_test || false,
     });
     setValidationErrors([]);
     setDialogOpen(true);
@@ -369,6 +374,8 @@ const AdminSettlements = () => {
       eligibility_summary: form.eligibility_summary.trim() || null,
       claim_url: form.claim_url.trim() || null,
       category: form.category || "data_breach",
+      submission_mode: form.submission_mode,
+      is_test: form.is_test,
     };
 
     if (form.verified) payload.last_verified_at = new Date().toISOString();
@@ -906,6 +913,31 @@ const AdminSettlements = () => {
             <Textarea placeholder="Description" className="rounded-xl" value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} rows={2} />
             <Textarea placeholder="Eligibility Summary" className="rounded-xl" value={form.eligibility_summary} onChange={(e) => setForm(f => ({ ...f, eligibility_summary: e.target.value }))} rows={2} />
             <Input placeholder="Claim URL" className="rounded-xl" value={form.claim_url} onChange={(e) => setForm(f => ({ ...f, claim_url: e.target.value }))} />
+
+            {/* Submission Mode & Test Toggle */}
+            <div className="space-y-3 rounded-xl border p-4">
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">Submission Configuration</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Submission Mode</Label>
+                  <Select value={form.submission_mode} onValueChange={(v) => setForm(f => ({ ...f, submission_mode: v }))}>
+                    <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="packet_only">Packet Only</SelectItem>
+                      <SelectItem value="redirect_official">Redirect to Official Site</SelectItem>
+                      <SelectItem value="partner_api">Partner API (Direct)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Test Settlement</Label>
+                  <div className="flex items-center gap-2 h-10">
+                    <Switch checked={form.is_test} onCheckedChange={(v) => setForm(f => ({ ...f, is_test: v }))} />
+                    <span className="text-xs text-muted-foreground">{form.is_test ? "Test mode" : "Production"}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* Verification */}
             <div className="space-y-3 rounded-xl border p-4">
