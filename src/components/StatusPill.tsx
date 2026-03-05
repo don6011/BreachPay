@@ -1,3 +1,4 @@
+import { forwardRef } from "react";
 import { cn } from "@/lib/utils";
 import type { SeverityLevel, SettlementStatus, ClaimStatus, AlertCategory } from "@/types";
 
@@ -43,11 +44,12 @@ const labelMap: Record<string, string> = {
   claim_update: "Claim Update",
 };
 
-export function StatusPill({ variant, className }: { variant: PillVariant; className?: string }) {
+export const StatusPill = forwardRef<HTMLSpanElement, { variant: PillVariant; className?: string }>(({ variant, className }, ref) => {
   const label = labelMap[variant] || variant.charAt(0).toUpperCase() + variant.slice(1);
   return (
-    <span className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize", variantStyles[variant] || "bg-muted text-muted-foreground", className)}>
+    <span ref={ref} className={cn("inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold capitalize", variantStyles[variant] || "bg-muted text-muted-foreground", className)}>
       {label}
     </span>
   );
-}
+});
+StatusPill.displayName = "StatusPill";
