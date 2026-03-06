@@ -130,7 +130,17 @@ const Wallet = () => {
       </div>
 
       {/* Payment Method */}
-      <DirectDepositForm />
+      <Collapsible>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" className="w-full flex items-center justify-between py-3 px-5 rounded-2xl border bg-card mb-2">
+            <span className="text-sm font-semibold">Payment Method</span>
+            <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform duration-200 [[data-state=open]_&]:rotate-180" />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <DirectDepositForm />
+        </CollapsibleContent>
+      </Collapsible>
 
       <p className="text-[10px] text-muted-foreground text-center mt-6">
         BreachPay is not a law firm. Payout amounts are estimates based on third-party data and are subject to settlement administrator approval.
