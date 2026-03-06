@@ -555,6 +555,51 @@ export type Database = {
           },
         ]
       }
+      claim_attempts: {
+        Row: {
+          attempt_type: string
+          blocked_reason: string | null
+          created_at: string
+          id: string
+          settlement_id: string
+          success: boolean
+          user_id: string
+        }
+        Insert: {
+          attempt_type?: string
+          blocked_reason?: string | null
+          created_at?: string
+          id?: string
+          settlement_id: string
+          success?: boolean
+          user_id: string
+        }
+        Update: {
+          attempt_type?: string
+          blocked_reason?: string | null
+          created_at?: string
+          id?: string
+          settlement_id?: string
+          success?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "claim_attempts_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "settlements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "claim_attempts_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "v_active_settlements"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       claim_doc_requests: {
         Row: {
           claim_id: string
@@ -1042,8 +1087,11 @@ export type Database = {
       }
       claims: {
         Row: {
+          blocked_reason: string | null
           created_at: string
           decided_at: string | null
+          eligibility_score: number
+          eligibility_validated: boolean
           est_payout: number | null
           exposure_confidence: number
           external_submission_ref: string | null
@@ -1064,13 +1112,17 @@ export type Database = {
           settlement_id: string
           status: Database["public"]["Enums"]["claim_status_t"]
           submission_channel: string
+          submit_blocked: boolean
           submitted_to_admin_at: string | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          blocked_reason?: string | null
           created_at?: string
           decided_at?: string | null
+          eligibility_score?: number
+          eligibility_validated?: boolean
           est_payout?: number | null
           exposure_confidence?: number
           external_submission_ref?: string | null
@@ -1091,13 +1143,17 @@ export type Database = {
           settlement_id: string
           status?: Database["public"]["Enums"]["claim_status_t"]
           submission_channel?: string
+          submit_blocked?: boolean
           submitted_to_admin_at?: string | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          blocked_reason?: string | null
           created_at?: string
           decided_at?: string | null
+          eligibility_score?: number
+          eligibility_validated?: boolean
           est_payout?: number | null
           exposure_confidence?: number
           external_submission_ref?: string | null
@@ -1118,6 +1174,7 @@ export type Database = {
           settlement_id?: string
           status?: Database["public"]["Enums"]["claim_status_t"]
           submission_channel?: string
+          submit_blocked?: boolean
           submitted_to_admin_at?: string | null
           updated_at?: string
           user_id?: string
@@ -2426,6 +2483,7 @@ export type Database = {
           deadline: string | null
           description: string | null
           discovered_at: string | null
+          eligibility_rules: Json
           eligibility_summary: string | null
           final_approval_date: string | null
           id: string
@@ -2473,6 +2531,7 @@ export type Database = {
           deadline?: string | null
           description?: string | null
           discovered_at?: string | null
+          eligibility_rules?: Json
           eligibility_summary?: string | null
           final_approval_date?: string | null
           id?: string
@@ -2520,6 +2579,7 @@ export type Database = {
           deadline?: string | null
           description?: string | null
           discovered_at?: string | null
+          eligibility_rules?: Json
           eligibility_summary?: string | null
           final_approval_date?: string | null
           id?: string
@@ -2842,6 +2902,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_risk_flags: {
+        Row: {
+          created_at: string
+          id: string
+          lock_reason: string | null
+          locked_until: string | null
+          total_lockouts: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lock_reason?: string | null
+          locked_until?: string | null
+          total_lockouts?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lock_reason?: string | null
+          locked_until?: string | null
+          total_lockouts?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_risk_snapshots: {
         Row: {
           breaches_detected: number
@@ -3149,6 +3239,7 @@ export type Database = {
         Args: { p_decision: string; p_notes?: string; p_settlement_id: string }
         Returns: undefined
       }
+      rpc_can_start_claim: { Args: { p_settlement_id: string }; Returns: Json }
       rpc_partner_add_claim_note: {
         Args: { p_claim_id: string; p_note: string; p_visibility?: string }
         Returns: undefined
@@ -3169,6 +3260,11 @@ export type Database = {
         Args: { p_claim_id: string; p_new_status: string; p_notes?: string }
         Returns: undefined
       }
+      rpc_start_claim_guarded: {
+        Args: { p_match_id?: string; p_settlement_id: string }
+        Returns: Json
+      }
+      rpc_submit_claim_guarded: { Args: { p_claim_id: string }; Returns: Json }
       validate_api_key: {
         Args: { p_key_hash: string }
         Returns: {

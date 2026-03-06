@@ -75,6 +75,8 @@ const ClaimFiling = () => {
   const [submitting, setSubmitting] = useState(false);
   const [createdClaimId, setCreatedClaimId] = useState<string | null>(null);
   const [draftClaimId, setDraftClaimId] = useState<string | null>(null);
+  const [eligibilityBlocked, setEligibilityBlocked] = useState<string | null>(null);
+  const [checkingEligibility, setCheckingEligibility] = useState(false);
 
   const [identity, setIdentity] = useState({ fullName: "", email: "", phone: "", address: "" });
   const [eligibility, setEligibility] = useState({
@@ -193,12 +195,10 @@ const ClaimFiling = () => {
     return true;
   }, [step, identity, eligibility, consent]);
 
-  // Create or get draft claim
+  // Create or get draft claim via guarded RPC
   const ensureDraftClaim = async (): Promise<string | null> => {
     if (draftClaimId) return draftClaimId;
     if (!user || !settlement) return null;
-
-    const estPayout = (settlement.payout_min + settlement.payout_max) / 2;
 
     // Find match_id if exists
     const { data: matchData } = await supabase
@@ -206,42 +206,28 @@ const ClaimFiling = () => {
       .select("id")
       .eq("user_id", user.id)
       .eq("settlement_id", settlement.id)
+      .order("confidence_score", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    const { data: claimData, error } = await supabase.from("claims").insert({
-      user_id: user.id,
-      settlement_id: settlement.id,
-      est_payout: estPayout,
-      status: "draft",
-      match_id: matchData?.id || null,
-    }).select("id").single();
-
-    if (error) {
-      // Might be unique constraint violation — check for existing
-      if (error.code === "23505") {
-        const { data: existing } = await supabase
-          .from("claims")
-          .select("id")
-          .eq("user_id", user.id)
-          .eq("settlement_id", settlement.id)
-          .maybeSingle();
-        if (existing) {
-          setDraftClaimId(existing.id);
-          return existing.id;
-        }
-      }
-      throw error;
-    }
-
-    setDraftClaimId(claimData.id);
-    track("claim_started", { claim_id: claimData.id, settlement_id: settlement.id });
-
-    // Create claim_applications row
-    await supabase.from("claim_applications").insert({
-      claim_id: claimData.id,
+    const { data, error } = await supabase.rpc("rpc_start_claim_guarded", {
+      p_settlement_id: settlement.id,
+      p_match_id: matchData?.id || null,
     });
 
-    return claimData.id;
+    if (error) throw error;
+    const result = data as any;
+
+    if (!result.allowed) {
+      setEligibilityBlocked(result.reason);
+      throw new Error(result.reason);
+    }
+
+    setDraftClaimId(result.claim_id);
+    if (!result.resumed) {
+      track("claim_started", { claim_id: result.claim_id, settlement_id: settlement.id });
+    }
+    return result.claim_id;
   };
 
   // Hash a file for duplicate detection
@@ -384,29 +370,27 @@ const ClaimFiling = () => {
         await uploadDocuments(claimId);
       }
 
-      // Transition from draft to submitted
-      await supabase.from("claims").update({
-        status: "submitted",
-        filed_at: new Date().toISOString().split("T")[0],
-        updated_at: new Date().toISOString(),
-      }).eq("id", claimId);
-
-      // Status history
-      await supabase.from("claim_status_history").insert({
-        claim_id: claimId,
-        old_status: "draft",
-        status: "submitted",
-        note: `Claim filed for ${settlement.name}`,
-        updated_by: "user",
+      // Use guarded submit RPC
+      const { data: submitResult, error: submitError } = await supabase.rpc("rpc_submit_claim_guarded", {
+        p_claim_id: claimId,
       });
+
+      if (submitError) throw submitError;
+      const result = submitResult as any;
+      if (!result.allowed) {
+        setEligibilityBlocked(result.reason);
+        toast({ title: "Submission Blocked", description: result.reason, variant: "destructive" });
+        return;
+      }
 
       setCreatedClaimId(claimId);
       setSubmitted(true);
       track("claim_submitted", { claim_id: claimId, settlement_id: settlement.id });
       if (documents.length > 0) track("doc_uploaded", { claim_id: claimId, doc_count: documents.length });
       toast({ title: "Claim Filed!", description: `Your claim for ${settlement.name} has been submitted.` });
-    } catch (error) {
-      toast({ title: "Error", description: "Failed to file claim. Please try again.", variant: "destructive" });
+    } catch (error: any) {
+      const msg = error?.message || "Failed to file claim. Please try again.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
       console.error("Claim filing error:", error);
     } finally {
       setSubmitting(false);
@@ -431,18 +415,21 @@ const ClaimFiling = () => {
   }
   const deadlinePassed = isDeadlinePassed(effectiveDeadline);
 
-  if (deadlinePassed) {
+  if (deadlinePassed || eligibilityBlocked) {
     return (
       <div>
-        <PageHeader title="Filing Closed" subtitle="The deadline for this settlement has passed" />
+        <PageHeader title={deadlinePassed ? "Filing Closed" : "Not Eligible"} subtitle={deadlinePassed ? "The deadline for this settlement has passed" : "You cannot file this claim"} />
         <div className="mx-auto max-w-lg text-center space-y-4">
           <div className="rounded-2xl border bg-card p-8">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">
               <XCircle className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h2 className="text-xl font-bold mb-2">Deadline Passed</h2>
+            <h2 className="text-xl font-bold mb-2">{deadlinePassed ? "Deadline Passed" : "Claim Blocked"}</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              The filing deadline for <span className="font-semibold text-foreground">{settlement.name}</span> was {effectiveDeadline}. Claims can no longer be submitted.
+              {deadlinePassed
+                ? <>The filing deadline for <span className="font-semibold text-foreground">{settlement.name}</span> was {effectiveDeadline}. Claims can no longer be submitted.</>
+                : <>{eligibilityBlocked}</>
+              }
             </p>
             <Button onClick={() => navigate("/settlements")}>View Other Settlements</Button>
           </div>

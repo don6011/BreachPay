@@ -23,7 +23,7 @@ export function DeadlineCountdown() {
     const fetch = async () => {
       const { data: matches } = await supabase
         .from("settlement_matches")
-        .select("settlement_id, settlements(id, name, company, claim_deadline, deadline)")
+        .select("settlement_id, settlements(id, name, company, claim_deadline, deadline, is_demo, is_test, lifecycle_status, status)")
         .eq("user_id", user.id);
 
       if (!matches) return;
@@ -40,6 +40,9 @@ export function DeadlineCountdown() {
       for (const m of matches as any[]) {
         const s = m.settlements;
         if (!s) continue;
+        if (s.is_demo || s.is_test) continue;
+        if (s.lifecycle_status !== "active") continue;
+        if (s.status !== "verified" && s.status !== "open") continue;
         const dl = s.claim_deadline || s.deadline;
         if (!dl) continue;
         const daysLeft = Math.ceil((new Date(dl).getTime() - Date.now()) / 86400000);
