@@ -5,6 +5,7 @@ import { RiskGauge } from "@/components/RiskGauge";
 import { AlertRow } from "@/components/AlertRow";
 import { BreachIntelligence } from "@/components/BreachIntelligence";
 import { DeadlineCountdown } from "@/components/DeadlineCountdown";
+import { MoneyRadar } from "@/components/MoneyRadar";
 import { ReferralCard } from "@/components/ReferralCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
