@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Wallet as WalletIcon, DollarSign, Clock, CheckCircle, TrendingUp, CreditCard, ArrowRight, Loader2 } from "lucide-react";
+import { Wallet as WalletIcon, DollarSign, Clock, CheckCircle, TrendingUp, ArrowRight, Loader2 } from "lucide-react";
+import DirectDepositForm from "@/components/DirectDepositForm";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 
@@ -129,14 +130,7 @@ const Wallet = () => {
       </div>
 
       {/* Payment Method */}
-      <div className="rounded-2xl border border-dashed bg-card p-6 text-center">
-        <CreditCard className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-        <h3 className="font-semibold mb-1">Payment Method</h3>
-        <p className="text-sm text-muted-foreground mb-4">Set up direct deposit to receive payouts faster</p>
-        <Button variant="outline" className="rounded-xl" disabled>
-          Coming Soon
-        </Button>
-      </div>
+      <DirectDepositForm />
 
       <p className="text-[10px] text-muted-foreground text-center mt-6">
         BreachPay is not a law firm. Payout amounts are estimates based on third-party data and are subject to settlement administrator approval.
