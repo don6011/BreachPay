@@ -74,33 +74,21 @@ const SettlementDetail = () => {
     if (!user || !settlement || filing) return;
     setFiling(true);
     try {
-      const estPayout = ((settlement.payout_min || 0) + (settlement.payout_max || 0)) / 2;
-      const { data, error } = await supabase
-        .from("claims")
-        .insert({
-          user_id: user.id,
-          settlement_id: settlement.id,
-          est_payout: estPayout,
-          filed_at: new Date().toISOString().split("T")[0],
-          status: "submitted",
-        })
-        .select("id")
-        .single();
-
-      if (error) throw error;
-
-      await supabase.from("claim_status_history").insert({
-        claim_id: data.id,
-        status: "submitted",
-        note: "Claim submitted",
-        updated_by: "user",
+      // Check eligibility via server-side RPC first
+      const { data: check, error: checkErr } = await supabase.rpc("rpc_can_start_claim", {
+        p_settlement_id: settlement.id,
       });
-
-      toast({ title: "Claim Filed", description: `Your claim for ${settlement.name} has been submitted.` });
-      navigate(`/claims/${data.id}`);
-    } catch (err) {
+      if (checkErr) throw checkErr;
+      const result = check as any;
+      if (!result.allowed) {
+        toast({ title: "Not Eligible", description: result.reason, variant: "destructive" });
+        return;
+      }
+      // Navigate to the full claim wizard
+      navigate(`/claims/file?settlement=${settlement.id}`);
+    } catch (err: any) {
       console.error(err);
-      toast({ title: "Error", description: "Failed to file claim.", variant: "destructive" });
+      toast({ title: "Error", description: err?.message || "Failed to start claim.", variant: "destructive" });
     } finally {
       setFiling(false);
     }
