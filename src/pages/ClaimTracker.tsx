@@ -428,15 +428,29 @@ const ClaimTracker = () => {
           </div>
 
           {effectiveDeadline && (() => {
-            const daysLeft = Math.max(0, Math.ceil((new Date(effectiveDeadline).getTime() - Date.now()) / 86400000));
-            const isUrgent = daysLeft <= 30;
+            const deadlineDate = new Date(effectiveDeadline);
+            const daysLeft = Math.ceil((deadlineDate.getTime() - Date.now()) / 86400000);
+            const isExpired = daysLeft < 0;
+            const isUrgent = !isExpired && daysLeft <= 30;
             return (
-              <div className={`flex items-center gap-2 rounded-xl p-3 ${isUrgent ? "bg-destructive/10 border border-destructive/20" : "bg-muted/50"}`}>
-                {isUrgent ? <AlertTriangle className="h-4 w-4 text-destructive shrink-0" /> : <Clock className="h-4 w-4 text-muted-foreground shrink-0" />}
+              <div className={`flex items-center gap-2 rounded-xl p-3 ${isExpired || isUrgent ? "bg-destructive/10 border border-destructive/20" : "bg-muted/50"}`}>
+                {isExpired || isUrgent ? <AlertTriangle className="h-4 w-4 text-destructive shrink-0" /> : <Clock className="h-4 w-4 text-muted-foreground shrink-0" />}
                 <div className="flex-1">
-                  <p className={`text-sm font-semibold ${isUrgent ? "text-destructive" : ""}`}>{daysLeft} days until filing deadline</p>
-                  <p className="text-xs text-muted-foreground">Filing deadline: {new Date(effectiveDeadline).toLocaleDateString()}</p>
+                  {isExpired ? (
+                    <>
+                      <p className="text-sm font-semibold text-destructive">Filing Deadline Expired</p>
+                      <p className="text-xs text-muted-foreground">Deadline was {deadlineDate.toLocaleDateString()}. This settlement is no longer accepting new claims.</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className={`text-sm font-semibold ${isUrgent ? "text-destructive" : ""}`}>{daysLeft} days until filing deadline</p>
+                      <p className="text-xs text-muted-foreground">Filing deadline: {deadlineDate.toLocaleDateString()}</p>
+                    </>
+                  )}
                 </div>
+                {isExpired && (
+                  <span className="text-[10px] font-bold uppercase tracking-wider bg-destructive/20 text-destructive px-2 py-0.5 rounded-full shrink-0">Expired</span>
+                )}
               </div>
             );
           })()}
