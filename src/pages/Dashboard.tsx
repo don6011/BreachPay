@@ -158,6 +158,11 @@ const Dashboard = () => {
         <DeadlineCountdown />
       </div>
 
+      {/* Money Radar */}
+      <div className="mb-6">
+        <MoneyRadar />
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
         {/* Risk Gauge */}
         <div className="flex items-center justify-center glass-card-glow p-6 lg:row-span-2">
