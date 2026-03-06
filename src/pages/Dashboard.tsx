@@ -5,6 +5,7 @@ import { RiskGauge } from "@/components/RiskGauge";
 import { AlertRow } from "@/components/AlertRow";
 import { BreachIntelligence } from "@/components/BreachIntelligence";
 import { DeadlineCountdown } from "@/components/DeadlineCountdown";
+import { MoneyRadar } from "@/components/MoneyRadar";
 import { ReferralCard } from "@/components/ReferralCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -155,6 +156,11 @@ const Dashboard = () => {
       {/* Deadline Countdown */}
       <div className="mb-6">
         <DeadlineCountdown />
+      </div>
+
+      {/* Money Radar */}
+      <div className="mb-6">
+        <MoneyRadar />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
