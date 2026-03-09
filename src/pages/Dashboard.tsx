@@ -141,8 +141,8 @@ const Dashboard = () => {
     <div>
       <PageHeader title="Dashboard" subtitle="Your compensation overview" />
 
-      {/* Estimated Value Hero */}
-      {!loading && totalEstimated > 0 && (
+      {/* Estimated Value Hero - Show empty state or value */}
+      {!loading && totalEstimated > 0 ? (
         <div className="mb-6 glass-card-glow p-6 text-center">
           <p className="text-sm text-muted-foreground mb-1">You may be eligible for up to</p>
           <p className="text-3xl font-bold gradient-emerald-text">${totalEstimated.toLocaleString()}</p>
@@ -151,7 +151,15 @@ const Dashboard = () => {
             <Link to="/settlements">View Matches <ArrowRight className="ml-2 h-4 w-4" /></Link>
           </Button>
         </div>
-      )}
+      ) : !loading && eligibleCount === 0 ? (
+        <div className="mb-6 glass-card p-6 text-center">
+          <Search className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground mb-3">Run your first breach scan to discover potential settlement opportunities.</p>
+          <Button className="rounded-xl" asChild>
+            <Link to="/scan"><Search className="mr-2 h-4 w-4" />Run Scan</Link>
+          </Button>
+        </div>
+      ) : null}
 
       {/* Deadline Countdown */}
       <div className="mb-6">
