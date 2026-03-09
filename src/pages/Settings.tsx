@@ -117,20 +117,88 @@ const Settings = () => {
           Your data is encrypted at rest. Documents are stored securely with time-limited access. Monitored identifiers are stored as hashes, never plaintext.
         </p>
         <div className="flex flex-wrap gap-3">
-          <Button variant="outline" className="rounded-xl"><Download className="mr-2 h-4 w-4" />Export My Data</Button>
-          <Button variant="destructive" className="rounded-xl" onClick={async () => {
-            if (!user) return;
-            if (!confirm("Are you sure you want to request deletion of all your data? This action cannot be undone.")) return;
-            const { error } = await supabase.from("data_deletion_requests").insert({
-              user_id: user.id,
-              reason: "User-initiated deletion request",
-            } as any);
-            if (error) {
-              alert("Failed to submit request. Please try again.");
-            } else {
-              alert("Your data deletion request has been submitted. We will process it within 30 days.");
-            }
-          }}><Trash2 className="mr-2 h-4 w-4" />Request Data Deletion</Button>
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            disabled={exporting}
+            onClick={async () => {
+              if (!user) return;
+              setExporting(true);
+              try {
+                const [profileRes, breachesRes, claimsRes, alertsRes, scansRes, matchesRes, identifiersRes] = await Promise.all([
+                  supabase.from("user_profiles").select("*").eq("user_id", user.id),
+                  supabase.from("breach_events").select("source, exposed_fields, breach_year, risk_level, created_at").eq("user_id", user.id),
+                  supabase.from("claims").select("id, status, est_payout, net_payout, created_at, filed_at, submission_channel, settlement_id").eq("user_id", user.id),
+                  supabase.from("alerts").select("title, body, type, severity, created_at, is_read").eq("user_id", user.id),
+                  supabase.from("scan_runs").select("risk_score, breaches_detected, databases_scanned, status, created_at").eq("user_id", user.id).order("created_at", { ascending: false }),
+                  supabase.from("settlement_matches").select("settlement_id, payout_estimate, match_confidence, created_at").eq("user_id", user.id),
+                  supabase.from("monitored_identifiers").select("type, value_last4, display_label, is_active, verified, created_at").eq("user_id", user.id),
+                ]);
+
+                const exportData = {
+                  exported_at: new Date().toISOString(),
+                  account: {
+                    email: user.email,
+                    created_at: user.created_at,
+                  },
+                  profile: profileRes.data ?? [],
+                  breach_events: breachesRes.data ?? [],
+                  claims: claimsRes.data ?? [],
+                  alerts: alertsRes.data ?? [],
+                  scan_runs: scansRes.data ?? [],
+                  settlement_matches: matchesRes.data ?? [],
+                  monitored_identifiers: identifiersRes.data ?? [],
+                };
+
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `breachpay-data-export-${new Date().toISOString().split("T")[0]}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+                toast.success("Data exported successfully");
+              } catch (err) {
+                console.error("Export error:", err);
+                toast.error("Failed to export data. Please try again.");
+              } finally {
+                setExporting(false);
+              }
+            }}
+          >
+            {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
+            {exporting ? "Exporting…" : "Export My Data"}
+          </Button>
+          <Button
+            variant="destructive"
+            className="rounded-xl"
+            disabled={deleting}
+            onClick={async () => {
+              if (!user) return;
+              if (!confirm("Are you sure you want to request deletion of all your data? This action cannot be undone.")) return;
+              setDeleting(true);
+              try {
+                const { error } = await supabase.from("data_deletion_requests").insert({
+                  user_id: user.id,
+                  reason: "User-initiated deletion request",
+                });
+                if (error) {
+                  console.error("Deletion request error:", error);
+                  toast.error("Failed to submit request. Please try again.");
+                } else {
+                  toast.success("Your data deletion request has been submitted. We will process it within 30 days.");
+                }
+              } catch (err) {
+                console.error("Deletion request error:", err);
+                toast.error("Something went wrong. Please try again.");
+              } finally {
+                setDeleting(false);
+              }
+            }}
+          >
+            {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+            {deleting ? "Submitting…" : "Request Data Deletion"}
+          </Button>
         </div>
       </section>
 
