@@ -14,6 +14,7 @@ const plans = [
     ctaLink: "/signup",
     highlighted: false,
     features: [
+      "1 monitored email",
       "1 secure scan (manual)",
       "Weekly monitoring scans",
       "Breach exposure summary",
