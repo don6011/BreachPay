@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { ScanProgressSteps } from "@/components/ScanProgressSteps";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
