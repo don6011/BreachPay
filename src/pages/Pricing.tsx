@@ -47,6 +47,7 @@ const plans = [
 ];
 
 const comparisonRows = [
+  { feature: "Monitored emails", free: "1", premium: "Up to 5" },
   { feature: "Scan frequency", free: "Weekly", premium: "Daily" },
   { feature: "Breach alerts", free: "Batched", premium: "Real-time" },
   { feature: "Dark web monitoring", free: "—", premium: "✓" },
