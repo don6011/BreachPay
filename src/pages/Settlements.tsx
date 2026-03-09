@@ -364,6 +364,27 @@ const Settlements = () => {
             )}
           </div>
 
+          {/* Trust Signal Badges */}
+          {(settlement.verified || settlement.official_source_url || settlement.claims_filing_url) && (
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {settlement.verified && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/8 border border-primary/15 px-2.5 py-1 text-[10px] font-medium text-primary">
+                  <CheckCircle2 className="h-3 w-3" /> Verified Settlement
+                </span>
+              )}
+              {settlement.claims_filing_url && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/8 border border-primary/15 px-2.5 py-1 text-[10px] font-medium text-primary">
+                  <CheckCircle2 className="h-3 w-3" /> Official Claim Portal
+                </span>
+              )}
+              {(settlement.official_source_url || settlement.source_url) && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/8 border border-primary/15 px-2.5 py-1 text-[10px] font-medium text-primary">
+                  <CheckCircle2 className="h-3 w-3" /> Source Linked
+                </span>
+              )}
+            </div>
+          )}
+
           {/* Deadline Countdown Bar */}
           {settlement.status !== "closed" && effectiveDeadline && (
             <div className="mb-3">
