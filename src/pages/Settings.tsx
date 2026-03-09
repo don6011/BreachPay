@@ -12,7 +12,8 @@ import { toast } from "sonner";
 const Settings = () => {
   const { user, signOut, plan } = useAuth();
   const navigate = useNavigate();
-  const loading = false;
+  const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const isPremium = plan === "premium";
 
