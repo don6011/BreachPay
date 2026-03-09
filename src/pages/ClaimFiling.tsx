@@ -694,17 +694,33 @@ const ClaimFiling = () => {
     <div>
       <PageHeader title="File Your Claim" subtitle={settlement.name} />
 
+      {/* Step indicator */}
+      <div className="mb-2 text-center">
+        <span className="text-xs font-semibold text-primary">Step {step + 1} of {STEPS.length}</span>
+      </div>
+
       {/* Progress bar */}
       <div className="mb-6">
         <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
           {STEPS.map((s, i) => (
-            <span key={s} className={i <= step ? "text-primary font-medium" : ""}>{s}</span>
+            <span key={s} className={`flex items-center gap-1 ${i < step ? "text-success" : i === step ? "text-primary font-medium" : ""}`}>
+              {i < step && <CheckCircle className="h-3 w-3" />}
+              {s}
+            </span>
           ))}
         </div>
         <Progress value={progressPercent} className="h-1.5" />
       </div>
 
       <div className="mx-auto max-w-2xl">
+
+        {/* Claim preparation notice */}
+        <div className="mb-4 rounded-xl border border-primary/20 bg-primary/5 p-3 flex items-start gap-2.5">
+          <Shield className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+          <p className="text-xs text-muted-foreground">
+            BreachPay helps prepare and submit your claim information. Final approval and payouts are determined by the official settlement administrator.
+          </p>
+        </div>
 
         {/* Verified Settlement Callout */}
         {settlement.verified && (
@@ -726,7 +742,11 @@ const ClaimFiling = () => {
         {step === 0 && (
           <div className="space-y-4">
             <div className="rounded-2xl border bg-card p-6 space-y-4">
-              <div className="flex items-start justify-between">
+              {/* Settlement branding */}
+              <div className="flex items-start gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-muted text-sm font-bold text-muted-foreground uppercase">
+                  {settlement.company?.slice(0, 2) || "??"}
+                </div>
                 <div>
                   <h2 className="text-lg font-bold">{settlement.name}</h2>
                   <p className="text-sm text-muted-foreground">{settlement.company} · {settlement.breach_year} Breach</p>
@@ -738,8 +758,7 @@ const ClaimFiling = () => {
                 <div className="rounded-xl bg-muted/50 p-4">
                   <p className="text-xs text-muted-foreground mb-1">Estimated Payout</p>
                   <PayoutRange min={settlement.payout_min} max={settlement.payout_max} size="md" />
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Subject to administrator review</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Subject to administrator review</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">Actual payout amounts depend on settlement administrator review and total claims submitted.</p>
                 </div>
                 <div className="rounded-xl bg-muted/50 p-4">
                   <div className="flex items-center gap-1.5 mb-1">
