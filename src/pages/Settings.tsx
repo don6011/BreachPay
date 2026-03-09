@@ -89,7 +89,7 @@ const Settings = () => {
                 <span className="text-sm font-semibold">Premium — $4.99/mo</span>
                 <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">50% OFF</span>
               </div>
-              <p className="text-xs text-muted-foreground">Daily scans · Real-time breach alerts · Dark web monitoring · Priority matching</p>
+              <p className="text-xs text-muted-foreground">Monitor up to 5 emails · Daily scans · Real-time breach alerts · Dark web monitoring · Priority matching</p>
             </div>
           </div>
         )}
