@@ -19,6 +19,10 @@ export function BreachIntelligence() {
   const { data: activeSettlements, isLoading: loadingSettlements } = useActiveSettlements();
   const [selectedBreach, setSelectedBreach] = useState<BreachCatalogEntry | null>(null);
 
+  // Check if all data is empty (no breaches and no settlements from catalog)
+  const hasNoData = !loadingBreaches && !loadingSettlements && 
+    (!recentBreaches?.length) && (!activeSettlements?.length);
+
   return (
     <div className="space-y-6">
       {/* Active Settlements Widget */}
