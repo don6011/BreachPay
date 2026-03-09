@@ -44,6 +44,7 @@ interface ClaimDetail {
   fee_percent: number;
   final_payout: number | null;
   flag_reason: string | null;
+  submission_channel: string | null;
   settlement: {
     id: string;
     name: string;
