@@ -12,6 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow, format } from "date-fns";
 import { BreachDetailModal } from "@/components/BreachDetailModal";
 import type { BreachCatalogEntry } from "@/hooks/useBreachCatalog";
+import shieldIcon from "@/assets/shield-icon.png";
 import { PremiumUpgradeCard } from "@/components/PremiumUpgradeCard";
 import { IdentityProtectionUpsell } from "@/components/IdentityProtectionUpsell";
 import { useTrackEvent } from "@/hooks/useTrackEvent";
