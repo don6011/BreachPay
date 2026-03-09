@@ -72,6 +72,7 @@ const Scan = () => {
   const { user } = useAuth();
   const track = useTrackEvent();
   const [state, setState] = useState<ScanState>("idle");
+  const [scanMode, setScanMode] = useState<ScanMode>("live");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [breaches, setBreaches] = useState<BreachResult[]>([]);
