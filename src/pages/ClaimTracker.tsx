@@ -19,10 +19,18 @@ import { PostClaimShare } from "@/components/PostClaimShare";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
-const PROGRESS_STEPS = [
+const PROGRESS_STEPS_DEFAULT = [
   { key: "draft", label: "Draft" },
   { key: "submitted", label: "Submitted" },
   { key: "under_review", label: "Under Review" },
+  { key: "approved", label: "Approved" },
+  { key: "paid", label: "Paid" },
+];
+
+const PROGRESS_STEPS_PACKET_ONLY = [
+  { key: "draft", label: "Draft" },
+  { key: "submitted", label: "Packet Ready" },
+  { key: "under_review", label: "User Submitted" },
   { key: "approved", label: "Approved" },
   { key: "paid", label: "Paid" },
 ];

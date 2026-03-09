@@ -560,27 +560,45 @@ const ClaimFiling = () => {
                 className="w-full mb-4 rounded-xl gap-2"
                 onClick={async () => {
                   if (!createdClaimId) return;
-                  // Fetch the packet URL from claim_packets
-                  const { data: packet } = await supabase
-                    .from("claim_packets")
-                    .select("packet_url, pdf_storage_path")
-                    .eq("claim_id", createdClaimId)
-                    .order("generated_at", { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
+                  try {
+                    const { data: packet } = await supabase
+                      .from("claim_packets")
+                      .select("pdf_storage_path, pdf_file_name")
+                      .eq("claim_id", createdClaimId)
+                      .eq("status", "generated")
+                      .order("generated_at", { ascending: false })
+                      .limit(1)
+                      .maybeSingle();
 
-                  if (packet?.packet_url) {
-                    window.open(packet.packet_url, "_blank");
-                  } else if (packet?.pdf_storage_path) {
+                    if (!packet?.pdf_storage_path) {
+                      toast({ title: "Packet not found", description: "Please try again or contact support.", variant: "destructive" });
+                      return;
+                    }
+
                     const { data: signedUrl } = await supabase.storage
                       .from("claim-packets")
                       .createSignedUrl(packet.pdf_storage_path, 300);
-                    if (signedUrl?.signedUrl) window.open(signedUrl.signedUrl, "_blank");
-                    else toast({ title: "Error", description: "Could not generate download link", variant: "destructive" });
-                  } else {
-                    toast({ title: "Packet not found", description: "Please try again or contact support.", variant: "destructive" });
+                    if (!signedUrl?.signedUrl) {
+                      toast({ title: "Error", description: "Could not generate download link", variant: "destructive" });
+                      return;
+                    }
+
+                    // Force download via blob to avoid browser displaying raw content
+                    const response = await fetch(signedUrl.signedUrl);
+                    if (!response.ok) throw new Error("Download failed");
+                    const blob = await response.blob();
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = packet.pdf_file_name || `BreachPay-Claim-Packet-${createdClaimId.slice(0, 8)}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    track("packet_downloaded", { claim_id: createdClaimId });
+                  } catch (e: any) {
+                    toast({ title: "Error", description: e.message || "Failed to download packet", variant: "destructive" });
                   }
-                  track("packet_downloaded", { claim_id: createdClaimId });
                 }}
               >
                 <FileText className="h-4 w-4" /> Download Claim Packet
