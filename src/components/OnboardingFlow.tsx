@@ -198,7 +198,7 @@ export function OnboardingFlow({ onComplete }: Props) {
               {/* Email limit indicator */}
               <div className="flex items-center justify-between pt-1">
                 <p className="text-xs text-muted-foreground">
-                  {secondaryEmails.length}/{emailLimit} additional email{emailLimit !== 1 ? "s" : ""}
+                  {secondaryEmails.length}/{emailLimit} additional emails
                 </p>
                 {!isPremium && secondaryEmails.length >= emailLimit && (
                   <div className="flex items-center gap-1 text-xs text-primary">
