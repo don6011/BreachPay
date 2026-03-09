@@ -57,6 +57,7 @@ export function useActiveSettlements() {
       if (error) throw error;
       return (data || []) as BreachCatalogEntry[];
     },
+    refetchInterval: 5 * 60 * 1000, // auto-refresh every 5 minutes
   });
 }
 
@@ -91,5 +92,6 @@ export function useRecentVerifiedBreaches(limit = 10) {
       if (error) throw error;
       return (data || []) as BreachCatalogEntry[];
     },
+    refetchInterval: 5 * 60 * 1000, // auto-refresh every 5 minutes
   });
 }
