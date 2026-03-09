@@ -65,7 +65,7 @@ const Settings = () => {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
-              {["Daily scans", "Real-time alerts", "Dark web monitoring", "Priority matching", "Risk scoring", "Auto-claim packets"].map(f => (
+              {["Monitor up to 5 emails", "Daily scans", "Real-time alerts", "Dark web monitoring", "Priority matching", "Risk scoring", "Auto-claim packets"].map(f => (
                 <div key={f} className="flex items-center gap-1.5 text-muted-foreground">
                   <CheckCircle className="h-3 w-3 text-primary" />{f}
                 </div>
