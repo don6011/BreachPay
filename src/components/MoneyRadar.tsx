@@ -76,7 +76,17 @@ export const MoneyRadar = () => {
   const totalRecovery = opportunities.reduce((sum, o) => sum + o.estimatedPayout, 0);
 
   if (loading) return null;
-  if (opportunities.length === 0) return null;
+  
+  if (opportunities.length === 0) {
+    return (
+      <div className="glass-card p-6 text-center">
+        <Radar className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+        <p className="text-sm text-muted-foreground">
+          No recovery opportunities found yet. Run a breach scan to check if you may qualify for compensation.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="glass-card-glow p-6">
