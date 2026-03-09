@@ -10,10 +10,11 @@ import { ReferralCard } from "@/components/ReferralCard";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PremiumUpgradeCard } from "@/components/PremiumUpgradeCard";
+import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useScanSchedule } from "@/hooks/useScanSchedule";
-import { ShieldAlert, Scale, DollarSign, FileText, Activity, Search, ArrowRight, Wallet, Clock, CheckCircle, CalendarClock } from "lucide-react";
+import { ShieldAlert, Scale, DollarSign, FileText, Activity, Search, ArrowRight, Wallet, Clock, CheckCircle, CalendarClock, Shield, FileCheck } from "lucide-react";
 import { Link } from "react-router-dom";
 
 const Dashboard = () => {
@@ -29,13 +30,13 @@ const Dashboard = () => {
   const [totalRecovered, setTotalRecovered] = useState(0);
   const [pendingPayouts, setPendingPayouts] = useState(0);
   const [approvedValue, setApprovedValue] = useState(0);
+  const [totalMin, setTotalMin] = useState(0);
 
   useEffect(() => {
     if (!user) return;
 
     const fetchDashboard = async () => {
       try {
-        // Latest scan run for risk score + breach count
         const { data: latestScan } = await supabase
           .from("scan_runs")
           .select("risk_score, breaches_detected")
@@ -49,10 +50,9 @@ const Dashboard = () => {
           setBreachCount(latestScan.breaches_detected);
         }
 
-        // Settlement matches with settlement details - only active verified settlements
         const { data: matches } = await supabase
           .from("settlement_matches")
-          .select("settlement_id, payout_estimate, settlements(status, payout_max, is_demo, is_test, lifecycle_status, claim_deadline)")
+          .select("settlement_id, payout_estimate, settlements(status, payout_min, payout_max, is_demo, is_test, lifecycle_status, claim_deadline)")
           .eq("user_id", user.id);
 
         if (matches) {
@@ -67,16 +67,15 @@ const Dashboard = () => {
           });
           setEligibleCount(open.length);
           setTotalEstimated(open.reduce((a: number, m: any) => a + (m.settlements?.payout_max || 0), 0));
+          setTotalMin(open.reduce((a: number, m: any) => a + (m.settlements?.payout_min || 0), 0));
         }
 
-        // Claims count
         const { count } = await supabase
           .from("claims")
           .select("*", { count: "exact", head: true })
           .eq("user_id", user.id);
         setClaimsCount(count || 0);
 
-        // Payout wallet data
         const [payoutsRes, claimsFullRes] = await Promise.all([
           supabase
             .from("payouts")
@@ -108,7 +107,6 @@ const Dashboard = () => {
           );
         }
 
-        // Recent alerts
         const { data: alertsData } = await supabase
           .from("alerts")
           .select("*")
@@ -141,22 +139,61 @@ const Dashboard = () => {
     <div>
       <PageHeader title="Dashboard" subtitle="Your compensation overview" />
 
-      {/* Estimated Value Hero - Show empty state or value */}
+      {/* Hero Recovery Card */}
       {!loading && totalEstimated > 0 ? (
-        <div className="mb-6 glass-card-glow p-6 text-center">
-          <p className="text-sm text-muted-foreground mb-1">You may be eligible for up to</p>
-          <p className="text-3xl font-bold gradient-emerald-text">${totalEstimated.toLocaleString()}</p>
-          <p className="text-sm text-muted-foreground mt-1">in estimated compensation across {eligibleCount} opportunit{eligibleCount !== 1 ? "ies" : "y"}</p>
-          <Button className="mt-4 rounded-xl" asChild>
-            <Link to="/settlements">View Matches <ArrowRight className="ml-2 h-4 w-4" /></Link>
-          </Button>
+        <div className="mb-6 glass-card-glow p-8 text-center relative overflow-hidden">
+          {/* Soft background glow */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
+            <div className="h-48 w-48 rounded-full bg-primary/8 blur-3xl" />
+          </div>
+          <div className="relative">
+            <p className="text-sm text-muted-foreground mb-2">Potential Recovery</p>
+            <div className="flex items-baseline justify-center gap-1 mb-2">
+              <span className="text-5xl font-bold gradient-emerald-text tracking-tight">
+                <AnimatedNumber value={totalEstimated} prefix="$" />
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground max-w-sm mx-auto">
+              Estimated compensation across your detected settlement opportunities.
+            </p>
+
+            {/* Recovery summary box */}
+            {eligibleCount > 0 && (
+              <div className="mt-5 inline-flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-5 py-3">
+                <div className="flex items-center gap-1.5 text-sm">
+                  <CheckCircle className="h-4 w-4 text-primary" />
+                  <span className="text-foreground font-medium">{eligibleCount} verified settlement{eligibleCount !== 1 ? "s" : ""} detected</span>
+                </div>
+                <span className="text-muted-foreground">·</span>
+                <span className="text-sm text-muted-foreground">
+                  ${totalMin.toLocaleString()}–${totalEstimated.toLocaleString()}
+                </span>
+              </div>
+            )}
+
+            <div className="mt-5 flex items-center justify-center gap-3">
+              <Button className="rounded-xl shadow-[0_0_20px_hsl(var(--primary)/0.25)] hover:shadow-[0_0_30px_hsl(var(--primary)/0.4)] transition-all duration-300" asChild>
+                <Link to="/settlements">View Matches <ArrowRight className="ml-2 h-4 w-4" /></Link>
+              </Button>
+              {eligibleCount > 1 && (
+                <Button variant="outline" className="rounded-xl" asChild>
+                  <Link to="/claims"><FileCheck className="mr-2 h-4 w-4" /> File All Eligible Claims</Link>
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       ) : !loading && eligibleCount === 0 ? (
-        <div className="mb-6 glass-card p-6 text-center">
-          <Search className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-          <p className="text-sm text-muted-foreground mb-3">Run your first breach scan to discover potential settlement opportunities.</p>
-          <Button className="rounded-xl" asChild>
-            <Link to="/scan"><Search className="mr-2 h-4 w-4" />Run Scan</Link>
+        <div className="mb-6 glass-card p-8 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/50">
+            <Search className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-semibold mb-1">No recovery opportunities detected yet.</h3>
+          <p className="text-sm text-muted-foreground mb-5 max-w-sm mx-auto">
+            Run a breach scan to check if you may qualify for compensation from data breach settlements.
+          </p>
+          <Button className="rounded-xl shadow-[0_0_20px_hsl(var(--primary)/0.25)] hover:shadow-[0_0_30px_hsl(var(--primary)/0.4)] transition-all duration-300" asChild>
+            <Link to="/scan"><Search className="mr-2 h-4 w-4" />Run Secure Scan</Link>
           </Button>
         </div>
       ) : null}
