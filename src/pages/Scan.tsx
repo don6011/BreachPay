@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, Shield, AlertTriangle, Loader2, Crown, Check, Eye, DollarSign, Zap, Bell, Activity, ArrowRight, ExternalLink, BadgeCheck, Clock, CalendarClock } from "lucide-react";
+import { Search, Shield, AlertTriangle, Loader2, Crown, Check, Eye, DollarSign, Zap, Bell, Activity, ArrowRight, ExternalLink, BadgeCheck, Clock, CalendarClock, Globe } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
@@ -17,6 +17,7 @@ import { IdentityProtectionUpsell } from "@/components/IdentityProtectionUpsell"
 import { useTrackEvent } from "@/hooks/useTrackEvent";
 
 type ScanState = "idle" | "scanning" | "results";
+type ScanMode = "demo" | "live";
 
 const severityColor: Record<string, string> = {
   low: "text-warning bg-warning/10 border-warning/20",
