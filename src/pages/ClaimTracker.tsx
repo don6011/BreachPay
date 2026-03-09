@@ -19,10 +19,18 @@ import { PostClaimShare } from "@/components/PostClaimShare";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
-const PROGRESS_STEPS = [
+const PROGRESS_STEPS_DEFAULT = [
   { key: "draft", label: "Draft" },
   { key: "submitted", label: "Submitted" },
   { key: "under_review", label: "Under Review" },
+  { key: "approved", label: "Approved" },
+  { key: "paid", label: "Paid" },
+];
+
+const PROGRESS_STEPS_PACKET_ONLY = [
+  { key: "draft", label: "Draft" },
+  { key: "submitted", label: "Packet Ready" },
+  { key: "under_review", label: "User Submitted" },
   { key: "approved", label: "Approved" },
   { key: "paid", label: "Paid" },
 ];
@@ -36,6 +44,7 @@ interface ClaimDetail {
   fee_percent: number;
   final_payout: number | null;
   flag_reason: string | null;
+  submission_channel: string | null;
   settlement: {
     id: string;
     name: string;
@@ -225,7 +234,7 @@ const ClaimTracker = () => {
       supabase
         .from("claims")
         .select(`
-          id, status, est_payout, filed_at, updated_at, fee_percent, final_payout, flag_reason,
+          id, status, est_payout, filed_at, updated_at, fee_percent, final_payout, flag_reason, submission_channel,
           settlements(id, name, company, breach_year, deadline, payout_min, payout_max, verified, verification_level, claim_deadline, official_source_url, claims_filing_url, administrator_name, source_url)
         `)
         .eq("id", claimId)
@@ -269,6 +278,7 @@ const ClaimTracker = () => {
         est_payout: Number(c.est_payout) || 0,
         fee_percent: Number(c.fee_percent) || 15,
         final_payout: c.final_payout ? Number(c.final_payout) : null,
+        submission_channel: c.submission_channel || null,
         settlement: c.settlements ? {
           ...c.settlements,
           payout_min: Number(c.settlements.payout_min) || 0,
@@ -331,6 +341,7 @@ const ClaimTracker = () => {
     );
   }
 
+  const PROGRESS_STEPS = claim.submission_channel === "packet_only" ? PROGRESS_STEPS_PACKET_ONLY : PROGRESS_STEPS_DEFAULT;
   const currentStepIndex = PROGRESS_STEPS.findIndex(s => s.key === claim.status);
   const isRejected = claim.status === "rejected";
   const isDocRequired = claim.status === "documentation_required";
