@@ -137,6 +137,9 @@
 .glass-card {
   transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease, border-color 0.3s ease;
 }
+.glass-card:hover {
+  transform: translateY(-1px);
+}
 
 /* Button glow on hover */
 .btn-glow {
@@ -144,6 +147,31 @@
 }
 .btn-glow:hover {
   box-shadow: 0 0 24px 0 hsl(var(--primary) / 0.3);
+}
+
+/* Focus ring for interactive elements */
+.focus-ring {
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+}
+
+/* Smooth scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.15);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.25);
+}
+
+/* Toast styling */
+[data-sonner-toaster] [data-sonner-toast] {
+  @apply border-border bg-card text-foreground;
 }
 
 @keyframes float-particle {
@@ -161,4 +189,13 @@
   90% {
     opacity: 0;
   }
+}
+
+/* Page transition helper */
+.page-enter {
+  animation: pageIn 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
 }
