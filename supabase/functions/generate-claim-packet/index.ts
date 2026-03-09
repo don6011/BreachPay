@@ -23,6 +23,36 @@ function safe(s: string | null | undefined): string {
   return s || "—";
 }
 
+// Map raw eligibility keys to friendly labels
+function friendlyLabel(key: string): string {
+  const map: Record<string, string> = {
+    BreachImpact: "Affected by breach",
+    breach_impact: "Affected by breach",
+    FinancialLoss: "Experienced financial loss",
+    financial_loss: "Experienced financial loss",
+    MonitoringPurchase: "Purchased credit monitoring",
+    monitoring_purchase: "Purchased credit monitoring",
+    LossAmount: "Loss amount",
+    loss_amount: "Loss amount",
+    MonitoringCost: "Monitoring cost",
+    monitoring_cost: "Monitoring cost",
+    TimeSpent: "Time spent on remediation",
+    time_spent: "Time spent on remediation",
+    IdentityTheft: "Experienced identity theft",
+    identity_theft: "Experienced identity theft",
+    FraudCharges: "Had fraudulent charges",
+    fraud_charges: "Had fraudulent charges",
+  };
+  return map[key] || key.replace(/([A-Z])/g, " $1").replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()).trim();
+}
+
+function friendlyValue(val: unknown): string {
+  if (val === true) return "Yes";
+  if (val === false) return "No";
+  if (val === null || val === undefined || val === "") return "Not provided";
+  return String(val);
+}
+
 function buildPdf(claim: any, settlement: any, application: any, documents: any[], match: any): Uint8Array {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
@@ -31,28 +61,22 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
   const contentW = pw - margin * 2;
   let y = margin;
 
+  const isPacketOnly = claim.submission_channel === "packet_only";
+  const isPartnerApi = claim.submission_channel === "partner_api";
+
   // Brand colors (RGB)
-  const navy = [7, 10, 18];
-  const panelNavy = [14, 23, 38];
   const emerald = [0, 230, 168];
-  const teal = [0, 191, 166];
-  const gold = [200, 162, 76];
   const dark = [15, 23, 42];
   const gray = [100, 116, 139];
   const lightGray = [148, 163, 184];
-  const white = [255, 255, 255];
-  const cardBg = [16, 24, 40];
-  const cardBorder = [30, 41, 59];
 
   function addFooter() {
     const totalPages = doc.getNumberOfPages();
     for (let i = 1; i <= totalPages; i++) {
       doc.setPage(i);
-      // Footer line
       doc.setDrawColor(...emerald as [number, number, number]);
       doc.setLineWidth(0.3);
       doc.line(margin, ph - 18, pw - margin, ph - 18);
-      // Footer text
       doc.setFontSize(7);
       doc.setTextColor(...lightGray as [number, number, number]);
       doc.setFont("helvetica", "normal");
@@ -79,14 +103,13 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
     doc.setLineWidth(0.6);
     doc.line(margin, y, margin + 45, y);
     doc.setLineWidth(0.15);
-    doc.setDrawColor(...cardBorder as [number, number, number]);
+    doc.setDrawColor(30, 41, 59);
     doc.line(margin + 45, y, pw - margin, y);
     y += 6;
   }
 
   function tableRow(label: string, value: string, highlight = false) {
     checkPage(7);
-    // Alternating subtle background
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...dark as [number, number, number]);
@@ -101,7 +124,6 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
     const lines = doc.splitTextToSize(value, contentW - 55);
     doc.text(lines, margin + 52, y + 3.5);
     y += Math.max(6.5, lines.length * 5) + 0.5;
-    // Subtle divider
     doc.setDrawColor(220, 225, 235);
     doc.setLineWidth(0.1);
     doc.line(margin, y - 0.5, pw - margin, y - 0.5);
@@ -117,12 +139,9 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
   // =============================================
   // COVER / HEADER
   // =============================================
-
-  // Top accent bar
   doc.setFillColor(...emerald as [number, number, number]);
   doc.rect(0, 0, pw, 3, "F");
 
-  // Brand name
   y = 20;
   doc.setFontSize(28);
   doc.setFont("helvetica", "bold");
@@ -135,14 +154,12 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
   doc.text("Compensation Recovery Packet", margin, y);
   y += 5;
 
-  // Claim ID & timestamp line
   doc.setFontSize(8);
   doc.setTextColor(...lightGray as [number, number, number]);
   const timestamp = new Date().toISOString().slice(0, 16).replace("T", " ");
   doc.text(`Claim ID: ${(claim.id || "").slice(0, 8).toUpperCase()}  •  Generated: ${timestamp} UTC`, margin, y);
   y += 3;
 
-  // Accent divider
   doc.setDrawColor(...emerald as [number, number, number]);
   doc.setLineWidth(0.8);
   doc.line(margin, y, pw - margin, y);
@@ -156,18 +173,15 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
   const badgeH = 18;
   const badgeY = y;
 
-  // Badge background
   doc.setFillColor(240, 253, 244);
   doc.setDrawColor(...emerald as [number, number, number]);
   doc.setLineWidth(0.4);
   doc.roundedRect(margin, badgeY, badgeW, badgeH, 2.5, 2.5, "FD");
 
-  // Shield icon (text placeholder)
   doc.setFontSize(14);
   doc.setTextColor(...emerald as [number, number, number]);
   doc.text("✓", margin + 5, badgeY + 8);
 
-  // Badge text
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(22, 101, 52);
@@ -182,68 +196,92 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
   y = badgeY + badgeH + 6;
 
   // =============================================
-  // SETTLEMENT SUMMARY CARD
+  // SETTLEMENT SUMMARY — enhanced visual hierarchy
   // =============================================
   sectionHeading("Settlement Summary");
 
-  const cardStartY = y;
-  const cardH = 38;
-  cardBox(margin, cardStartY, contentW, cardH);
-
-  // Card content - 3 columns
-  const col1X = margin + 5;
-  const col2X = margin + contentW * 0.4;
-  const col3X = margin + contentW * 0.72;
-  let cardY = cardStartY + 6;
-
-  doc.setFontSize(7);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...lightGray as [number, number, number]);
-  doc.text("SETTLEMENT", col1X, cardY);
-  doc.text("ESTIMATED PAYOUT", col2X, cardY);
-  doc.text("DEADLINE", col3X, cardY);
-
-  cardY += 5;
-  doc.setFontSize(10);
+  // Settlement name — large and prominent
+  checkPage(12);
+  doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...dark as [number, number, number]);
   const settlementName = safe(settlement?.name);
-  const nameLines = doc.splitTextToSize(settlementName, contentW * 0.35);
-  doc.text(nameLines, col1X, cardY);
+  const nameLines = doc.splitTextToSize(settlementName, contentW);
+  doc.text(nameLines, margin, y);
+  y += nameLines.length * 6 + 2;
 
+  // Payout range — bold and prominent
+  checkPage(10);
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
   doc.setTextColor(...emerald as [number, number, number]);
-  doc.text(`${money(settlement?.payout_min)} – ${money(settlement?.payout_max)}`, col2X, cardY);
+  doc.text(`Estimated Payout: ${money(settlement?.payout_min)} – ${money(settlement?.payout_max)}`, margin, y);
+  y += 6;
 
-  doc.setTextColor(...dark as [number, number, number]);
-  doc.text(fmt(settlement?.claim_deadline || settlement?.deadline), col3X, cardY);
+  // Deadline — highlighted
+  const deadlineStr = fmt(settlement?.claim_deadline || settlement?.deadline);
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  if (deadlineStr !== "—") {
+    doc.setTextColor(180, 60, 20);
+    doc.text(`⏰  Claim Deadline: ${deadlineStr}`, margin, y);
+  } else {
+    doc.setTextColor(...gray as [number, number, number]);
+    doc.text(`Claim Deadline: Not specified`, margin, y);
+  }
+  y += 7;
 
-  cardY += 8;
-  doc.setFontSize(8);
+  // Detail rows
+  doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...gray as [number, number, number]);
-  doc.text(`Company: ${safe(settlement?.company)}`, col1X, cardY);
-  doc.text(`Breach Year: ${settlement?.breach_year || "—"}`, col2X, cardY);
-
+  doc.text(`Company: ${safe(settlement?.company)}    •    Breach Year: ${settlement?.breach_year || "—"}`, margin, y);
+  y += 5;
   if (settlement?.administrator_name) {
-    cardY += 4.5;
-    doc.text(`Administrator: ${settlement.administrator_name}`, col1X, cardY);
+    doc.text(`Administrator: ${settlement.administrator_name}`, margin, y);
+    y += 5;
   }
   if (settlement?.case_number) {
-    doc.text(`Case: ${settlement.case_number}`, col2X, cardY);
+    doc.text(`Case Number: ${settlement.case_number}`, margin, y);
+    y += 5;
   }
-
-  y = cardStartY + cardH + 6;
+  y += 3;
 
   // =============================================
-  // CLAIM STATUS
+  // CLAIM STATUS — channel-aware wording
   // =============================================
   sectionHeading("Claim Status");
 
-  tableRow("Claim Status", (claim.status || "draft").toUpperCase(), true);
-  tableRow("Filed Date", fmt(claim.filed_at));
+  let displayStatus = (claim.status || "draft").toUpperCase();
+  let filedLabel = "Filed Date";
+  if (isPacketOnly) {
+    if (displayStatus === "SUBMITTED" || displayStatus === "FILED") {
+      displayStatus = "PACKET READY";
+    }
+    filedLabel = "Prepared Date";
+  }
+
+  tableRow("Claim Status", displayStatus, true);
+
+  if (isPacketOnly) {
+    checkPage(7);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(140, 100, 30);
+    doc.text("This packet has been prepared for submission. It has not been officially submitted on your behalf.", margin + 2, y + 2);
+    y += 7;
+  }
+
+  tableRow(filedLabel, fmt(claim.filed_at));
   tableRow("Estimated Payout", money(claim.est_payout), true);
   tableRow("Platform Fee", `${claim.fee_percent || 15}%`);
-  if (claim.submission_channel) tableRow("Submission Channel", claim.submission_channel);
+
+  if (claim.submission_channel) {
+    const channelLabel = isPacketOnly ? "Packet Only — Awaiting user submission"
+      : isPartnerApi ? "Submitted via Partner"
+      : claim.submission_channel;
+    tableRow("Submission Method", channelLabel);
+  }
   if (claim.external_submission_ref) tableRow("External Ref", claim.external_submission_ref);
 
   // =============================================
@@ -252,7 +290,6 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
   if (match) {
     sectionHeading("Match Confidence");
 
-    // Confidence highlight box
     checkPage(18);
     const confBoxY = y;
     const confBoxH = 14;
@@ -270,7 +307,6 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
 
     y = confBoxY + confBoxH + 4;
 
-    // Match reasons as bullet list
     if (match.match_reason) {
       const reasons = match.match_reason.split(/[,;\n]+/).map((r: string) => r.trim()).filter(Boolean);
       doc.setFontSize(8.5);
@@ -288,7 +324,7 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
   }
 
   // =============================================
-  // CLAIMANT INFORMATION
+  // CLAIMANT INFORMATION — all on page 1 together
   // =============================================
   sectionHeading("Claimant Information");
 
@@ -300,13 +336,13 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
     tableRow("Breach Experience", application.breach_experience);
   }
 
-  // Eligibility Answers
+  // Eligibility Answers — friendly formatting
   const eligibility = application?.eligibility_answers || {};
   const entries = Object.entries(eligibility);
   if (entries.length > 0) {
     sectionHeading("Eligibility Answers");
     for (const [k, v] of entries) {
-      tableRow(k.replace(/_/g, " ").replace(/\b\w/g, (c: string) => c.toUpperCase()), String(v));
+      tableRow(friendlyLabel(k), friendlyValue(v));
     }
   }
 
@@ -314,8 +350,6 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
   // EVIDENCE SECTION (new page)
   // =============================================
   doc.addPage();
-
-  // Top accent bar on new pages
   doc.setFillColor(...emerald as [number, number, number]);
   doc.rect(0, 0, pw, 1.5, "F");
 
@@ -323,7 +357,6 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
   sectionHeading(`Evidence Index (${documents.length} document${documents.length !== 1 ? "s" : ""})`);
 
   if (documents.length > 0) {
-    // Table header
     checkPage(10);
     doc.setFillColor(241, 245, 249);
     doc.setDrawColor(200, 210, 225);
@@ -345,7 +378,6 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
     for (let i = 0; i < documents.length; i++) {
       const d = documents[i];
       checkPage(7);
-      // Alternating row bg
       if (i % 2 === 0) {
         doc.setFillColor(249, 250, 251);
         doc.rect(margin, y - 1, contentW, 6.5, "F");
@@ -353,7 +385,6 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
       doc.setTextColor(50, 55, 65);
       doc.text((d.file_name || "").slice(0, 28), cols[0], y + 3);
       doc.text(safe(d.doc_type).slice(0, 14), cols[1], y + 3);
-      // Status with color
       const status = safe(d.status);
       if (status.toLowerCase() === "verified") {
         doc.setTextColor(...emerald as [number, number, number]);
@@ -379,11 +410,9 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
   }
 
   // =============================================
-  // DECLARATION PAGE
+  // DECLARATION PAGE — improved signature section
   // =============================================
   doc.addPage();
-
-  // Top accent bar
   doc.setFillColor(...emerald as [number, number, number]);
   doc.rect(0, 0, pw, 1.5, "F");
 
@@ -417,36 +446,70 @@ function buildPdf(claim: any, settlement: any, application: any, documents: any[
   doc.text(decl3, margin, y);
   y += decl3.length * 5 + 14;
 
-  // Signature area
-  checkPage(35);
+  // ---- Signature area (improved) ----
+  checkPage(55);
 
-  doc.setDrawColor(...dark as [number, number, number]);
-  doc.setLineWidth(0.3);
-  doc.line(margin, y, margin + 72, y);
-  doc.line(pw - margin - 55, y, pw - margin, y);
-
-  y += 5;
+  // Signature line
   doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
   doc.setTextColor(...gray as [number, number, number]);
+  doc.text("SIGNATURE", margin, y);
+  y += 3;
+  doc.setDrawColor(...dark as [number, number, number]);
+  doc.setLineWidth(0.4);
+  doc.line(margin, y, margin + 85, y);
+  y += 5;
+  doc.setFontSize(7.5);
   doc.setFont("helvetica", "normal");
-  doc.text("Signature", margin, y);
-  doc.text("Date", pw - margin - 55, y);
+  doc.setTextColor(...lightGray as [number, number, number]);
+  doc.text("Sign above or attach digital signature", margin, y);
+  y += 10;
+
+  // Date line
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(...gray as [number, number, number]);
+  doc.text("DATE", margin, y);
+  y += 3;
+  doc.setDrawColor(...dark as [number, number, number]);
+  doc.setLineWidth(0.4);
+  doc.line(margin, y, margin + 55, y);
+  y += 5;
+  doc.setFontSize(7.5);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...lightGray as [number, number, number]);
+  doc.text("MM / DD / YYYY", margin, y);
   y += 12;
 
-  // Certification status
+  // Digital certification confirmation box
+  checkPage(24);
+  doc.setFillColor(240, 253, 244);
+  doc.setDrawColor(...emerald as [number, number, number]);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(margin, y, contentW, 20, 2, 2, "FD");
+
+  const certY = y + 5;
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.setTextColor(22, 101, 52);
+  doc.text("Digital Certification", margin + 5, certY);
+
   doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
   if (application?.certifications_signed) {
     doc.setTextColor(22, 101, 52);
-    doc.text("✓  Digital certifications were signed at submission.", margin, y);
+    doc.text("✓  All required certifications were digitally signed at the time of submission.", margin + 5, certY + 6);
   } else {
     doc.setTextColor(180, 80, 20);
-    doc.text("⚠  Digital certifications were not signed.", margin, y);
+    doc.text("⚠  Digital certifications were not signed. Manual signature may be required.", margin + 5, certY + 6);
   }
-  y += 5;
+
   if (application?.disclaimer_accepted_at) {
     doc.setTextColor(...gray as [number, number, number]);
-    doc.text(`Disclaimer accepted on ${fmt(application.disclaimer_accepted_at)}.`, margin, y);
+    doc.text(`Platform disclaimer accepted on ${fmt(application.disclaimer_accepted_at)}.`, margin + 5, certY + 11);
   }
+
+  y += 24;
 
   // =============================================
   // FOOTER ON EVERY PAGE
