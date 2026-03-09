@@ -902,6 +902,11 @@ const ClaimFiling = () => {
                 </p>
               </button>
 
+              <p className="text-xs text-muted-foreground flex items-center gap-1.5 mt-2">
+                <FileCheck className="h-3.5 w-3.5 text-primary shrink-0" />
+                Providing supporting documents may increase your claim approval chances.
+              </p>
+
               {documents.length > 0 && (
                 <div className="space-y-2">
                   {documents.map((doc, index) => (
