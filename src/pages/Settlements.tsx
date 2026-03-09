@@ -299,7 +299,7 @@ const Settlements = () => {
           </div>
         )}
 
-        <div className={`glass-card p-6 transition-all duration-300 hover:translate-y-[-1px] ${
+        <div className={`glass-card p-6 transition-all duration-300 hover:translate-y-[-2px] hover:shadow-[0_8px_30px_-12px_hsl(var(--primary)/0.15)] ${
           settlement.lifecycle_status !== "active" || settlement.status === "closed" ? "opacity-60" : filingStatus === "approved" || filingStatus === "paid" ? "!border-success/30" : settlement.status === "open" ? "hover:border-primary/25" : ""
         }`}>
           <div className="flex items-start justify-between mb-3">
