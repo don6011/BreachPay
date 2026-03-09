@@ -1003,9 +1003,9 @@ const ClaimFiling = () => {
             ) : (
               <Button onClick={handleSubmit} disabled={!canProceed || submitting}>
                 {submitting ? (
-                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Submitting...</>
+                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Preparing Packet...</>
                 ) : (
-                  <><Send className="h-4 w-4 mr-1" /> Submit Claim</>
+                  <><FileText className="h-4 w-4 mr-1" /> Prepare Claim Packet</>
                 )}
               </Button>
             )}
