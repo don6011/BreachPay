@@ -234,7 +234,7 @@ const ClaimTracker = () => {
       supabase
         .from("claims")
         .select(`
-          id, status, est_payout, filed_at, updated_at, fee_percent, final_payout, flag_reason,
+          id, status, est_payout, filed_at, updated_at, fee_percent, final_payout, flag_reason, submission_channel,
           settlements(id, name, company, breach_year, deadline, payout_min, payout_max, verified, verification_level, claim_deadline, official_source_url, claims_filing_url, administrator_name, source_url)
         `)
         .eq("id", claimId)
