@@ -3247,6 +3247,10 @@ export type Database = {
       compute_fraud_score: { Args: { p_claim_id: string }; Returns: number }
       enqueue_due_scan_jobs: { Args: never; Returns: number }
       get_partner_id_for_user: { Args: { p_user_id: string }; Returns: string }
+      get_partner_ids_for_user: {
+        Args: { p_user_id: string }
+        Returns: string[]
+      }
       is_admin:
         | { Args: never; Returns: boolean }
         | { Args: { p_user: string }; Returns: boolean }
