@@ -156,12 +156,25 @@ const ClaimTracker = () => {
     try {
       const { data } = await supabase.storage
         .from("claim-packets")
-        .createSignedUrl(latestPacket.pdf_storage_path, 600);
-      if (data?.signedUrl) {
-        window.open(data.signedUrl, "_blank");
-      } else {
+        .createSignedUrl(latestPacket.pdf_storage_path, 300);
+      if (!data?.signedUrl) {
         toast({ title: "Error", description: "Failed to generate download link", variant: "destructive" });
+        return;
       }
+      const response = await fetch(data.signedUrl);
+      if (!response.ok) throw new Error("Download failed");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = latestPacket.pdf_file_name || `BreachPay-Claim-Packet-${claimId?.slice(0, 8)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      track("packet_downloaded", { claim_id: claimId });
+    } catch (e: any) {
+      toast({ title: "Error", description: e.message || "Failed to download packet", variant: "destructive" });
     } finally {
       setDownloadingPacket(false);
     }
