@@ -45,7 +45,7 @@ const Settings = () => {
           <h2 className="font-semibold">Plan & Billing</h2>
         </div>
 
-        {loading ? (
+        {false ? (
           <div className="h-16 animate-pulse rounded-xl bg-muted" />
         ) : isPremium ? (
           <div className="space-y-4">
