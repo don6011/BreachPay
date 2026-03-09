@@ -16,7 +16,7 @@ import { toast } from "@/hooks/use-toast";
 import {
   Shield, Lock, ChevronRight, ChevronLeft, Upload, FileText,
   Clock, AlertTriangle, CheckCircle, DollarSign, Camera, X, XCircle,
-  Bookmark, Eye, Send, Sparkles, ArrowRight, Loader2, ExternalLink,
+  Bookmark, Eye, Send, Sparkles, ArrowRight, Loader2, ExternalLink, FileCheck,
 } from "lucide-react";
 import { useTrackEvent } from "@/hooks/useTrackEvent";
 import { ClaimAccelerationCard } from "@/components/ClaimAccelerationCard";
