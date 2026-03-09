@@ -70,9 +70,9 @@ export const ClaimAccelerationCard = ({ claimId, estPayout }: ClaimAccelerationC
     <div className="rounded-2xl border bg-card p-5">
       <div className="flex items-center gap-2 mb-1">
         <Zap className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-semibold">Accelerate Your Claim</h3>
+        <h3 className="text-sm font-semibold">Optional Claim Assistance</h3>
       </div>
-      <p className="text-xs text-muted-foreground mb-4">Optional add-ons to speed up your payout. Never required.</p>
+      <p className="text-xs text-muted-foreground mb-4">Optional services to help prepare and review your claim documentation. These services do not affect settlement administrator processing times.</p>
 
       <div className="space-y-3">
         {services.map(({ type, icon: Icon, title, description, price }) => (
