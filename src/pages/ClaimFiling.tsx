@@ -464,18 +464,30 @@ const ClaimFiling = () => {
   if (submitted) {
     return (
       <div>
-        <PageHeader title="Claim Information Submitted" subtitle="Pending administrator review" />
+        <PageHeader title="Claim Packet Ready" subtitle="Download and submit to the settlement administrator" />
         <div className="mx-auto max-w-lg text-center space-y-6">
           <div className="rounded-2xl border bg-card p-8">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success/20">
-              <CheckCircle className="h-8 w-8 text-success" />
+              {generatingPacket ? (
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              ) : packetReady ? (
+                <FileText className="h-8 w-8 text-success" />
+              ) : (
+                <CheckCircle className="h-8 w-8 text-success" />
+              )}
             </div>
-            <h2 className="text-xl font-bold mb-2">Claim Information Submitted</h2>
+            <h2 className="text-xl font-bold mb-2">
+              {generatingPacket ? "Generating Your Claim Packet…" : packetReady ? "Your Claim Packet is Ready" : "Claim Information Prepared"}
+            </h2>
             <p className="text-muted-foreground text-sm mb-1">
-              Your claim information has been submitted and is pending administrator review.
+              {generatingPacket
+                ? "We're preparing your claim documents. This usually takes a few seconds."
+                : packetReady
+                ? "Download your claim packet below and submit it to the official settlement administrator."
+                : "Your claim information has been saved. Download the packet to submit your claim."}
             </p>
             <p className="text-muted-foreground text-xs mb-4">
-              BreachPay prepares and submits your claim information to the official settlement administrator.
+              BreachPay prepares your claim packet — you submit it to the settlement administrator. BreachPay does not file claims on your behalf.
             </p>
 
             {/* Settlement name with company */}
@@ -503,16 +515,107 @@ const ClaimFiling = () => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Status</span>
-                <span className="font-semibold text-warning">Submitted — pending review</span>
+                <span className="font-semibold text-warning">Packet ready — awaiting your submission</span>
               </div>
             </div>
 
+            {/* Packet download / error */}
+            {generatingPacket && (
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground mb-4">
+                <Loader2 className="h-4 w-4 animate-spin" /> Generating packet…
+              </div>
+            )}
+            {packetError && (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 mb-4">
+                <p className="text-xs text-destructive">{packetError}</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={async () => {
+                    if (!createdClaimId) return;
+                    setGeneratingPacket(true);
+                    setPacketError(null);
+                    try {
+                      const { data, error } = await supabase.functions.invoke("generate-claim-packet", {
+                        body: { claim_id: createdClaimId },
+                      });
+                      if (error) throw error;
+                      if (!data?.ok) throw new Error(data?.error || "Failed");
+                      setPacketReady(true);
+                      track("packet_generated", { claim_id: createdClaimId });
+                    } catch (e: any) {
+                      setPacketError(e.message);
+                    } finally {
+                      setGeneratingPacket(false);
+                    }
+                  }}
+                >
+                  Retry
+                </Button>
+              </div>
+            )}
+            {packetReady && (
+              <Button
+                className="w-full mb-4 rounded-xl gap-2"
+                onClick={async () => {
+                  if (!createdClaimId) return;
+                  // Fetch the packet URL from claim_packets
+                  const { data: packet } = await supabase
+                    .from("claim_packets")
+                    .select("packet_url, pdf_storage_path")
+                    .eq("claim_id", createdClaimId)
+                    .order("generated_at", { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                  if (packet?.packet_url) {
+                    window.open(packet.packet_url, "_blank");
+                  } else if (packet?.pdf_storage_path) {
+                    const { data: signedUrl } = await supabase.storage
+                      .from("claim-packets")
+                      .createSignedUrl(packet.pdf_storage_path, 300);
+                    if (signedUrl?.signedUrl) window.open(signedUrl.signedUrl, "_blank");
+                    else toast({ title: "Error", description: "Could not generate download link", variant: "destructive" });
+                  } else {
+                    toast({ title: "Packet not found", description: "Please try again or contact support.", variant: "destructive" });
+                  }
+                  track("packet_downloaded", { claim_id: createdClaimId });
+                }}
+              >
+                <FileText className="h-4 w-4" /> Download Claim Packet
+              </Button>
+            )}
+
+            {/* Next steps */}
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 mb-4 text-left space-y-2">
+              <h3 className="text-sm font-semibold flex items-center gap-1.5">
+                <ArrowRight className="h-3.5 w-3.5 text-primary" /> Next Steps
+              </h3>
+              <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                <li>Download your claim packet above</li>
+                <li>Visit the official settlement website to submit your claim</li>
+                <li>Upload the packet or enter the information as required</li>
+                <li>Return here to track your claim status</li>
+              </ol>
+              {settlement.claims_filing_url && (
+                <a
+                  href={settlement.claims_filing_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1"
+                >
+                  <ExternalLink className="h-3 w-3" /> Go to Official Claim Site
+                </a>
+              )}
+            </div>
+
             <p className="text-xs text-muted-foreground mb-4">
-              Eligibility depends on settlement administrator review. Filing deadline is enforced by the settlement administrator. BreachPay is not a law firm and does not guarantee payouts.
+              Eligibility depends on settlement administrator review. BreachPay is not a law firm, does not file claims on your behalf, and does not guarantee payouts.
             </p>
 
             <div className="flex items-center gap-1 mb-6">
-              {["Submitted", "Under Review", "Approved", "Paid"].map((s, i) => (
+              {["Packet Ready", "You Submit", "Under Review", "Paid"].map((s, i) => (
                 <div key={s} className="flex flex-1 items-center">
                   <div className="flex flex-col items-center flex-1">
                     <div className={`h-3 w-3 rounded-full ${i === 0 ? "bg-primary ring-2 ring-primary/30" : "bg-muted"}`} />
