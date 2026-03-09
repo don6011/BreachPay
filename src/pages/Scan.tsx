@@ -346,7 +346,7 @@ const Scan = () => {
             )}
 
             <form onSubmit={handleScan} className="space-y-4">
-              {scanMode === "demo" && (
+              {scanMode === "catalog" && (
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">Email Address</label>
                   <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="rounded-xl" />
