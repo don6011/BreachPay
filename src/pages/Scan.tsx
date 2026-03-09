@@ -18,7 +18,7 @@ import { IdentityProtectionUpsell } from "@/components/IdentityProtectionUpsell"
 import { useTrackEvent } from "@/hooks/useTrackEvent";
 
 type ScanState = "idle" | "scanning" | "results";
-type ScanMode = "demo" | "live";
+type ScanMode = "catalog" | "live";
 
 const severityColor: Record<string, string> = {
   low: "text-warning bg-warning/10 border-warning/20",
@@ -227,7 +227,7 @@ const Scan = () => {
         setScanRunId(result.scan_run_id);
 
       } else {
-        // Demo scan: enable monitoring + use existing catalog-based procedure
+        // Catalog scan: enable monitoring + use existing catalog-based procedure
         await supabase
           .from("user_profiles")
           .update({ monitoring_enabled: true, next_scan_at: new Date().toISOString() })
@@ -324,15 +324,15 @@ const Scan = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setScanMode("demo")}
+                onClick={() => setScanMode("catalog")}
                 className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-                  scanMode === "demo"
+                  scanMode === "catalog"
                     ? "bg-background text-foreground shadow-sm border border-border"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <Shield className="h-4 w-4" />
-                Demo Scan
+                Catalog Scan
               </button>
             </div>
 
@@ -346,7 +346,7 @@ const Scan = () => {
             )}
 
             <form onSubmit={handleScan} className="space-y-4">
-              {scanMode === "demo" && (
+              {scanMode === "catalog" && (
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">Email Address</label>
                   <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="rounded-xl" />
@@ -357,7 +357,7 @@ const Scan = () => {
                   Scanning your account email: <strong className="text-foreground">{user?.email}</strong>
                 </div>
               )}
-              {scanMode === "demo" && (
+              {scanMode === "catalog" && (
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">Phone Number <span className="text-muted-foreground">(optional)</span></label>
                   <Input type="tel" placeholder="+1 (555) 000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl" />

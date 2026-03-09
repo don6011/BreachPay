@@ -6,9 +6,9 @@ import { Link } from "react-router-dom";
 import logo from "@/assets/logo.png";
 
 const stats = [
-  { icon: Database, value: "12,000+", label: "Databases Scanned" },
-  { icon: DollarSign, value: "$2.4M+", label: "Settlements Tracked" },
-  { icon: Users, value: "50,000+", label: "Identities Protected" },
+  { icon: Database, value: "10,000+", label: "Breach Databases" },
+  { icon: DollarSign, value: "Billions", label: "In Active Settlements" },
+  { icon: Users, value: "Real-Time", label: "Identity Monitoring" },
   { icon: Radio, value: "Daily", label: "Breach Detection" },
 ];
 
@@ -58,20 +58,20 @@ const pricingPlans = [
 ];
 
 const breachTickerItems = [
-  { company: "National Health Corp", records: "14.2M", date: "Feb 2026" },
-  { company: "StreamVault", records: "8.7M", date: "Jan 2026" },
-  { company: "PayLink Financial", records: "3.1M", date: "Jan 2026" },
-  { company: "CloudSync Pro", records: "22M", date: "Dec 2025" },
-  { company: "TravelEase", records: "5.4M", date: "Dec 2025" },
-  { company: "RetailMax", records: "11.8M", date: "Nov 2025" },
-  { company: "FinSecure Bank", records: "2.9M", date: "Nov 2025" },
-  { company: "EduConnect", records: "7.6M", date: "Oct 2025" },
+  { company: "Change Healthcare", records: "100M", date: "2024" },
+  { company: "National Public Data", records: "2.7B", date: "2024" },
+  { company: "AT&T", records: "73M", date: "2024" },
+  { company: "23andMe", records: "6.9M", date: "2023" },
+  { company: "T-Mobile", records: "76.6M", date: "2021" },
+  { company: "Equifax", records: "147M", date: "2017" },
+  { company: "Capital One", records: "106M", date: "2019" },
+  { company: "Marriott", records: "500M", date: "2018" },
 ];
 
 const urgencyStats = [
-  { value: "847", label: "Active Breaches This Month", icon: AlertTriangle, color: "text-critical" },
-  { value: "$18.2M", label: "Unclaimed Settlement Funds", icon: DollarSign, color: "text-primary" },
-  { value: "23", label: "Deadlines Closing This Week", icon: TrendingUp, color: "text-warning" },
+  { value: "Thousands", label: "Known Data Breaches", icon: AlertTriangle, color: "text-critical" },
+  { value: "Billions", label: "In Unclaimed Settlements", icon: DollarSign, color: "text-primary" },
+  { value: "Active", label: "Filing Deadlines Closing", icon: TrendingUp, color: "text-warning" },
 ];
 
 const Landing = () => {
