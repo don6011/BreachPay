@@ -209,10 +209,6 @@ const AdminBreachCatalog = () => {
     <div>
       <PageHeader title="Breach Catalog" subtitle="Manage breach sources that fuel scan matching">
         <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline" className="rounded-xl" onClick={seedCatalog} disabled={seeding || items.length > 0}>
-            <Sparkles className={`mr-1 h-3 w-3 ${seeding ? "animate-spin" : ""}`} />
-            Seed Demo Catalog
-          </Button>
           <Button size="sm" variant="outline" className="rounded-xl" onClick={fetchItems} disabled={loading}>
             <RefreshCw className={`mr-1 h-3 w-3 ${loading ? "animate-spin" : ""}`} />
             Refresh
