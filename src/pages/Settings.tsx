@@ -204,6 +204,65 @@ const Settings = () => {
         </div>
       </section>
 
+      {/* Delete Account */}
+      <section className="mb-6 rounded-2xl border border-destructive/30 bg-card p-6">
+        <div className="flex items-center gap-2 mb-3">
+          <AlertTriangle className="h-4 w-4 text-destructive" />
+          <h2 className="font-semibold text-destructive">Delete Account</h2>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          Permanently delete your account and all associated data. This action is <strong>irreversible</strong> — all claims, scan history, breach data, and profile information will be removed.
+        </p>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs text-muted-foreground mb-1 block">
+              Type <strong>DELETE</strong> to confirm
+            </label>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="DELETE"
+              className="w-full rounded-xl border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-destructive/50"
+            />
+          </div>
+          <Button
+            variant="destructive"
+            className="w-full rounded-xl"
+            disabled={deleteConfirmText !== "DELETE" || deletingAccount}
+            onClick={async () => {
+              if (!user || deleteConfirmText !== "DELETE") return;
+              setDeletingAccount(true);
+              try {
+                const { data: { session: currentSession } } = await supabase.auth.getSession();
+                if (!currentSession?.access_token) {
+                  toast.error("Please log in again before deleting your account.");
+                  return;
+                }
+                const res = await supabase.functions.invoke("delete-account", {
+                  headers: { Authorization: `Bearer ${currentSession.access_token}` },
+                });
+                if (res.error || res.data?.error) {
+                  toast.error(res.data?.error || "Failed to delete account. Please try again.");
+                } else {
+                  toast.success("Your account has been permanently deleted.");
+                  await signOut();
+                  navigate("/");
+                }
+              } catch (err) {
+                console.error("Delete account error:", err);
+                toast.error("Something went wrong. Please try again.");
+              } finally {
+                setDeletingAccount(false);
+              }
+            }}
+          >
+            {deletingAccount ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+            {deletingAccount ? "Deleting Account…" : "Permanently Delete Account"}
+          </Button>
+        </div>
+      </section>
+
       {/* Legal */}
       <section className="mb-6 rounded-2xl border bg-card p-6">
         <h2 className="font-semibold mb-3">Legal</h2>
