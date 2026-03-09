@@ -278,6 +278,7 @@ const ClaimTracker = () => {
         est_payout: Number(c.est_payout) || 0,
         fee_percent: Number(c.fee_percent) || 15,
         final_payout: c.final_payout ? Number(c.final_payout) : null,
+        submission_channel: c.submission_channel || null,
         settlement: c.settlements ? {
           ...c.settlements,
           payout_min: Number(c.settlements.payout_min) || 0,
