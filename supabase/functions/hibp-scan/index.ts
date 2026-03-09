@@ -275,12 +275,14 @@ Deno.serve(async (req) => {
       databases_scanned: 1,
     }).eq("id", scanRunId);
 
-    // Update user risk snapshot
-    await supabase.from("user_risk_snapshots").insert({
-      user_id: userId,
-      risk_score: riskScore,
-      breaches_detected: breachesInserted,
-    }).catch(() => {});
+    // Update user risk snapshot (ignore errors)
+    try {
+      await supabase.from("user_risk_snapshots").insert({
+        user_id: userId,
+        risk_score: riskScore,
+        breaches_detected: breachesInserted,
+      });
+    } catch { /* ignore */ }
 
     // Completion alert
     await supabase.from("alerts").insert({
