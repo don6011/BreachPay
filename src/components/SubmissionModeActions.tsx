@@ -43,16 +43,43 @@ export const SubmissionModeActions = ({
     if (!claimId) return;
     setGeneratingPacket(true);
     try {
+      // Step 1: Generate the PDF on the server
       const { data, error } = await supabase.functions.invoke("generate-claim-packet", {
         body: { claim_id: claimId },
       });
       if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Failed to generate packet");
-      toast({ title: "Claim Packet Generated", description: "Your claim packet is ready for download." });
+      if (!data?.ok) throw new Error(data?.error || "We couldn't generate your claim packet right now. Please try again.");
+
+      const storagePath = data.storage_path as string;
+      const fileName = data.file_name as string || `BreachPay-Claim-Packet-${claimId.slice(0, 8)}.pdf`;
+
+      // Step 2: Get a signed URL for the real PDF
+      const { data: signedData, error: signedErr } = await supabase.storage
+        .from("claim-packets")
+        .createSignedUrl(storagePath, 300); // 5-minute expiry
+
+      if (signedErr || !signedData?.signedUrl) {
+        throw new Error("We couldn't generate your claim packet right now. Please try again.");
+      }
+
+      // Step 3: Fetch the PDF and trigger a real browser download
+      const response = await fetch(signedData.signedUrl);
+      if (!response.ok) throw new Error("We couldn't generate your claim packet right now. Please try again.");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({ title: "Claim Packet Downloaded", description: "Your PDF claim packet has been downloaded." });
       track("packet_generated", { claim_id: claimId });
       onClaimUpdate();
     } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
+      toast({ title: "Error", description: e.message || "We couldn't generate your claim packet right now. Please try again.", variant: "destructive" });
     } finally {
       setGeneratingPacket(false);
     }
