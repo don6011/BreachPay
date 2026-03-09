@@ -938,8 +938,8 @@ const ClaimFiling = () => {
           <div className="space-y-4">
             <div className="rounded-2xl border bg-card p-6 space-y-5">
               <div>
-                <h2 className="text-lg font-bold mb-1">Review & Submit</h2>
-                <p className="text-sm text-muted-foreground">Review your claim details before submitting.</p>
+                <h2 className="text-lg font-bold mb-1">Review & Prepare Packet</h2>
+                <p className="text-sm text-muted-foreground">Review your claim details before we generate your claim packet.</p>
               </div>
 
               <div className="space-y-3">
