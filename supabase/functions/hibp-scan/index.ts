@@ -243,21 +243,23 @@ Deno.serve(async (req) => {
 
         matchedSettlementIds.push(s.id);
 
-        // Notify
-        await supabase.from("notification_outbox").insert({
-          user_id: userId,
-          channel: "in_app",
-          template: "new_match",
-          payload: {
-            settlement_id: s.id,
-            settlement_name: s.name,
-            company: s.company,
-            payout_estimate: payoutEst,
-            confidence: confLevel,
-            confidence_score: confidence,
-          },
-          dedupe_key: `new_match:${userId}:${s.id}`,
-        }).select().single().then(() => {}).catch(() => {});
+        // Notify (fire-and-forget, ignore dedupe conflicts)
+        try {
+          await supabase.from("notification_outbox").insert({
+            user_id: userId,
+            channel: "in_app",
+            template: "new_match",
+            payload: {
+              settlement_id: s.id,
+              settlement_name: s.name,
+              company: s.company,
+              payout_estimate: payoutEst,
+              confidence: confLevel,
+              confidence_score: confidence,
+            },
+            dedupe_key: `new_match:${userId}:${s.id}`,
+          });
+        } catch { /* ignore dedupe conflicts */ }
       }
     }
 
