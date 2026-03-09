@@ -298,7 +298,7 @@ const Scan = () => {
         <div className="mx-auto max-w-lg">
           <div className="glass-card-glow p-8">
             <div className="mb-6 flex items-center justify-center">
-              <img src="/lovable-uploads/07aborig.png" alt="BreachPay" className="h-16 w-16" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+              <img src={shieldIcon} alt="BreachPay" className="h-16 w-16 drop-shadow-lg" />
             </div>
             <h2 className="mb-1 text-center text-lg font-bold">Secure Breach Scan</h2>
             <p className="mb-2 text-center text-sm text-muted-foreground">
