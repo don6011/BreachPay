@@ -33,6 +33,7 @@ const plans = [
     highlighted: true,
     badge: "Most Popular",
     features: [
+      "Monitor up to 5 emails",
       "Daily monitoring scans",
       "Real-time breach alerts",
       "Dark web exposure monitoring",
