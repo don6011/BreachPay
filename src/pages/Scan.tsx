@@ -296,10 +296,13 @@ const Scan = () => {
 
       {state === "idle" && (
         <div className="mx-auto max-w-lg">
-          <div className="glass-card-glow p-8">
-            <div className="mb-6 flex items-center justify-center">
-              <img src={shieldIcon} alt="BreachPay" className="h-20 w-20 drop-shadow-lg" />
-            </div>
+           <div className="glass-card-glow p-8">
+             <div className="mb-6 flex items-center justify-center">
+               <div className="relative">
+                 <div className="absolute inset-0 rounded-full bg-gradient-to-r from-primary/20 to-primary/5 blur-2xl scale-150" aria-hidden="true" />
+                 <img src={shieldIcon} alt="BreachPay" className="relative h-24 w-24 drop-shadow-[0_0_24px_hsl(var(--primary)/0.3)]" style={{ imageRendering: 'crisp-edges' }} />
+               </div>
+             </div>
             <h2 className="mb-1 text-center text-lg font-bold">Secure Breach Scan</h2>
             <p className="mb-2 text-center text-sm text-muted-foreground">
               Check if your email appears in data breaches and discover settlements you may be eligible for.
