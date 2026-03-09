@@ -227,7 +227,7 @@ const Scan = () => {
         setScanRunId(result.scan_run_id);
 
       } else {
-        // Demo scan: enable monitoring + use existing catalog-based procedure
+        // Catalog scan: enable monitoring + use existing catalog-based procedure
         await supabase
           .from("user_profiles")
           .update({ monitoring_enabled: true, next_scan_at: new Date().toISOString() })
