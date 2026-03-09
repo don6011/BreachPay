@@ -301,8 +301,13 @@ const Scan = () => {
                 <Shield className="h-8 w-8 text-primary" />
               </div>
             </div>
-            <h2 className="mb-1 text-center text-lg font-bold">Secure Identity Scan</h2>
-            <p className="mb-5 text-center text-sm text-muted-foreground">Check your email against real-world breach databases</p>
+            <h2 className="mb-1 text-center text-lg font-bold">Secure Breach Scan</h2>
+            <p className="mb-2 text-center text-sm text-muted-foreground">
+              Check if your email appears in data breaches and discover settlements you may be eligible for.
+            </p>
+            <p className="mb-5 text-center text-[11px] text-muted-foreground/70">
+              Breach intelligence powered by <span className="text-muted-foreground">Have I Been Pwned</span>.
+            </p>
 
             {/* Scan Mode Toggle */}
             <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl border border-border bg-muted/30 p-1">
@@ -317,7 +322,6 @@ const Scan = () => {
               >
                 <Globe className="h-4 w-4 text-primary" />
                 Live Scan
-                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary border-0">HIBP</Badge>
               </button>
               <button
                 type="button"
@@ -337,8 +341,7 @@ const Scan = () => {
               <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
                 <Globe className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
                 <span>
-                  <strong className="text-foreground">Live Scan</strong> checks your account email against{" "}
-                  <strong className="text-foreground">Have I Been Pwned</strong> — 14 billion+ real breached records. Results are fetched in real-time.
+                  <strong className="text-foreground">Live Scan</strong> checks your account email against 14 billion+ real breached records in real-time, then matches you to open settlements.
                 </span>
               </div>
             )}
@@ -362,13 +365,31 @@ const Scan = () => {
                 </div>
               )}
               <Button type="submit" className="w-full rounded-xl" size="lg">
-                {scanMode === "live" ? (
-                  <><Globe className="mr-2 h-4 w-4" /> Run Live HIBP Scan</>
-                ) : (
-                  <><Search className="mr-2 h-4 w-4" /> Start Secure Scan</>
-                )}
+                <Search className="mr-2 h-4 w-4" /> Run Secure Scan
               </Button>
             </form>
+
+            {/* What happens after the scan */}
+            <div className="mt-6 rounded-xl border border-border bg-muted/20 p-4">
+              <h3 className="text-sm font-semibold mb-3 text-foreground">What happens after the scan</h3>
+              <div className="space-y-2.5">
+                <div className="flex items-start gap-2.5">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">1</div>
+                  <p className="text-xs text-muted-foreground">We detect breaches tied to your email</p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">2</div>
+                  <p className="text-xs text-muted-foreground">We check if settlements exist for those breaches</p>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">3</div>
+                  <p className="text-xs text-muted-foreground">We help you prepare claims if money may be available</p>
+                </div>
+              </div>
+              <p className="mt-3 text-[11px] text-muted-foreground/70 border-t border-border pt-2.5">
+                BreachPay currently tracks verified settlements including Equifax, Yahoo, and T-Mobile.
+              </p>
+            </div>
 
             {/* Scan Schedule Info */}
             {(scanMeta.lastScanAt || scanMeta.nextScanAt) && (
@@ -395,12 +416,12 @@ const Scan = () => {
         <div className="mx-auto max-w-lg text-center py-20">
           <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary mb-4" />
           <h2 className="text-xl font-bold mb-2">
-            {scanMode === "live" ? "Running Live Scan..." : "Scanning Databases..."}
+            {scanMode === "live" ? "Running Secure Scan..." : "Scanning Databases..."}
           </h2>
           <p className="text-sm text-muted-foreground">
             {scanMode === "live"
-              ? "Checking Have I Been Pwned's 14B+ record database for your email"
-              : "Checking 12,847 breach databases for your identity"}
+              ? "Checking breach databases and matching you to open settlements"
+              : "Checking breach databases for your identity"}
           </p>
           <div className="mt-6 mx-auto max-w-xs rounded-full bg-muted h-2 overflow-hidden">
             <div className="h-full bg-primary animate-pulse rounded-full" style={{ width: "70%" }} />
