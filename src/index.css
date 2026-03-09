@@ -133,6 +133,19 @@
   }
 }
 
+/* Micro-animation: card hover lift */
+.glass-card {
+  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+/* Button glow on hover */
+.btn-glow {
+  transition: box-shadow 0.3s ease;
+}
+.btn-glow:hover {
+  box-shadow: 0 0 24px 0 hsl(var(--primary) / 0.3);
+}
+
 @keyframes float-particle {
   0%, 100% {
     transform: translateY(0) translateX(0);
