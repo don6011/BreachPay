@@ -18,7 +18,7 @@ import { IdentityProtectionUpsell } from "@/components/IdentityProtectionUpsell"
 import { useTrackEvent } from "@/hooks/useTrackEvent";
 
 type ScanState = "idle" | "scanning" | "results";
-type ScanMode = "demo" | "live";
+type ScanMode = "catalog" | "live";
 
 const severityColor: Record<string, string> = {
   low: "text-warning bg-warning/10 border-warning/20",
