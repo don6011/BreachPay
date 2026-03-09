@@ -324,15 +324,15 @@ const Scan = () => {
               </button>
               <button
                 type="button"
-                onClick={() => setScanMode("demo")}
+                onClick={() => setScanMode("catalog")}
                 className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
-                  scanMode === "demo"
+                  scanMode === "catalog"
                     ? "bg-background text-foreground shadow-sm border border-border"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <Shield className="h-4 w-4" />
-                Demo Scan
+                Catalog Scan
               </button>
             </div>
 
