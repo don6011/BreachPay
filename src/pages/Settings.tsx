@@ -95,13 +95,16 @@ const Settings = () => {
         )}
       </section>
 
+      {/* Monitored Emails */}
+      <MonitoredEmailsManager />
+
       {/* Monitored Identifiers */}
       <section className="mb-6 rounded-2xl border bg-card p-6">
         <div className="flex items-center gap-2 mb-4">
           <Shield className="h-4 w-4 text-primary" />
-          <h2 className="font-semibold">Monitored Identifiers</h2>
+          <h2 className="font-semibold">Other Monitored Identifiers</h2>
         </div>
-        <p className="text-sm text-muted-foreground">No identifiers being monitored. Run a scan to get started.</p>
+        <p className="text-sm text-muted-foreground">Phone numbers, SSNs, and other identifiers from your scans appear here.</p>
       </section>
 
       {/* Data Controls */}
