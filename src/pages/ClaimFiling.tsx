@@ -885,7 +885,12 @@ const ClaimFiling = () => {
                       }`}
                   >
                     {dt.label}
-                  </button>
+               </button>
+
+               <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                 <FileCheck className="h-3.5 w-3.5 text-primary shrink-0" />
+                 Providing supporting documents may increase your claim approval chances.
+               </p>
                 ))}
               </div>
 
