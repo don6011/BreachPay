@@ -12,6 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import { formatDistanceToNow, format } from "date-fns";
 import { BreachDetailModal } from "@/components/BreachDetailModal";
 import type { BreachCatalogEntry } from "@/hooks/useBreachCatalog";
+import shieldIcon from "@/assets/shield-icon.png";
 import { PremiumUpgradeCard } from "@/components/PremiumUpgradeCard";
 import { IdentityProtectionUpsell } from "@/components/IdentityProtectionUpsell";
 import { useTrackEvent } from "@/hooks/useTrackEvent";
@@ -297,9 +298,7 @@ const Scan = () => {
         <div className="mx-auto max-w-lg">
           <div className="glass-card-glow p-8">
             <div className="mb-6 flex items-center justify-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-                <Shield className="h-8 w-8 text-primary" />
-              </div>
+              <img src={shieldIcon} alt="BreachPay" className="h-16 w-16 drop-shadow-lg" />
             </div>
             <h2 className="mb-1 text-center text-lg font-bold">Secure Breach Scan</h2>
             <p className="mb-2 text-center text-sm text-muted-foreground">
