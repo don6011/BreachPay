@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, Shield, AlertTriangle, Loader2, Crown, Check, Eye, DollarSign, Zap, Bell, Activity, ArrowRight, ExternalLink, BadgeCheck, Clock, CalendarClock } from "lucide-react";
+import { Search, Shield, AlertTriangle, Loader2, Crown, Check, Eye, DollarSign, Zap, Bell, Activity, ArrowRight, ExternalLink, BadgeCheck, Clock, CalendarClock, Globe } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "@/hooks/use-toast";
@@ -17,6 +17,7 @@ import { IdentityProtectionUpsell } from "@/components/IdentityProtectionUpsell"
 import { useTrackEvent } from "@/hooks/useTrackEvent";
 
 type ScanState = "idle" | "scanning" | "results";
+type ScanMode = "demo" | "live";
 
 const severityColor: Record<string, string> = {
   low: "text-warning bg-warning/10 border-warning/20",
@@ -71,6 +72,7 @@ const Scan = () => {
   const { user } = useAuth();
   const track = useTrackEvent();
   const [state, setState] = useState<ScanState>("idle");
+  const [scanMode, setScanMode] = useState<ScanMode>("live");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [breaches, setBreaches] = useState<BreachResult[]>([]);
@@ -193,56 +195,80 @@ const Scan = () => {
     if (!user) return;
 
     setState("scanning");
-    track("scan_started", { email_provided: !!email, phone_provided: !!phone });
+    track("scan_started", { email_provided: !!email, phone_provided: !!phone, mode: scanMode });
 
-    // Enable monitoring + trigger scan via edge function
-    await supabase
-      .from("user_profiles")
-      .update({ monitoring_enabled: true, next_scan_at: new Date().toISOString() })
-      .eq("user_id", user.id);
-
-    // Call the run-scheduled-scans edge function
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || "";
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/run-scheduled-scans`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session?.access_token || ""}`,
-        },
-        body: JSON.stringify({}),
-      });
+      if (scanMode === "live") {
+        // Call HIBP scan edge function — uses the authenticated user's email
+        const response = await fetch(`${supabaseUrl}/functions/v1/hibp-scan`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+        });
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (response.status === 429) {
+          toast({ title: "Rate Limited", description: "HIBP rate limit hit. Please wait a moment and try again.", variant: "destructive" });
+          setState("idle");
+          return;
+        }
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.error || `HTTP ${response.status}`);
+        }
 
-      // Find the scan run that was just created
-      const { data: latestScan } = await supabase
-        .from("scan_runs")
-        .select("id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        const result = await response.json();
+        setScanRunId(result.scan_run_id);
 
-      if (latestScan) {
-        setScanRunId(latestScan.id);
       } else {
-        // Fallback: wait and retry
-        setTimeout(async () => {
-          const { data: retryScan } = await supabase
-            .from("scan_runs")
-            .select("id")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (retryScan) setScanRunId(retryScan.id);
-        }, 3000);
+        // Demo scan: enable monitoring + use existing catalog-based procedure
+        await supabase
+          .from("user_profiles")
+          .update({ monitoring_enabled: true, next_scan_at: new Date().toISOString() })
+          .eq("user_id", user.id);
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/run-scheduled-scans`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({}),
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        // Find the scan run just created
+        const { data: latestScan } = await supabase
+          .from("scan_runs")
+          .select("id")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestScan) {
+          setScanRunId(latestScan.id);
+        } else {
+          setTimeout(async () => {
+            const { data: retryScan } = await supabase
+              .from("scan_runs")
+              .select("id")
+              .eq("user_id", user.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (retryScan) setScanRunId(retryScan.id);
+          }, 3000);
+        }
       }
-    } catch (error) {
-      toast({ title: "Scan Error", description: "Failed to start scan. Please try again.", variant: "destructive" });
+    } catch (error: any) {
+      toast({ title: "Scan Error", description: error?.message || "Failed to start scan. Please try again.", variant: "destructive" });
       setState("idle");
     }
   };
@@ -276,18 +302,71 @@ const Scan = () => {
               </div>
             </div>
             <h2 className="mb-1 text-center text-lg font-bold">Secure Identity Scan</h2>
-            <p className="mb-6 text-center text-sm text-muted-foreground">We'll check your information against 12,000+ breach databases</p>
+            <p className="mb-5 text-center text-sm text-muted-foreground">Check your email against real-world breach databases</p>
+
+            {/* Scan Mode Toggle */}
+            <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl border border-border bg-muted/30 p-1">
+              <button
+                type="button"
+                onClick={() => setScanMode("live")}
+                className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+                  scanMode === "live"
+                    ? "bg-background text-foreground shadow-sm border border-border"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Globe className="h-4 w-4 text-primary" />
+                Live Scan
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary border-0">HIBP</Badge>
+              </button>
+              <button
+                type="button"
+                onClick={() => setScanMode("demo")}
+                className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+                  scanMode === "demo"
+                    ? "bg-background text-foreground shadow-sm border border-border"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Shield className="h-4 w-4" />
+                Demo Scan
+              </button>
+            </div>
+
+            {scanMode === "live" && (
+              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
+                <Globe className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+                <span>
+                  <strong className="text-foreground">Live Scan</strong> checks your account email against{" "}
+                  <strong className="text-foreground">Have I Been Pwned</strong> — 14 billion+ real breached records. Results are fetched in real-time.
+                </span>
+              </div>
+            )}
+
             <form onSubmit={handleScan} className="space-y-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">Email Address</label>
-                <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="rounded-xl" />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">Phone Number <span className="text-muted-foreground">(optional)</span></label>
-                <Input type="tel" placeholder="+1 (555) 000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl" />
-              </div>
+              {scanMode === "demo" && (
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Email Address</label>
+                  <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="rounded-xl" />
+                </div>
+              )}
+              {scanMode === "live" && (
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm text-muted-foreground text-center">
+                  Scanning your account email: <strong className="text-foreground">{user?.email}</strong>
+                </div>
+              )}
+              {scanMode === "demo" && (
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Phone Number <span className="text-muted-foreground">(optional)</span></label>
+                  <Input type="tel" placeholder="+1 (555) 000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl" />
+                </div>
+              )}
               <Button type="submit" className="w-full rounded-xl" size="lg">
-                <Search className="mr-2 h-4 w-4" /> Start Secure Scan
+                {scanMode === "live" ? (
+                  <><Globe className="mr-2 h-4 w-4" /> Run Live HIBP Scan</>
+                ) : (
+                  <><Search className="mr-2 h-4 w-4" /> Start Secure Scan</>
+                )}
               </Button>
             </form>
 
@@ -315,8 +394,14 @@ const Scan = () => {
       {state === "scanning" && (
         <div className="mx-auto max-w-lg text-center py-20">
           <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary mb-4" />
-          <h2 className="text-xl font-bold mb-2">Scanning Databases...</h2>
-          <p className="text-sm text-muted-foreground">Checking 12,847 breach databases for your identity</p>
+          <h2 className="text-xl font-bold mb-2">
+            {scanMode === "live" ? "Running Live Scan..." : "Scanning Databases..."}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {scanMode === "live"
+              ? "Checking Have I Been Pwned's 14B+ record database for your email"
+              : "Checking 12,847 breach databases for your identity"}
+          </p>
           <div className="mt-6 mx-auto max-w-xs rounded-full bg-muted h-2 overflow-hidden">
             <div className="h-full bg-primary animate-pulse rounded-full" style={{ width: "70%" }} />
           </div>
