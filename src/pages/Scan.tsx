@@ -195,56 +195,80 @@ const Scan = () => {
     if (!user) return;
 
     setState("scanning");
-    track("scan_started", { email_provided: !!email, phone_provided: !!phone });
+    track("scan_started", { email_provided: !!email, phone_provided: !!phone, mode: scanMode });
 
-    // Enable monitoring + trigger scan via edge function
-    await supabase
-      .from("user_profiles")
-      .update({ monitoring_enabled: true, next_scan_at: new Date().toISOString() })
-      .eq("user_id", user.id);
-
-    // Call the run-scheduled-scans edge function
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || "";
 
-      const response = await fetch(`${supabaseUrl}/functions/v1/run-scheduled-scans`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${session?.access_token || ""}`,
-        },
-        body: JSON.stringify({}),
-      });
+      if (scanMode === "live") {
+        // Call HIBP scan edge function — uses the authenticated user's email
+        const response = await fetch(`${supabaseUrl}/functions/v1/hibp-scan`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+        });
 
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        if (response.status === 429) {
+          toast({ title: "Rate Limited", description: "HIBP rate limit hit. Please wait a moment and try again.", variant: "destructive" });
+          setState("idle");
+          return;
+        }
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.error || `HTTP ${response.status}`);
+        }
 
-      // Find the scan run that was just created
-      const { data: latestScan } = await supabase
-        .from("scan_runs")
-        .select("id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        const result = await response.json();
+        setScanRunId(result.scan_run_id);
 
-      if (latestScan) {
-        setScanRunId(latestScan.id);
       } else {
-        // Fallback: wait and retry
-        setTimeout(async () => {
-          const { data: retryScan } = await supabase
-            .from("scan_runs")
-            .select("id")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (retryScan) setScanRunId(retryScan.id);
-        }, 3000);
+        // Demo scan: enable monitoring + use existing catalog-based procedure
+        await supabase
+          .from("user_profiles")
+          .update({ monitoring_enabled: true, next_scan_at: new Date().toISOString() })
+          .eq("user_id", user.id);
+
+        const response = await fetch(`${supabaseUrl}/functions/v1/run-scheduled-scans`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({}),
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        // Find the scan run just created
+        const { data: latestScan } = await supabase
+          .from("scan_runs")
+          .select("id")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (latestScan) {
+          setScanRunId(latestScan.id);
+        } else {
+          setTimeout(async () => {
+            const { data: retryScan } = await supabase
+              .from("scan_runs")
+              .select("id")
+              .eq("user_id", user.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (retryScan) setScanRunId(retryScan.id);
+          }, 3000);
+        }
       }
-    } catch (error) {
-      toast({ title: "Scan Error", description: "Failed to start scan. Please try again.", variant: "destructive" });
+    } catch (error: any) {
+      toast({ title: "Scan Error", description: error?.message || "Failed to start scan. Please try again.", variant: "destructive" });
       setState("idle");
     }
   };
