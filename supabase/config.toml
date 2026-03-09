@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.hibp-scan]
 verify_jwt = false
+
+[functions.send-email-verification]
+verify_jwt = false

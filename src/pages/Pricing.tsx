@@ -14,6 +14,7 @@ const plans = [
     ctaLink: "/signup",
     highlighted: false,
     features: [
+      "1 monitored email",
       "1 secure scan (manual)",
       "Weekly monitoring scans",
       "Breach exposure summary",
@@ -33,6 +34,7 @@ const plans = [
     highlighted: true,
     badge: "Most Popular",
     features: [
+      "Monitor up to 5 emails",
       "Daily monitoring scans",
       "Real-time breach alerts",
       "Dark web exposure monitoring",
@@ -46,6 +48,7 @@ const plans = [
 ];
 
 const comparisonRows = [
+  { feature: "Monitored emails", free: "1", premium: "Up to 5" },
   { feature: "Scan frequency", free: "Weekly", premium: "Daily" },
   { feature: "Breach alerts", free: "Batched", premium: "Real-time" },
   { feature: "Dark web monitoring", free: "—", premium: "✓" },

@@ -15,6 +15,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { toast } from "@/hooks/use-toast";
 
 const premiumBenefits = [
+  "Monitor up to 5 emails",
   "Daily monitoring scans",
   "Instant email alerts",
   "30-day deadline alerts",

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { MonitoredEmailsManager } from "@/components/MonitoredEmailsManager";
 import { User, Shield, Download, Trash2, FileText, ExternalLink, LogOut, Crown, CreditCard, Calendar, CheckCircle, ArrowRight } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -64,7 +65,7 @@ const Settings = () => {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 text-xs">
-              {["Daily scans", "Real-time alerts", "Dark web monitoring", "Priority matching", "Risk scoring", "Auto-claim packets"].map(f => (
+              {["Monitor up to 5 emails", "Daily scans", "Real-time alerts", "Dark web monitoring", "Priority matching", "Risk scoring", "Auto-claim packets"].map(f => (
                 <div key={f} className="flex items-center gap-1.5 text-muted-foreground">
                   <CheckCircle className="h-3 w-3 text-primary" />{f}
                 </div>
@@ -88,19 +89,22 @@ const Settings = () => {
                 <span className="text-sm font-semibold">Premium — $4.99/mo</span>
                 <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold text-primary">50% OFF</span>
               </div>
-              <p className="text-xs text-muted-foreground">Daily scans · Real-time breach alerts · Dark web monitoring · Priority matching</p>
+              <p className="text-xs text-muted-foreground">Monitor up to 5 emails · Daily scans · Real-time breach alerts · Dark web monitoring · Priority matching</p>
             </div>
           </div>
         )}
       </section>
 
+      {/* Monitored Emails */}
+      <MonitoredEmailsManager />
+
       {/* Monitored Identifiers */}
       <section className="mb-6 rounded-2xl border bg-card p-6">
         <div className="flex items-center gap-2 mb-4">
           <Shield className="h-4 w-4 text-primary" />
-          <h2 className="font-semibold">Monitored Identifiers</h2>
+          <h2 className="font-semibold">Other Monitored Identifiers</h2>
         </div>
-        <p className="text-sm text-muted-foreground">No identifiers being monitored. Run a scan to get started.</p>
+        <p className="text-sm text-muted-foreground">Phone numbers, SSNs, and other identifiers from your scans appear here.</p>
       </section>
 
       {/* Data Controls */}
