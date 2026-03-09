@@ -6,9 +6,9 @@ import { Link } from "react-router-dom";
 import logo from "@/assets/logo.png";
 
 const stats = [
-  { icon: Database, value: "12,000+", label: "Databases Scanned" },
-  { icon: DollarSign, value: "$2.4M+", label: "Settlements Tracked" },
-  { icon: Users, value: "50,000+", label: "Identities Protected" },
+  { icon: Database, value: "10,000+", label: "Breach Databases" },
+  { icon: DollarSign, value: "Billions", label: "In Active Settlements" },
+  { icon: Users, value: "Real-Time", label: "Identity Monitoring" },
   { icon: Radio, value: "Daily", label: "Breach Detection" },
 ];
 
