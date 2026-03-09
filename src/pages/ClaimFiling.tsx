@@ -438,24 +438,44 @@ const ClaimFiling = () => {
     );
   }
 
+  const claimRefId = createdClaimId ? `BP-${createdClaimId.slice(0, 8).toUpperCase()}` : null;
+
   if (submitted) {
     return (
       <div>
-        <PageHeader title="Claim Filed Successfully" subtitle="Your claim has been submitted for review" />
+        <PageHeader title="Claim Information Submitted" subtitle="Pending administrator review" />
         <div className="mx-auto max-w-lg text-center space-y-6">
           <div className="rounded-2xl border bg-card p-8">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success/20">
               <CheckCircle className="h-8 w-8 text-success" />
             </div>
-            <h2 className="text-xl font-bold mb-2">Claim Submitted!</h2>
-            <p className="text-muted-foreground text-sm mb-4">
-              Your claim for <span className="text-foreground font-semibold">{settlement.name}</span> has been successfully filed.
+            <h2 className="text-xl font-bold mb-2">Claim Information Submitted</h2>
+            <p className="text-muted-foreground text-sm mb-1">
+              Your claim information has been submitted and is pending administrator review.
             </p>
+            <p className="text-muted-foreground text-xs mb-4">
+              BreachPay prepares and submits your claim information to the official settlement administrator.
+            </p>
+
+            {/* Settlement name with company */}
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-bold text-muted-foreground uppercase">
+                {settlement.company?.slice(0, 2) || "??"}
+              </div>
+              <span className="font-semibold text-foreground">{settlement.name}</span>
+            </div>
+
             <div className="rounded-xl bg-muted/50 p-4 mb-6 space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Estimated Payout</span>
                 <span className="font-semibold text-primary">{settlement.payout_min > 0 && settlement.payout_max > 0 && settlement.payout_min !== settlement.payout_max ? `$${settlement.payout_min.toLocaleString()} – $${settlement.payout_max.toLocaleString()}` : `Up to $${Math.max(settlement.payout_min, settlement.payout_max).toLocaleString()}`}</span>
               </div>
+              {claimRefId && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Claim ID</span>
+                  <span className="font-mono text-xs font-semibold text-foreground">{claimRefId}</span>
+                </div>
+              )}
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Service Fee</span>
                 <span className="text-muted-foreground">15% only if paid</span>
@@ -467,7 +487,7 @@ const ClaimFiling = () => {
             </div>
 
             <p className="text-xs text-muted-foreground mb-4">
-              Eligibility depends on settlement administrator review. Filing deadline is enforced by the settlement administrator.
+              Eligibility depends on settlement administrator review. Filing deadline is enforced by the settlement administrator. BreachPay is not a law firm and does not guarantee payouts.
             </p>
 
             <div className="flex items-center gap-1 mb-6">
@@ -494,7 +514,7 @@ const ClaimFiling = () => {
             </div>
           </div>
 
-          {/* Claim Acceleration - post submission upsell */}
+          {/* Optional Claim Assistance - post submission upsell */}
           {createdClaimId && (
             <ClaimAccelerationCard
               claimId={createdClaimId}
@@ -504,6 +524,43 @@ const ClaimFiling = () => {
 
           {/* Identity Protection - post claim */}
           <IdentityProtectionUpsell placement="post_claim" compact />
+
+          {/* Share / Invite section */}
+          <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5 space-y-3">
+            <div className="flex items-center justify-center gap-2">
+              <Send className="h-4 w-4 text-primary" />
+              <h3 className="text-sm font-semibold">Know someone affected by this breach?</h3>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Invite them to check their eligibility with BreachPay.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                className="flex-1 rounded-xl"
+                onClick={() => {
+                  const url = `${window.location.origin}/signup`;
+                  if (navigator.share) {
+                    navigator.share({ title: "Check if you're owed money from data breaches", text: "I found settlement opportunities with BreachPay. You might be eligible too.", url }).catch(() => {});
+                  } else {
+                    navigator.clipboard.writeText(url);
+                    toast({ title: "Link copied!" });
+                  }
+                }}
+              >
+                <Send className="h-4 w-4 mr-1" /> Invite Friends
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 rounded-xl"
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/signup`);
+                  toast({ title: "Link copied to clipboard" });
+                }}
+              >
+                <Bookmark className="h-4 w-4 mr-1" /> Copy Link
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     );
