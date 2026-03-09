@@ -78,6 +78,10 @@ const ClaimFiling = () => {
   const [eligibilityBlocked, setEligibilityBlocked] = useState<string | null>(null);
   const [checkingEligibility, setCheckingEligibility] = useState(false);
 
+  const [generatingPacket, setGeneratingPacket] = useState(false);
+  const [packetReady, setPacketReady] = useState(false);
+  const [packetError, setPacketError] = useState<string | null>(null);
+
   const [identity, setIdentity] = useState({ fullName: "", email: "", phone: "", address: "" });
   const [eligibility, setEligibility] = useState({
     breachImpact: false, financialLoss: false, monitoringPurchase: false,
