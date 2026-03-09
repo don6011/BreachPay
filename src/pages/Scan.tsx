@@ -394,8 +394,14 @@ const Scan = () => {
       {state === "scanning" && (
         <div className="mx-auto max-w-lg text-center py-20">
           <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary mb-4" />
-          <h2 className="text-xl font-bold mb-2">Scanning Databases...</h2>
-          <p className="text-sm text-muted-foreground">Checking 12,847 breach databases for your identity</p>
+          <h2 className="text-xl font-bold mb-2">
+            {scanMode === "live" ? "Running Live Scan..." : "Scanning Databases..."}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {scanMode === "live"
+              ? "Checking Have I Been Pwned's 14B+ record database for your email"
+              : "Checking 12,847 breach databases for your identity"}
+          </p>
           <div className="mt-6 mx-auto max-w-xs rounded-full bg-muted h-2 overflow-hidden">
             <div className="h-full bg-primary animate-pulse rounded-full" style={{ width: "70%" }} />
           </div>
