@@ -341,6 +341,7 @@ const ClaimTracker = () => {
     );
   }
 
+  const PROGRESS_STEPS = claim.submission_channel === "packet_only" ? PROGRESS_STEPS_PACKET_ONLY : PROGRESS_STEPS_DEFAULT;
   const currentStepIndex = PROGRESS_STEPS.findIndex(s => s.key === claim.status);
   const isRejected = claim.status === "rejected";
   const isDocRequired = claim.status === "documentation_required";
