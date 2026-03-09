@@ -16,6 +16,7 @@ type EventName =
   | "share_link_created"
   | "payout_marked_paid"
   | "redirect_official"
+  | "official_portal_visited"
   | "partner_api_submitted";
 
 export const useTrackEvent = () => {
