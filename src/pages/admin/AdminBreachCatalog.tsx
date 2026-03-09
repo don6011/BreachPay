@@ -94,7 +94,7 @@ const AdminBreachCatalog = () => {
   const [editing, setEditing] = useState<BreachCatalogItem | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
-  const [seeding, setSeeding] = useState(false);
+  
 
   const fetchItems = async () => {
     setLoading(true);
