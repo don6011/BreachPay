@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,14 +6,18 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useTrackEvent } from "@/hooks/useTrackEvent";
 import { toast } from "@/hooks/use-toast";
 import logo from "@/assets/logo.png";
-import { Mail, Phone, Search, ArrowRight, Plus, X, Loader2, CheckCircle, Shield } from "lucide-react";
+import { Mail, Phone, Search, ArrowRight, Plus, X, Loader2, CheckCircle, Shield, Crown } from "lucide-react";
+import { ScanProgressSteps } from "@/components/ScanProgressSteps";
 
 interface Props {
   onComplete: () => void;
 }
 
+const FREE_EMAIL_LIMIT = 2;
+const PREMIUM_EMAIL_LIMIT = 5;
+
 export function OnboardingFlow({ onComplete }: Props) {
-  const { user } = useAuth();
+  const { user, plan } = useAuth();
   const track = useTrackEvent();
   const [step, setStep] = useState(1);
   const [secondaryEmails, setSecondaryEmails] = useState<string[]>([]);
@@ -21,12 +25,17 @@ export function OnboardingFlow({ onComplete }: Props) {
   const [phone, setPhone] = useState("");
   const [scanning, setScanning] = useState(false);
   const [scanDone, setScanDone] = useState(false);
+  const [scanRunId, setScanRunId] = useState<string | null>(null);
   const [scanResult, setScanResult] = useState<{ breaches: number; estimatedValue: number } | null>(null);
 
   const primaryEmail = user?.email || "";
+  const isPremium = plan === "premium";
+  const emailLimit = isPremium ? PREMIUM_EMAIL_LIMIT : FREE_EMAIL_LIMIT;
+  const canAddMore = secondaryEmails.length < emailLimit;
 
   const addSecondaryEmail = () => {
     const trimmed = newEmail.trim().toLowerCase();
+    if (!canAddMore) return;
     if (trimmed && trimmed !== primaryEmail && !secondaryEmails.includes(trimmed) && /\S+@\S+\.\S+/.test(trimmed)) {
       setSecondaryEmails([...secondaryEmails, trimmed]);
       setNewEmail("");
@@ -37,48 +46,89 @@ export function OnboardingFlow({ onComplete }: Props) {
     setSecondaryEmails(secondaryEmails.filter(e => e !== email));
   };
 
+  // Poll for scan completion
+  useEffect(() => {
+    if (!scanning || !scanRunId || !user) return;
+
+    const interval = setInterval(async () => {
+      const { data: scan } = await supabase
+        .from("scan_runs")
+        .select("status, risk_score, breaches_detected, eligible_settlements")
+        .eq("id", scanRunId)
+        .maybeSingle();
+
+      if (scan && (scan.status === "completed" || scan.status === "failed")) {
+        clearInterval(interval);
+
+        if (scan.status === "failed") {
+          toast({ title: "Scan Failed", description: "Something went wrong. Please try again.", variant: "destructive" });
+          setScanning(false);
+          return;
+        }
+
+        // Fetch settlement matches for estimated value
+        const { data: matches } = await supabase
+          .from("settlement_matches")
+          .select("payout_estimate, confidence_level, settlements(payout_max)")
+          .eq("user_id", user.id);
+
+        const estimatedValue = (matches || []).reduce((sum: number, m: any) => sum + (m.settlements?.payout_max || 0), 0);
+
+        setScanResult({
+          breaches: scan.breaches_detected || 0,
+          estimatedValue,
+        });
+
+        track("scan_completed", { scan_id: scanRunId, breaches: scan.breaches_detected || 0, source: "onboarding" });
+        setScanDone(true);
+        setScanning(false);
+
+        // Mark onboarding complete
+        await supabase
+          .from("user_profiles")
+          .update({ onboarding_completed: true })
+          .eq("user_id", user.id);
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [scanning, scanRunId, user]);
+
   const handleRunScan = async () => {
     if (!user) return;
     setScanning(true);
     try {
-      // Create scan run
-      const { data: scan, error } = await supabase
-        .from("scan_runs")
-        .insert({ user_id: user.id, status: "running" as const, started_at: new Date().toISOString() })
-        .select("id")
-        .single();
-      if (error) throw error;
+      track("scan_started", { source: "onboarding" });
 
-      track("scan_started", { scan_id: scan.id, source: "onboarding" });
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || "";
 
-      // Simulate scan completion (real scan handled by backend)
-      await new Promise(r => setTimeout(r, 3000));
-
-      // Fetch results
-      const { data: matches } = await supabase
-        .from("settlement_matches")
-        .select("payout_estimate, confidence_level, settlements(payout_max)")
-        .eq("user_id", user.id);
-
-      const strongMatches = (matches || []).filter((m: any) => m.confidence_level === "high");
-      const estimatedValue = (matches || []).reduce((sum: number, m: any) => sum + (m.settlements?.payout_max || 0), 0);
-
-      setScanResult({
-        breaches: matches?.length || 0,
-        estimatedValue,
+      // Call the real hibp-scan edge function
+      const response = await fetch(`${supabaseUrl}/functions/v1/hibp-scan`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
       });
 
-      track("scan_completed", { scan_id: scan.id, breaches: matches?.length || 0, source: "onboarding" });
-      setScanDone(true);
+      if (response.status === 429) {
+        toast({ title: "Rate Limited", description: "Please wait a moment and try again.", variant: "destructive" });
+        setScanning(false);
+        return;
+      }
 
-      // Mark onboarding complete
-      await supabase
-        .from("user_profiles")
-        .update({ onboarding_completed: true })
-        .eq("user_id", user.id);
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${response.status}`);
+      }
+
+      const result = await response.json();
+      setScanRunId(result.scan_run_id);
+      // Polling will handle the rest via useEffect
     } catch (e: any) {
       toast({ title: "Scan Error", description: e.message, variant: "destructive" });
-    } finally {
       setScanning(false);
     }
   };
@@ -129,18 +179,33 @@ export function OnboardingFlow({ onComplete }: Props) {
                 </div>
               ))}
 
-              <div className="flex items-center gap-2">
-                <Input
-                  type="email"
-                  placeholder="Add another email (optional)"
-                  value={newEmail}
-                  onChange={e => setNewEmail(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addSecondaryEmail())}
-                  className="rounded-xl flex-1"
-                />
-                <Button variant="outline" size="icon" className="shrink-0 h-9 w-9 rounded-xl" onClick={addSecondaryEmail}>
-                  <Plus className="h-4 w-4" />
-                </Button>
+              {canAddMore ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="email"
+                    placeholder="Add another email (optional)"
+                    value={newEmail}
+                    onChange={e => setNewEmail(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addSecondaryEmail())}
+                    className="rounded-xl flex-1"
+                  />
+                  <Button variant="outline" size="icon" className="shrink-0 h-9 w-9 rounded-xl" onClick={addSecondaryEmail}>
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : null}
+
+              {/* Email limit indicator */}
+              <div className="flex items-center justify-between pt-1">
+                <p className="text-xs text-muted-foreground">
+                  {secondaryEmails.length}/{emailLimit} additional email{emailLimit !== 1 ? "s" : ""}
+                </p>
+                {!isPremium && secondaryEmails.length >= emailLimit && (
+                  <div className="flex items-center gap-1 text-xs text-primary">
+                    <Crown className="h-3 w-3" />
+                    <span>Upgrade for up to {PREMIUM_EMAIL_LIMIT} emails</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -183,7 +248,7 @@ export function OnboardingFlow({ onComplete }: Props) {
         )}
 
         {/* Step 3: Run Scan */}
-        {step === 3 && !scanDone && (
+        {step === 3 && !scanDone && !scanning && (
           <div className="glass-card p-8 space-y-6">
             <div className="text-center">
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
@@ -213,18 +278,15 @@ export function OnboardingFlow({ onComplete }: Props) {
             <Button
               className="w-full rounded-xl text-base h-12 gradient-emerald text-primary-foreground font-semibold"
               onClick={handleRunScan}
-              disabled={scanning}
             >
-              {scanning ? (
-                <>
-                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Scanning breach databases…
-                </>
-              ) : (
-                "Check If I'm Owed Money"
-              )}
+              Check If I'm Owed Money
             </Button>
           </div>
+        )}
+
+        {/* Step 3: Scanning in progress */}
+        {step === 3 && scanning && !scanDone && (
+          <ScanProgressSteps />
         )}
 
         {/* Step 3: Results */}
