@@ -11,7 +11,7 @@ import { PayoutRange } from "@/components/PayoutRange";
 import {
   Scale, DollarSign, Clock, ArrowRight, Shield, AlertTriangle, FileCheck,
   Zap, ChevronDown, Sparkles, TrendingUp, CheckCircle2, Target,
-  ExternalLink, XCircle, Info, ChevronRight,
+  ExternalLink, XCircle, Info, ChevronRight, Search,
 } from "lucide-react";
 import type { SettlementStatus } from "@/types";
 import { Link, useNavigate } from "react-router-dom";
@@ -299,7 +299,7 @@ const Settlements = () => {
           </div>
         )}
 
-        <div className={`glass-card p-6 transition-all duration-300 hover:translate-y-[-1px] ${
+        <div className={`glass-card p-6 transition-all duration-300 hover:translate-y-[-2px] hover:shadow-[0_8px_30px_-12px_hsl(var(--primary)/0.15)] ${
           settlement.lifecycle_status !== "active" || settlement.status === "closed" ? "opacity-60" : filingStatus === "approved" || filingStatus === "paid" ? "!border-success/30" : settlement.status === "open" ? "hover:border-primary/25" : ""
         }`}>
           <div className="flex items-start justify-between mb-3">
@@ -363,6 +363,27 @@ const Settlements = () => {
               </TooltipProvider>
             )}
           </div>
+
+          {/* Trust Signal Badges */}
+          {(settlement.verified || settlement.official_source_url || settlement.claims_filing_url) && (
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+              {settlement.verified && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/8 border border-primary/15 px-2.5 py-1 text-[10px] font-medium text-primary">
+                  <CheckCircle2 className="h-3 w-3" /> Verified Settlement
+                </span>
+              )}
+              {settlement.claims_filing_url && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/8 border border-primary/15 px-2.5 py-1 text-[10px] font-medium text-primary">
+                  <CheckCircle2 className="h-3 w-3" /> Official Claim Portal
+                </span>
+              )}
+              {(settlement.official_source_url || settlement.source_url) && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-primary/8 border border-primary/15 px-2.5 py-1 text-[10px] font-medium text-primary">
+                  <CheckCircle2 className="h-3 w-3" /> Source Linked
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Deadline Countdown Bar */}
           {settlement.status !== "closed" && effectiveDeadline && (
@@ -575,16 +596,23 @@ const Settlements = () => {
 
       {/* Settlement Cards */}
       {filtered.length === 0 ? (
-        <div className="glass-card p-8 text-center">
-          <Scale className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
-          <p className="text-muted-foreground">
+        <div className="glass-card p-10 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-muted/50">
+            <Scale className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-semibold mb-1">
             {settlements.length === 0 
-              ? "No settlement matches yet. Run a breach scan to discover potential compensation opportunities." 
+              ? "No recovery opportunities detected yet." 
               : "No settlements match this filter."}
+          </h3>
+          <p className="text-sm text-muted-foreground mb-5 max-w-sm mx-auto">
+            {settlements.length === 0 
+              ? "Run a breach scan to check if you may qualify for compensation from data breach settlements."
+              : "Try adjusting your filter to see more results."}
           </p>
           {settlements.length === 0 && (
-            <Button className="mt-4 rounded-xl" asChild>
-              <Link to="/scan">Run Breach Scan <ArrowRight className="ml-2 h-4 w-4" /></Link>
+            <Button className="rounded-xl shadow-[0_0_20px_hsl(var(--primary)/0.25)] hover:shadow-[0_0_30px_hsl(var(--primary)/0.4)] transition-all duration-300" asChild>
+              <Link to="/scan"><Search className="mr-2 h-4 w-4" />Run Secure Scan</Link>
             </Button>
           )}
         </div>
