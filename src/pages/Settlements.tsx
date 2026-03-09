@@ -11,7 +11,7 @@ import { PayoutRange } from "@/components/PayoutRange";
 import {
   Scale, DollarSign, Clock, ArrowRight, Shield, AlertTriangle, FileCheck,
   Zap, ChevronDown, Sparkles, TrendingUp, CheckCircle2, Target,
-  ExternalLink, XCircle, Info, ChevronRight,
+  ExternalLink, XCircle, Info, ChevronRight, Search,
 } from "lucide-react";
 import type { SettlementStatus } from "@/types";
 import { Link, useNavigate } from "react-router-dom";
