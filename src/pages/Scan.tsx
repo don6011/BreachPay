@@ -357,7 +357,7 @@ const Scan = () => {
                   Scanning your account email: <strong className="text-foreground">{user?.email}</strong>
                 </div>
               )}
-              {scanMode === "demo" && (
+              {scanMode === "catalog" && (
                 <div>
                   <label className="mb-1.5 block text-sm font-medium">Phone Number <span className="text-muted-foreground">(optional)</span></label>
                   <Input type="tel" placeholder="+1 (555) 000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl" />
