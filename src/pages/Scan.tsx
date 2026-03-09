@@ -302,18 +302,71 @@ const Scan = () => {
               </div>
             </div>
             <h2 className="mb-1 text-center text-lg font-bold">Secure Identity Scan</h2>
-            <p className="mb-6 text-center text-sm text-muted-foreground">We'll check your information against 12,000+ breach databases</p>
+            <p className="mb-5 text-center text-sm text-muted-foreground">Check your email against real-world breach databases</p>
+
+            {/* Scan Mode Toggle */}
+            <div className="mb-5 grid grid-cols-2 gap-2 rounded-xl border border-border bg-muted/30 p-1">
+              <button
+                type="button"
+                onClick={() => setScanMode("live")}
+                className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+                  scanMode === "live"
+                    ? "bg-background text-foreground shadow-sm border border-border"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Globe className="h-4 w-4 text-primary" />
+                Live Scan
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-primary/10 text-primary border-0">HIBP</Badge>
+              </button>
+              <button
+                type="button"
+                onClick={() => setScanMode("demo")}
+                className={`flex items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-all ${
+                  scanMode === "demo"
+                    ? "bg-background text-foreground shadow-sm border border-border"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Shield className="h-4 w-4" />
+                Demo Scan
+              </button>
+            </div>
+
+            {scanMode === "live" && (
+              <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
+                <Globe className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
+                <span>
+                  <strong className="text-foreground">Live Scan</strong> checks your account email against{" "}
+                  <strong className="text-foreground">Have I Been Pwned</strong> — 14 billion+ real breached records. Results are fetched in real-time.
+                </span>
+              </div>
+            )}
+
             <form onSubmit={handleScan} className="space-y-4">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">Email Address</label>
-                <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="rounded-xl" />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium">Phone Number <span className="text-muted-foreground">(optional)</span></label>
-                <Input type="tel" placeholder="+1 (555) 000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl" />
-              </div>
+              {scanMode === "demo" && (
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Email Address</label>
+                  <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="rounded-xl" />
+                </div>
+              )}
+              {scanMode === "live" && (
+                <div className="rounded-xl border border-border bg-muted/30 p-3 text-sm text-muted-foreground text-center">
+                  Scanning your account email: <strong className="text-foreground">{user?.email}</strong>
+                </div>
+              )}
+              {scanMode === "demo" && (
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium">Phone Number <span className="text-muted-foreground">(optional)</span></label>
+                  <Input type="tel" placeholder="+1 (555) 000-0000" value={phone} onChange={(e) => setPhone(e.target.value)} className="rounded-xl" />
+                </div>
+              )}
               <Button type="submit" className="w-full rounded-xl" size="lg">
-                <Search className="mr-2 h-4 w-4" /> Start Secure Scan
+                {scanMode === "live" ? (
+                  <><Globe className="mr-2 h-4 w-4" /> Run Live HIBP Scan</>
+                ) : (
+                  <><Search className="mr-2 h-4 w-4" /> Start Secure Scan</>
+                )}
               </Button>
             </form>
 
