@@ -956,7 +956,7 @@ const ClaimFiling = () => {
                 <div className="rounded-xl bg-muted/30 p-4 space-y-2">
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Estimated Payout</h4>
                   <p className="text-sm font-bold text-primary">${settlement.payout_min} – ${settlement.payout_max}</p>
-                  <p className="text-[10px] text-muted-foreground">Subject to administrator review. 15% platform fee applies only if paid.</p>
+                  <p className="text-[10px] text-muted-foreground">Actual payout amounts depend on settlement administrator review and total claims submitted. 15% platform fee applies only if paid.</p>
                 </div>
                 <div className="rounded-xl bg-muted/30 p-4 space-y-2">
                   <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Documents</h4>
