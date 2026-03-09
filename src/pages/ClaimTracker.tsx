@@ -364,6 +364,20 @@ const ClaimTracker = () => {
                   Download ({format(new Date(latestPacket.generated_at), "MMM d")})
                 </Button>
               )}
+              {claim.settlement?.claims_filing_url && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="rounded-xl gap-2"
+                  onClick={() => {
+                    window.open(claim.settlement!.claims_filing_url!, "_blank", "noopener,noreferrer");
+                    track("official_portal_visited", { claim_id: claimId, settlement_id: claim.settlement!.id });
+                  }}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Visit Official Claim Portal
+                </Button>
+              )}
             </div>
 
             {/* Share Link Creation */}
