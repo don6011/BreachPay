@@ -416,20 +416,7 @@ const Scan = () => {
       )}
 
       {state === "scanning" && (
-        <div className="mx-auto max-w-lg text-center py-20">
-          <Loader2 className="mx-auto h-12 w-12 animate-spin text-primary mb-4" />
-          <h2 className="text-xl font-bold mb-2">
-            {scanMode === "live" ? "Running Secure Scan..." : "Scanning Databases..."}
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            {scanMode === "live"
-              ? "Checking breach databases and matching you to open settlements"
-              : "Checking breach databases for your identity"}
-          </p>
-          <div className="mt-6 mx-auto max-w-xs rounded-full bg-muted h-2 overflow-hidden">
-            <div className="h-full bg-primary animate-pulse rounded-full" style={{ width: "70%" }} />
-          </div>
-        </div>
+        <ScanProgressSteps />
       )}
 
       {state === "results" && (
