@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { MonitoredEmailsManager } from "@/components/MonitoredEmailsManager";
 import { User, Shield, Download, Trash2, FileText, ExternalLink, LogOut, Crown, CreditCard, Calendar, CheckCircle, ArrowRight } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
