@@ -1,6 +1,7 @@
 /// <reference lib="deno.ns" />
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,153 +9,238 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-function esc(s: string | null | undefined): string {
-  if (!s) return "";
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-function formatDate(d: string | null): string {
+function fmt(d: string | null): string {
   if (!d) return "—";
   return new Date(d).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 }
 
-function formatCurrency(n: number | null): string {
+function money(n: number | null): string {
   if (n == null) return "—";
   return `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function buildPacketHtml(claim: any, settlement: any, application: any, documents: any[], match: any): string {
+function safe(s: string | null | undefined): string {
+  return s || "—";
+}
+
+function buildPdf(claim: any, settlement: any, application: any, documents: any[], match: any): Uint8Array {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const pw = doc.internal.pageSize.getWidth();
+  const margin = 18;
+  const contentW = pw - margin * 2;
+  let y = margin;
+
+  const blue = [37, 99, 235];
+  const dark = [15, 23, 42];
+  const gray = [100, 116, 139];
+
+  function heading(text: string) {
+    y += 6;
+    doc.setDrawColor(...blue);
+    doc.setLineWidth(0.5);
+    doc.line(margin, y + 5, pw - margin, y + 5);
+    doc.setFontSize(13);
+    doc.setTextColor(...blue);
+    doc.setFont("helvetica", "bold");
+    doc.text(text, margin, y + 3);
+    y += 10;
+  }
+
+  function row(label: string, value: string) {
+    if (y > 270) { doc.addPage(); y = margin; }
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...dark);
+    doc.text(label, margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(60, 60, 60);
+    const lines = doc.splitTextToSize(value, contentW - 50);
+    doc.text(lines, margin + 50, y);
+    y += Math.max(5, lines.length * 4.5);
+  }
+
+  function checkPage(needed: number) {
+    if (y + needed > 275) { doc.addPage(); y = margin; }
+  }
+
+  // HEADER
+  doc.setFontSize(20);
+  doc.setTextColor(...dark);
+  doc.setFont("helvetica", "bold");
+  doc.text("BreachPay Claim Packet", margin, y);
+  y += 6;
+  doc.setFontSize(10);
+  doc.setTextColor(...gray);
+  doc.setFont("helvetica", "normal");
+  doc.text("Compensation Recovery File", margin, y);
+  y += 5;
+  doc.setFontSize(8);
+  doc.text(`Generated ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC  •  Claim ID: ${(claim.id || "").slice(0, 8)}`, margin, y);
+  y += 4;
+
+  // Verified badge
+  if (settlement?.credibility_score) {
+    doc.setFillColor(220, 252, 231);
+    doc.roundedRect(margin, y, 40, 5, 1, 1, "F");
+    doc.setFontSize(7);
+    doc.setTextColor(22, 101, 52);
+    doc.text(`✓ Verified  •  Credibility: ${settlement.credibility_score}/100`, margin + 2, y + 3.5);
+    y += 8;
+  } else {
+    y += 3;
+  }
+
+  // PAGE 1: Settlement Details
+  heading("Settlement Details");
+  row("Settlement", safe(settlement?.name));
+  row("Company", safe(settlement?.company));
+  row("Breach Year", settlement?.breach_year ? String(settlement.breach_year) : "—");
+  row("Filing Deadline", fmt(settlement?.claim_deadline || settlement?.deadline));
+  row("Payout Range", `${money(settlement?.payout_min)} – ${money(settlement?.payout_max)}`);
+  row("Verification", safe(settlement?.verification_level || "verified"));
+  if (settlement?.administrator_name) row("Administrator", settlement.administrator_name);
+  if (settlement?.case_number) row("Case Number", settlement.case_number);
+  if (settlement?.jurisdiction) row("Jurisdiction", settlement.jurisdiction);
+
+  // Claim Status
+  heading("Claim Status");
+  row("Status", (claim.status || "draft").toUpperCase());
+  row("Filed", fmt(claim.filed_at));
+  row("Estimated Payout", money(claim.est_payout));
+  row("Platform Fee", `${claim.fee_percent || 15}%`);
+
+  // Match Confidence
+  if (match) {
+    heading("Match Confidence");
+    row("Score", `${match.confidence_score || "—"}%`);
+    row("Level", safe(match.confidence_level));
+    row("Reason", safe(match.match_reason));
+  }
+
+  // Claimant Information
+  heading("Claimant Information");
+  row("Full Name", safe(application?.full_name));
+  row("Email", safe(application?.email));
+  row("Phone", safe(application?.phone));
+  row("Address", safe(application?.address));
+  row("Breach Experience", safe(application?.breach_experience));
+  row("Certs Signed", application?.certifications_signed ? "Yes" : "No");
+
+  // Eligibility Answers
   const eligibility = application?.eligibility_answers || {};
-  const eligibilityRows = Object.entries(eligibility)
-    .map(([k, v]) => `<tr><td style="padding:6px 12px;border:1px solid #e5e7eb;font-weight:500">${esc(k.replace(/_/g, " "))}</td><td style="padding:6px 12px;border:1px solid #e5e7eb">${esc(String(v))}</td></tr>`)
-    .join("");
+  const entries = Object.entries(eligibility);
+  if (entries.length > 0) {
+    heading("Eligibility Answers");
+    for (const [k, v] of entries) {
+      row(k.replace(/_/g, " "), String(v));
+    }
+  }
 
-  const docRows = documents
-    .map(
-      (d: any) =>
-        `<tr><td style="padding:6px 12px;border:1px solid #e5e7eb">${esc(d.file_name)}</td><td style="padding:6px 12px;border:1px solid #e5e7eb">${esc(d.doc_type)}</td><td style="padding:6px 12px;border:1px solid #e5e7eb">${esc(d.status)}</td><td style="padding:6px 12px;border:1px solid #e5e7eb">${d.file_size ? (d.file_size / 1024).toFixed(1) + " KB" : "—"}</td><td style="padding:6px 12px;border:1px solid #e5e7eb">${formatDate(d.created_at)}</td></tr>`
-    )
-    .join("");
+  // PAGE 2: Evidence Index
+  doc.addPage();
+  y = margin;
+  heading(`Evidence Index (${documents.length} documents)`);
 
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><style>
-  body { font-family: 'Helvetica Neue', Arial, sans-serif; color: #1a1a2e; margin: 40px; font-size: 13px; line-height: 1.6; }
-  h1 { font-size: 22px; margin-bottom: 4px; color: #0f172a; }
-  h2 { font-size: 16px; margin: 28px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #2563eb; color: #2563eb; }
-  .meta { color: #64748b; font-size: 11px; margin-bottom: 24px; }
-  table { width: 100%; border-collapse: collapse; margin: 8px 0 16px; font-size: 12px; }
-  th { background: #f1f5f9; padding: 8px 12px; border: 1px solid #e5e7eb; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-  td { padding: 6px 12px; border: 1px solid #e5e7eb; }
-  .grid { display: flex; gap: 16px; margin: 8px 0; }
-  .grid-item { flex: 1; background: #f8fafc; border-radius: 8px; padding: 12px; }
-  .grid-item .label { font-size: 10px; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; }
-  .grid-item .value { font-size: 15px; font-weight: 600; margin-top: 2px; }
-  .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e5e7eb; font-size: 10px; color: #94a3b8; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
-  .badge-status { background: #dbeafe; color: #1e40af; }
-  .page-break { page-break-before: always; margin-top: 40px; }
-  @media print { body { margin: 20px; } }
-</style></head>
-<body>
-  <!-- PAGE 1: Settlement & Claimant Info -->
-  <h1>BreachPay Claim Packet</h1>
-  <p style="font-size:13px;color:#64748b;margin:-4px 0 4px">Compensation Recovery File</p>
-  <p style="font-size:11px;margin:0 0 20px"><span class="badge" style="background:#dcfce7;color:#166534">✓ Verified Settlement</span>${settlement?.credibility_score ? ` <span class="badge" style="background:#f0fdf4;color:#166534">Credibility: ${settlement.credibility_score}/100</span>` : ""}</p>
-  <p class="meta">Generated ${new Date().toISOString().slice(0, 16).replace("T", " ")} UTC · Claim ID: ${esc(claim.id?.slice(0, 8))}</p>
+  if (documents.length > 0) {
+    // Table header
+    doc.setFillColor(241, 245, 249);
+    doc.rect(margin, y, contentW, 6, "F");
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...dark);
+    const cols = [margin + 2, margin + 55, margin + 85, margin + 110, margin + 135];
+    doc.text("FILE NAME", cols[0], y + 4);
+    doc.text("CATEGORY", cols[1], y + 4);
+    doc.text("STATUS", cols[2], y + 4);
+    doc.text("SIZE", cols[3], y + 4);
+    doc.text("UPLOADED", cols[4], y + 4);
+    y += 7;
 
-  <h2>Settlement Details</h2>
-  <table>
-    <tr><th>Settlement</th><td>${esc(settlement?.name)}</td></tr>
-    <tr><th>Company</th><td>${esc(settlement?.company)}</td></tr>
-    <tr><th>Breach Year</th><td>${settlement?.breach_year || "—"}</td></tr>
-    <tr><th>Filing Deadline</th><td>${formatDate(settlement?.claim_deadline || settlement?.deadline)}</td></tr>
-    <tr><th>Payout Range</th><td>${formatCurrency(settlement?.payout_min)} – ${formatCurrency(settlement?.payout_max)}</td></tr>
-    <tr><th>Verification</th><td>${esc(settlement?.verification_level || "verified")} · ${esc(settlement?.verification_status || "verified")}</td></tr>
-    ${settlement?.administrator_name ? `<tr><th>Administrator</th><td>${esc(settlement.administrator_name)}</td></tr>` : ""}
-    ${settlement?.case_number ? `<tr><th>Case Number</th><td>${esc(settlement.case_number)}</td></tr>` : ""}
-    ${settlement?.jurisdiction ? `<tr><th>Jurisdiction</th><td>${esc(settlement.jurisdiction)}</td></tr>` : ""}
-  </table>
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    for (const d of documents) {
+      checkPage(6);
+      doc.setTextColor(60, 60, 60);
+      doc.text((d.file_name || "").slice(0, 30), cols[0], y + 3);
+      doc.text(safe(d.doc_type).slice(0, 16), cols[1], y + 3);
+      doc.text(safe(d.status), cols[2], y + 3);
+      doc.text(d.file_size ? `${(d.file_size / 1024).toFixed(1)} KB` : "—", cols[3], y + 3);
+      doc.text(fmt(d.created_at).slice(0, 18), cols[4], y + 3);
+      doc.setDrawColor(229, 231, 235);
+      doc.line(margin, y + 5, pw - margin, y + 5);
+      y += 6;
+    }
+  } else {
+    doc.setFontSize(9);
+    doc.setTextColor(...gray);
+    doc.text("No documents uploaded.", margin, y + 4);
+    y += 8;
+  }
 
-  <h2>Claim Status</h2>
-  <div class="grid">
-    <div class="grid-item"><div class="label">Status</div><div class="value"><span class="badge badge-status">${esc(claim.status?.toUpperCase())}</span></div></div>
-    <div class="grid-item"><div class="label">Filed</div><div class="value">${formatDate(claim.filed_at)}</div></div>
-    <div class="grid-item"><div class="label">Estimated Payout</div><div class="value">${formatCurrency(claim.est_payout)}</div></div>
-    <div class="grid-item"><div class="label">Platform Fee</div><div class="value">${claim.fee_percent || 15}%</div></div>
-  </div>
+  // PAGE 3: Declaration
+  doc.addPage();
+  y = margin;
+  heading("Claimant Declaration");
 
-  ${match ? `
-  <h2>Match Confidence</h2>
-  <table>
-    <tr><th>Confidence Score</th><td>${match.confidence_score || "—"}%</td></tr>
-    <tr><th>Confidence Level</th><td>${esc(match.confidence_level)}</td></tr>
-    <tr><th>Match Reason</th><td>${esc(match.match_reason)}</td></tr>
-  </table>` : ""}
+  doc.setFontSize(10);
+  doc.setTextColor(...dark);
+  doc.setFont("helvetica", "normal");
 
-  <h2>Claimant Information</h2>
-  <table>
-    <tr><th>Full Name</th><td>${esc(application?.full_name)}</td></tr>
-    <tr><th>Email</th><td>${esc(application?.email)}</td></tr>
-    <tr><th>Phone</th><td>${esc(application?.phone) || "—"}</td></tr>
-    <tr><th>Address</th><td>${esc(application?.address) || "—"}</td></tr>
-    <tr><th>Breach Experience</th><td>${esc(application?.breach_experience) || "—"}</td></tr>
-    <tr><th>Certifications Signed</th><td>${application?.certifications_signed ? "Yes" : "No"}</td></tr>
-  </table>
+  const decl1 = doc.splitTextToSize(
+    `I, ${application?.full_name || "________________________"}, hereby declare that the information provided in this claim packet is true and accurate to the best of my knowledge. I understand that submitting false or misleading information may result in the denial of my claim and potential legal consequences.`,
+    contentW
+  );
+  doc.text(decl1, margin, y);
+  y += decl1.length * 5 + 4;
 
-  ${eligibilityRows ? `
-  <h2>Eligibility Answers</h2>
-  <table>
-    <tr><th>Question</th><th>Answer</th></tr>
-    ${eligibilityRows}
-  </table>` : ""}
+  const decl2 = doc.splitTextToSize(
+    `I confirm that I was affected by the ${settlement?.company || ""} data breach${settlement?.breach_year ? ` (${settlement.breach_year})` : ""} and that I am eligible to participate in the ${settlement?.name || ""} settlement as described herein.`,
+    contentW
+  );
+  doc.text(decl2, margin, y);
+  y += decl2.length * 5 + 4;
 
-  <!-- PAGE 2: Supporting Evidence -->
-  <div class="page-break">
-  <h2>Evidence Index (${documents.length} documents)</h2>
-  ${documents.length > 0 ? `
-  <table>
-    <tr><th>File Name</th><th>Category</th><th>Status</th><th>Size</th><th>Uploaded</th></tr>
-    ${docRows}
-  </table>` : "<p>No documents uploaded.</p>"}
-  </div>
+  const decl3 = doc.splitTextToSize(
+    `I authorize BreachPay to act on my behalf in processing this claim and understand that a platform fee of ${claim.fee_percent || 15}% will apply to any awarded compensation.`,
+    contentW
+  );
+  doc.text(decl3, margin, y);
+  y += decl3.length * 5 + 12;
 
-  <!-- PAGE 3: Claimant Declaration -->
-  <div class="page-break">
-  <h2>Claimant Declaration</h2>
-  <div style="border: 2px solid #e5e7eb; border-radius: 8px; padding: 24px; margin: 16px 0;">
-    <p style="font-size: 13px; line-height: 1.8;">
-      I, <strong>${esc(application?.full_name) || "________________________"}</strong>, hereby declare that the information provided in this claim packet is true and accurate to the best of my knowledge. I understand that submitting false or misleading information may result in the denial of my claim and potential legal consequences.
-    </p>
-    <p style="font-size: 13px; line-height: 1.8; margin-top: 12px;">
-      I confirm that I was affected by the <strong>${esc(settlement?.company)}</strong> data breach${settlement?.breach_year ? ` (${settlement.breach_year})` : ""} and that I am eligible to participate in the <strong>${esc(settlement?.name)}</strong> settlement as described herein.
-    </p>
-    <p style="font-size: 13px; line-height: 1.8; margin-top: 12px;">
-      I authorize BreachPay to act on my behalf in processing this claim and understand that a platform fee of <strong>${claim.fee_percent || 15}%</strong> will apply to any awarded compensation.
-    </p>
-    <div style="margin-top: 40px; display: flex; gap: 48px;">
-      <div style="flex: 1;">
-        <div style="border-bottom: 1px solid #1a1a2e; height: 40px;"></div>
-        <p style="font-size: 11px; color: #64748b; margin-top: 4px;">Signature</p>
-      </div>
-      <div style="flex: 1;">
-        <div style="border-bottom: 1px solid #1a1a2e; height: 40px;"></div>
-        <p style="font-size: 11px; color: #64748b; margin-top: 4px;">Date</p>
-      </div>
-    </div>
-    <p style="font-size: 11px; color: #94a3b8; margin-top: 16px;">
-      ${application?.certifications_signed ? "✓ Digital certifications were signed at submission." : "⚠ Digital certifications were not signed."}
-      ${application?.disclaimer_accepted_at ? ` Disclaimer accepted on ${formatDate(application.disclaimer_accepted_at)}.` : ""}
-    </p>
-  </div>
-  </div>
+  // Signature lines
+  checkPage(30);
+  doc.setDrawColor(...dark);
+  doc.line(margin, y + 10, margin + 70, y + 10);
+  doc.line(margin + 85, y + 10, pw - margin, y + 10);
+  doc.setFontSize(8);
+  doc.setTextColor(...gray);
+  doc.text("Signature", margin, y + 15);
+  doc.text("Date", margin + 85, y + 15);
+  y += 22;
 
-  <div class="footer">
-    <p>Generated by BreachPay Settlement Recovery Platform</p>
-    <p>BreachPay is not a law firm and does not provide legal advice. Eligibility depends on settlement administrator review.</p>
-  </div>
-</body>
-</html>`;
+  // Certification note
+  doc.setFontSize(7);
+  if (application?.certifications_signed) {
+    doc.text("✓ Digital certifications were signed at submission.", margin, y);
+  } else {
+    doc.text("⚠ Digital certifications were not signed.", margin, y);
+  }
+  if (application?.disclaimer_accepted_at) {
+    doc.text(`Disclaimer accepted on ${fmt(application.disclaimer_accepted_at)}.`, margin, y + 4);
+  }
+
+  // Footer on every page
+  const totalPages = doc.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7);
+    doc.setTextColor(...gray);
+    doc.text("Generated by BreachPay Settlement Recovery Platform", margin, 288);
+    doc.text("BreachPay is not a law firm and does not provide legal advice.", margin, 291);
+    doc.text(`Page ${i} of ${totalPages}`, pw - margin - 20, 291);
+  }
+
+  return new Uint8Array(doc.output("arraybuffer"));
 }
 
 Deno.serve(async (req) => {
@@ -174,7 +260,6 @@ Deno.serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const bucket = Deno.env.get("PACKET_BUCKET") ?? "claim-packets";
 
-    // Auth
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ ok: false, error: "unauthorized" }), {
@@ -207,7 +292,6 @@ Deno.serve(async (req) => {
 
     const admin = createClient(supabaseUrl, serviceKey);
 
-    // Fetch claim
     const { data: claim, error: claimErr } = await admin
       .from("claims")
       .select("*")
@@ -221,7 +305,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Authorization: owner or admin
     const { data: isAdminData } = await admin.rpc("is_admin", { p_user: userId });
     if (claim.user_id !== userId && !isAdminData) {
       return new Response(JSON.stringify({ ok: false, error: "forbidden" }), {
@@ -230,7 +313,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Fetch related data in parallel
     const [settlementRes, appRes, docsRes, matchRes] = await Promise.all([
       admin.from("settlements").select("*").eq("id", claim.settlement_id).maybeSingle(),
       admin.from("claim_applications").select("*").eq("claim_id", claim_id).maybeSingle(),
@@ -240,15 +322,19 @@ Deno.serve(async (req) => {
         : Promise.resolve({ data: null }),
     ]);
 
-    const html = buildPacketHtml(claim, settlementRes.data, appRes.data, docsRes.data || [], matchRes.data);
+    // Generate real PDF
+    const pdfBytes = buildPdf(claim, settlementRes.data, appRes.data, docsRes.data || [], matchRes.data);
 
-    // Create claim_packets row first to get packet_id
+    const friendlyName = `BreachPay-Claim-Packet-${claim_id.slice(0, 8)}.pdf`;
+
+    // Insert claim_packets row
     const { data: packet, error: packetInsertErr } = await admin
       .from("claim_packets")
       .insert({
         claim_id,
         generated_by: userId,
         status: "generated",
+        pdf_file_name: friendlyName,
         meta: {
           settlement_name: settlementRes.data?.name,
           company: settlementRes.data?.company,
@@ -267,11 +353,11 @@ Deno.serve(async (req) => {
     const packetId = packet.id as string;
     const storagePath = `${claim_id}/${packetId}.pdf`;
 
-    // Upload HTML as PDF placeholder (content is HTML, saved as .pdf for now)
+    // Upload real PDF binary
     const { error: uploadErr } = await admin.storage
       .from(bucket)
-      .upload(storagePath, new TextEncoder().encode(html), {
-        contentType: "text/html",
+      .upload(storagePath, pdfBytes, {
+        contentType: "application/pdf",
         upsert: true,
       });
 
@@ -286,7 +372,6 @@ Deno.serve(async (req) => {
     // Update packet with storage path
     await admin.from("claim_packets").update({
       pdf_storage_path: storagePath,
-      pdf_file_name: `claim-packet-${claim_id.slice(0, 8)}.pdf`,
     }).eq("id", packetId);
 
     // Update claims.packet_generated_at
@@ -297,7 +382,8 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       ok: true,
       packet_id: packetId,
-      pdf_storage_path: `${bucket}/${storagePath}`,
+      storage_path: storagePath,
+      file_name: friendlyName,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
