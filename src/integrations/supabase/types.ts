@@ -1418,6 +1418,7 @@ export type Database = {
       monitored_identifiers: {
         Row: {
           created_at: string
+          display_label: string | null
           id: string
           is_active: boolean
           type: string
@@ -1425,9 +1426,13 @@ export type Database = {
           user_id: string
           value_hash: string
           value_last4: string | null
+          verification_code: string | null
+          verification_expires_at: string | null
+          verified: boolean
         }
         Insert: {
           created_at?: string
+          display_label?: string | null
           id?: string
           is_active?: boolean
           type: string
@@ -1435,9 +1440,13 @@ export type Database = {
           user_id: string
           value_hash: string
           value_last4?: string | null
+          verification_code?: string | null
+          verification_expires_at?: string | null
+          verified?: boolean
         }
         Update: {
           created_at?: string
+          display_label?: string | null
           id?: string
           is_active?: boolean
           type?: string
@@ -1445,6 +1454,9 @@ export type Database = {
           user_id?: string
           value_hash?: string
           value_last4?: string | null
+          verification_code?: string | null
+          verification_expires_at?: string | null
+          verified?: boolean
         }
         Relationships: []
       }
