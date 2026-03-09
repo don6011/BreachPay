@@ -14,6 +14,8 @@ const Settings = () => {
   const navigate = useNavigate();
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
   const isPremium = plan === "premium";
 
