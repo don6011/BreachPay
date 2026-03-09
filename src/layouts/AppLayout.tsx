@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { AnimatePresence } from "framer-motion";
 import { AppSidebar } from "@/components/AppSidebar";
 import { OnboardingFlow } from "@/components/OnboardingFlow";
+import { PageTransition } from "@/components/PageTransition";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function AppLayout() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [needsOnboarding, setNeedsOnboarding] = useState<boolean | null>(null);
 
   useEffect(() => {
@@ -24,14 +27,12 @@ export function AppLayout() {
         return;
       }
 
-      // If user already has scan runs, skip onboarding
       const { count } = await supabase
         .from("scan_runs")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id);
 
       if (count && count > 0) {
-        // Mark as completed so they don't see it again
         await supabase
           .from("user_profiles")
           .update({ onboarding_completed: true })
@@ -65,7 +66,11 @@ export function AppLayout() {
     <div className="flex min-h-screen w-full">
       <AppSidebar />
       <main className="flex-1 overflow-y-auto p-6 lg:p-8">
-        <Outlet />
+        <AnimatePresence mode="wait">
+          <PageTransition key={location.pathname}>
+            <Outlet />
+          </PageTransition>
+        </AnimatePresence>
       </main>
     </div>
   );
