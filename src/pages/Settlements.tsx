@@ -575,8 +575,18 @@ const Settlements = () => {
 
       {/* Settlement Cards */}
       {filtered.length === 0 ? (
-        <div className="glass-card p-8 text-center text-muted-foreground">
-          {settlements.length === 0 ? "No settlement matches yet. Run a scan to find eligible settlements." : "No settlements match this filter."}
+        <div className="glass-card p-8 text-center">
+          <Scale className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+          <p className="text-muted-foreground">
+            {settlements.length === 0 
+              ? "No settlement matches yet. Run a breach scan to discover potential compensation opportunities." 
+              : "No settlements match this filter."}
+          </p>
+          {settlements.length === 0 && (
+            <Button className="mt-4 rounded-xl" asChild>
+              <Link to="/scan">Run Breach Scan <ArrowRight className="ml-2 h-4 w-4" /></Link>
+            </Button>
+          )}
         </div>
       ) : (
         <div className="space-y-3">
