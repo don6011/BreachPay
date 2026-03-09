@@ -389,9 +389,26 @@ const ClaimFiling = () => {
 
       setCreatedClaimId(claimId);
       setSubmitted(true);
-      track("claim_submitted", { claim_id: claimId, settlement_id: settlement.id });
+      track("claim_filed", { claim_id: claimId, settlement_id: settlement.id });
       if (documents.length > 0) track("doc_uploaded", { claim_id: claimId, doc_count: documents.length });
-      toast({ title: "Claim Filed!", description: `Your claim for ${settlement.name} has been submitted.` });
+      toast({ title: "Claim Packet Preparing", description: `Your claim packet for ${settlement.name} is being generated.` });
+
+      // Auto-generate claim packet
+      setGeneratingPacket(true);
+      try {
+        const { data: packetData, error: packetErr } = await supabase.functions.invoke("generate-claim-packet", {
+          body: { claim_id: claimId },
+        });
+        if (packetErr) throw packetErr;
+        if (!packetData?.ok) throw new Error(packetData?.error || "Packet generation failed");
+        setPacketReady(true);
+        track("packet_generated", { claim_id: claimId });
+      } catch (pe: any) {
+        console.error("Packet generation error:", pe);
+        setPacketError(pe.message || "Could not generate packet. You can try again from your claim tracker.");
+      } finally {
+        setGeneratingPacket(false);
+      }
     } catch (error: any) {
       const msg = error?.message || "Failed to file claim. Please try again.";
       toast({ title: "Error", description: msg, variant: "destructive" });
