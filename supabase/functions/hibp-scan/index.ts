@@ -22,6 +22,70 @@ interface HibpBreach {
   IsSpamList: boolean;
 }
 
+// ── Matching breaches to listed settlements ─────────────────────────────────
+// Deliberately strict: a wrong "possible match" is worse than a missed one,
+// because people can always browse the full directory.
+
+/** How long someone must wait between breach checks. Results rarely change faster. */
+const COOLDOWN_MINUTES = 10;
+
+const LEGAL_WORDS = new Set([
+  "inc", "incorporated", "llc", "ltd", "limited", "corp", "corporation", "co", "company", "plc", "lp", "the", "and",
+]);
+
+/** Words that describe a business without identifying it ("Acme International" is still Acme). */
+const DESCRIPTOR_WORDS = new Set([
+  "group", "holdings", "international", "global", "worldwide", "usa", "us", "america", "financial", "services",
+  "technologies", "technology", "systems", "solutions", "communications", "entertainment", "interactive", "media",
+  "software", "labs", "networks", "enterprises", "industries", "brands", "online", "digital", "information",
+]);
+
+/** A name as lowercase words, without punctuation, accents or legal suffixes. */
+function nameWords(name: string): string[] {
+  return name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\(.*?\)/g, " ")
+    .replace(/['’]s\b/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(" ")
+    .filter((w) => w && !LEGAL_WORDS.has(w));
+}
+
+function startsWithWords(longer: string[], shorter: string[]): boolean {
+  return shorter.length > 0 && shorter.length <= longer.length && shorter.every((w, i) => longer[i] === w);
+}
+
+/** Whether a breach (by its title and website) is about the same company as a settlement. */
+function isSameCompany(breachTitle: string, breachDomain: string, settlementCompany: string): boolean {
+  const company = nameWords(settlementCompany);
+  const title = nameWords(breachTitle);
+  const companyKey = company.join("");
+  const titleKey = title.join("");
+  if (companyKey.length < 3) return false;
+
+  // The breached site's address matches the company name, e.g. "t-mobile.com" and "T-Mobile".
+  const domainKey = breachDomain.toLowerCase().replace(/^www\./, "").split(".")[0].replace(/[^a-z0-9]/g, "");
+  if (domainKey.length >= 3 && domainKey === companyKey) return true;
+
+  if (titleKey.length < 3) return false;
+  if (titleKey === companyKey) return true;
+
+  // The breach title is the company name plus a qualifier, e.g. "LinkedIn Scraped Data".
+  if (companyKey.length >= 4 && startsWithWords(title, company)) return true;
+
+  // The company name is the breach title plus generic words, e.g. "Acme" and "Acme Holdings".
+  if (startsWithWords(company, title)) {
+    const rest = company.slice(title.length);
+    if (rest.every((w) => DESCRIPTOR_WORDS.has(w))) return true;
+    // Multi-word titles are specific enough on their own, e.g. "Capital One" in "Capital One Bank".
+    if (title.length >= 2 && titleKey.length >= 6) return true;
+  }
+  return false;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -71,6 +135,39 @@ Deno.serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
 
   try {
+    // One check every few minutes per account protects the breach-data quota.
+    const since = new Date(Date.now() - COOLDOWN_MINUTES * 60_000).toISOString();
+    const { data: recent } = await supabase
+      .from("scan_runs")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("provider", "hibp")
+      .in("status", ["running", "completed"])
+      .gte("created_at", since)
+      .limit(1);
+    if (recent && recent.length > 0) {
+      return new Response(
+        JSON.stringify({
+          error: "You ran a breach check a few minutes ago. Results don't change that quickly, so please try again later.",
+        }),
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(COOLDOWN_MINUTES * 60) } },
+      );
+    }
+
+    // Listed settlements that are open for claims. Approved listings only:
+    // never demo, test, rejected or unreviewed rows.
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: openSettlements } = await supabase
+      .from("settlements")
+      .select("id, name, company, breach_year, payout_min, payout_max, status, claim_deadline")
+      .eq("verified", true)
+      .eq("is_demo", false)
+      .eq("is_test", false)
+      .eq("lifecycle_status", "active")
+      .in("status", ["verified", "open"])
+      .or(`claim_deadline.is.null,claim_deadline.gte.${today}`)
+      .limit(1000);
+
     // Create scan run
     const { data: scanRun, error: scanErr } = await supabase
       .from("scan_runs")
@@ -125,7 +222,7 @@ Deno.serve(async (req) => {
     // Process each breach
     let riskScore = 0;
     let breachesInserted = 0;
-    const matchedSettlementIds: string[] = [];
+    const matchedSettlementIds = new Set<string>();
 
     for (const breach of hibpBreaches) {
       // Map HIBP data classes to exposed_fields format
@@ -165,7 +262,7 @@ Deno.serve(async (req) => {
           company: breach.Title,
           source_type: "hibp",
           source_name: "Have I Been Pwned",
-          source_url: `https://haveibeenpwned.com/api/v3/breach/${breach.Name}`,
+          source_url: `https://haveibeenpwned.com/Breach/${encodeURIComponent(breach.Name)}`,
           breach_year: breachYear,
           records_exposed: breach.PwnCount,
           exposed_fields: exposedFields,
@@ -209,18 +306,16 @@ Deno.serve(async (req) => {
       await supabase.from("alerts").insert({
         user_id: userId,
         type: "breach_detected",
-        title: `Your data was found in the ${breach.Title} breach`,
+        title: `Your email address appears in the ${breach.Title} breach`,
         body: `${breach.Title} exposed: ${exposedFields}${breachYear ? ` (${breachYear})` : ""}. ${breach.PwnCount.toLocaleString()} accounts affected.`,
         severity: sev as "low" | "medium" | "high" | "critical",
         related_scan_run_id: scanRunId,
       });
 
-      // Match against settlements
-      const { data: settlements } = await supabase
-        .from("settlements")
-        .select("id, name, company, breach_year, payout_min, payout_max, status")
-        .or(`company.ilike.%${breach.Title}%,company.ilike.%${breach.Domain.replace(/\.[^.]+$/, "")}%`)
-        .in("status", ["verified", "open"]);
+      // Match against the open settlements loaded above.
+      const settlements = (openSettlements ?? []).filter((s) =>
+        isSameCompany(breach.Title, breach.Domain ?? "", s.company)
+      );
 
       for (const s of settlements ?? []) {
         const yearMatch = !s.breach_year || !breachYear || s.breach_year === breachYear;
@@ -241,7 +336,7 @@ Deno.serve(async (req) => {
           payout_estimate: payoutEst,
         }, { onConflict: "user_id,settlement_id" });
 
-        matchedSettlementIds.push(s.id);
+        matchedSettlementIds.add(s.id);
 
         // Notify (fire-and-forget, ignore dedupe conflicts)
         try {
@@ -270,7 +365,7 @@ Deno.serve(async (req) => {
       status: "completed",
       breaches_detected: breachesInserted,
       risk_score: riskScore,
-      eligible_settlements: matchedSettlementIds.length,
+      eligible_settlements: matchedSettlementIds.size,
       completed_at: new Date().toISOString(),
       databases_scanned: 1,
     }).eq("id", scanRunId);
@@ -288,10 +383,10 @@ Deno.serve(async (req) => {
     await supabase.from("alerts").insert({
       user_id: userId,
       type: "system",
-      title: "Live breach scan complete",
+      title: "Breach check complete",
       body: breachesInserted > 0
-        ? `Found ${breachesInserted} real breach exposure(s) via Have I Been Pwned. Risk score: ${riskScore}.`
-        : "No breach exposures found for your email. Stay protected!",
+        ? `${breachesInserted} known breach${breachesInserted === 1 ? "" : "es"} include your email address (source: Have I Been Pwned).`
+        : "No known breaches include your email address (source: Have I Been Pwned).",
       severity: riskScore >= 76 ? "critical" : riskScore >= 51 ? "high" : riskScore >= 26 ? "medium" : "low",
       related_scan_run_id: scanRunId,
     });
@@ -302,7 +397,7 @@ Deno.serve(async (req) => {
         scan_run_id: scanRunId,
         breaches_found: breachesInserted,
         risk_score: riskScore,
-        settlements_matched: matchedSettlementIds.length,
+        settlements_matched: matchedSettlementIds.size,
         source: "hibp",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import logo from "@/assets/logo.png";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -42,7 +41,7 @@ const Login = () => {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex items-center justify-center">
-          <img src={logo} alt="BreachPay" className="h-12 drop-shadow-[0_0_20px_hsl(164_100%_45%/0.2)]" />
+          <Link to="/" aria-label="BreachPay home"><img src="/logo.png" alt="BreachPay" width={145} height={48} className="h-12 w-auto" /></Link>
         </div>
         <div className="rounded-2xl border border-border bg-card p-8">
           {forgotMode ? (

@@ -42,153 +42,92 @@ function buildUnsubscribeFooter(appBaseUrl: string) {
   `;
 }
 
+// Emails about payouts are only sent when BreachPay actually handles payouts.
+// It does not today: settlement administrators pay claimants directly.
+const PAYOUT_TEMPLATES = new Set(["claim_approved", "claim_paid", "payout_paid"]);
+const PAYOUTS_ENABLED = Deno.env.get("PAYOUTS_ENABLED") === "true";
+
 function buildEmailHtml(
   template: OutboxRow["template"],
   payload: Record<string, unknown>,
   appBaseUrl: string
 ) {
-  const settlementId = String(payload.settlement_id ?? "");
+  const base = appBaseUrl.replace(/\/$/, "");
   // Settlement names/companies originate from scraped third-party pages, so
   // they are escaped before being placed in email HTML.
-  const rawSettlementName = String(payload.settlement_name ?? "Settlement");
+  const rawSettlementName = String(payload.settlement_name ?? "a settlement");
   const settlementName = escapeHtml(rawSettlementName);
   const company = escapeHtml(payload.company ?? "");
-  const payout = payload.payout_estimate ?? payload.payout_est ?? "";
-  const daysLeft = escapeHtml(payload.days_left ?? "");
+  const daysLeft = Number(payload.days_left);
+  const hasDaysLeft = Number.isFinite(daysLeft) && daysLeft >= 0;
 
-  const detailsUrl = settlementId
-    ? `${appBaseUrl.replace(/\/$/, "")}/settlements/${encodeURIComponent(settlementId)}`
-    : `${appBaseUrl.replace(/\/$/, "")}/settlements`;
-
+  const matchesUrl = `${base}/settlements`;
   const footer = buildUnsubscribeFooter(appBaseUrl);
+  const wrap = (inner: string) =>
+    `<div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px;line-height:1.5">${inner}${footer}</div>`;
+  const link = (href: string, text: string) => `<p><a href="${href}" style="color:#2563eb">${text}</a></p>`;
+  const who = `<strong>${settlementName}</strong>${company ? ` (${company})` : ""}`;
+  const notADecision =
+    "<p>Only the settlement administrator can decide whether you are eligible. Filing a claim is free, and you file on the official settlement site.</p>";
 
   if (template === "new_match") {
-    const subject = `You may be owed money — new settlement found`;
-    const html = `
-      <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
-        <h2>You may be eligible for compensation</h2>
-        <p>We found a new settlement match: <strong>${settlementName}</strong>${company ? ` — ${company}` : ""}</p>
-        ${payout ? `<p>Your claim could be worth <strong>$${Number(payout).toFixed(2)}</strong></p>` : ""}
-        <p><a href="${detailsUrl}" style="color:#2563eb">Check your eligibility →</a></p>
-        ${footer}
-      </div>
-    `;
-    return { subject, html };
+    return {
+      subject: "A listed settlement may relate to one of your breaches",
+      html: wrap(
+        `<h2>A settlement that may be related</h2>
+        <p>${who} is listed on BreachPay and may relate to a breach found for your email address.</p>
+        ${notADecision}
+        ${link(matchesUrl, "View your matches")}`
+      ),
+    };
   }
 
   if (template === "deadline_soon") {
-    const subject = `Deadline approaching: Don't miss your payout`;
-    const html = `
-      <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
-        <h2>⚠️ Don't miss your payout</h2>
-        <p><strong>${settlementName}</strong>${company ? ` — ${company}` : ""}</p>
-        ${daysLeft !== "" ? `<p>Only <strong>${String(daysLeft)} days</strong> left to file</p>` : ""}
-        <p><a href="${detailsUrl}" style="color:#2563eb">File your claim now →</a></p>
-        ${footer}
-      </div>
-    `;
-    return { subject, html };
+    const when = hasDaysLeft ? (daysLeft === 1 ? "1 day" : `${daysLeft} days`) : "";
+    return {
+      subject: when ? `${when} left to file: ${rawSettlementName}` : `Claim deadline approaching: ${rawSettlementName}`,
+      html: wrap(
+        `<h2>A claim deadline is coming up</h2>
+        <p>${when ? `There ${daysLeft === 1 ? "is" : "are"} <strong>${when}</strong> left to file a claim in ${who}.` : `The deadline to file a claim in ${who} is approaching.`}</p>
+        <p>Check the date on the official settlement site, since deadlines can change. Filing is free.</p>
+        ${link(matchesUrl, "View your matches")}`
+      ),
+    };
   }
 
-  // scan_complete
   if (template === "scan_complete") {
-    const subject = `Your BreachPay scan is complete`;
-    const html = `
-      <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
-        <h2>Scan complete</h2>
-        <p>Your scheduled scan finished successfully.</p>
-        ${payload.breaches ? `<p>Exposures found: <strong>${escapeHtml(payload.breaches)}</strong></p>` : ""}
-        ${payload.score ? `<p>Risk score: <strong>${escapeHtml(payload.score)}/100</strong></p>` : ""}
-        <p><a href="${appBaseUrl.replace(/\/$/, "")}/dashboard" style="color:#2563eb">Open dashboard →</a></p>
-        ${footer}
-      </div>
-    `;
-    return { subject, html };
+    return {
+      subject: "Your BreachPay breach check is complete",
+      html: wrap(
+        `<h2>Breach check complete</h2>
+        ${payload.breaches ? `<p>Known breaches that include your email: <strong>${escapeHtml(payload.breaches)}</strong></p>` : ""}
+        ${link(`${base}/scan`, "See the results")}`
+      ),
+    };
   }
 
-  // claim_submitted
   if (template === "claim_submitted") {
-    const subject = `Your claim is filed — ${rawSettlementName}`;
-    const html = `
-      <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
-        <h2>Your claim has been filed</h2>
-        <p>Your claim for <strong>${settlementName}</strong>${company ? ` — ${company}` : ""} is being processed.</p>
-        ${payout ? `<p>Your claim could be worth <strong>$${Number(payout).toFixed(2)}</strong></p>` : ""}
-        <p><a href="${detailsUrl}" style="color:#2563eb">Track your claim →</a></p>
-        ${footer}
-      </div>
-    `;
-    return { subject, html };
+    return {
+      subject: `You marked your claim as filed: ${rawSettlementName}`,
+      html: wrap(
+        `<h2>Saved to your claims</h2>
+        <p>You marked your claim in ${who} as filed.</p>
+        <p>BreachPay does not file or process claims. The settlement administrator will contact you directly about yours, so keep your confirmation number.</p>
+        ${link(`${base}/claims`, "View your claims")}`
+      ),
+    };
   }
 
-  // claim_approved
-  if (template === "claim_approved") {
-    const subject = `Your claim could be worth $${payout ? Number(payout).toFixed(2) : "___"} — ${rawSettlementName}`;
-    const html = `
-      <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
-        <h2>🎉 Your claim has been approved</h2>
-        <p><strong>${settlementName}</strong>${company ? ` — ${company}` : ""}</p>
-        ${payout ? `<p>Estimated compensation: <strong>$${Number(payout).toFixed(2)}</strong></p>` : ""}
-        <p>Your payout will be processed according to the settlement timeline.</p>
-        <p><a href="${detailsUrl}" style="color:#2563eb">View claim details →</a></p>
-        ${footer}
-      </div>
-    `;
-    return { subject, html };
-  }
-
-  // claim_paid
-  if (template === "claim_paid") {
-    const finalPayout = payload.final_payout ?? payout;
-    const subject = `Payout processed: ${rawSettlementName}`;
-    const html = `
-      <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
-        <h2>💰 Your payout has been processed</h2>
-        <p><strong>${settlementName}</strong>${company ? ` — ${company}` : ""}</p>
-        ${finalPayout ? `<p>Amount: <strong>$${Number(finalPayout).toFixed(2)}</strong></p>` : ""}
-        <p>Funds will appear in your account within 3-5 business days.</p>
-        <p><a href="${appBaseUrl.replace(/\/$/, "")}/wallet" style="color:#2563eb">View wallet →</a></p>
-        ${footer}
-      </div>
-    `;
-    return { subject, html };
-  }
-
-  // payout_paid (from rpc_admin_mark_claim_paid)
-  if (template === "payout_paid") {
-    const amount = payload.amount ?? payout;
-    const method = escapeHtml(String(payload.method ?? "").replace(/_/g, " "));
-    const claimId = String(payload.claim_id ?? "");
-    const claimUrl = claimId
-      ? `${appBaseUrl.replace(/\/$/, "")}/claims/${encodeURIComponent(claimId)}`
-      : `${appBaseUrl.replace(/\/$/, "")}/payouts`;
-    const subject = `You've been paid — $${amount ? Number(amount).toFixed(2) : "0.00"}`;
-    const html = `
-      <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
-        <h2>💰 Payout Received</h2>
-        ${amount ? `<p style="font-size:28px;font-weight:bold;color:#22c55e;margin:16px 0">$${Number(amount).toFixed(2)}</p>` : ""}
-        ${method && method !== "unknown" ? `<p>Payment method: <strong style="text-transform:capitalize">${method}</strong></p>` : ""}
-        <p>Your payout has been processed and should arrive in your account shortly.</p>
-        <p style="margin-top:20px"><a href="${claimUrl}" style="display:inline-block;background:#22c55e;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;font-weight:600">View Payout Details →</a></p>
-        <p style="margin-top:16px;font-size:12px;color:#9ca3af">If you have questions about this payout, visit your <a href="${appBaseUrl.replace(/\/$/, "")}/payouts" style="color:#6b7280;text-decoration:underline">payouts page</a>.</p>
-        ${footer}
-      </div>
-    `;
-    return { subject, html };
-  }
-
-  // fallback: generic claim_update / claim_rejected
-  const subject = `Claim update: ${rawSettlementName}`;
-  const html = `
-    <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
-      <h2>Claim status update</h2>
-      <p>Your claim for <strong>${settlementName}</strong>${company ? ` — ${company}` : ""} has been updated.</p>
-      <p>New status: <strong>${escapeHtml(payload.new_status ?? "updated")}</strong></p>
-      <p><a href="${detailsUrl}" style="color:#2563eb">View details →</a></p>
-      ${footer}
-    </div>
-  `;
-  return { subject, html };
+  // Everything else (including payout templates, when enabled): a plain status note.
+  return {
+    subject: `Claim update: ${rawSettlementName}`,
+    html: wrap(
+      `<h2>Claim record updated</h2>
+      <p>Your claim record for ${who} was updated in BreachPay.</p>
+      <p>Status: <strong>${escapeHtml(String(payload.new_status ?? template).replace(/_/g, " "))}</strong></p>
+      ${link(`${base}/claims`, "View your claims")}`
+    ),
+  };
 }
 
 async function sendResendEmail(to: string, subject: string, html: string) {
@@ -336,6 +275,21 @@ Deno.serve(async (req) => {
                 status: "sent",
                 sent_at: new Date().toISOString(),
                 last_error: "skipped:email_alerts_off",
+              })
+              .eq("id", row.id);
+            skipped += 1;
+            continue;
+          }
+
+          // Payout emails describe money BreachPay does not handle; never send them
+          // unless payouts have been switched on for this deployment.
+          if (PAYOUT_TEMPLATES.has(row.template) && !PAYOUTS_ENABLED) {
+            await supabase
+              .from("notification_outbox")
+              .update({
+                status: "sent",
+                sent_at: new Date().toISOString(),
+                last_error: "skipped:payouts_disabled",
               })
               .eq("id", row.id);
             skipped += 1;

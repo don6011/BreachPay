@@ -1,70 +1,110 @@
-import { Link } from "react-router-dom";
-import { Shield, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import logo from "@/assets/logo.png";
+import { LegalPage, LegalSection } from "@/components/public/LegalPage";
+import type { PageMeta } from "@/lib/settlements/content";
+import { SITE_NAME, SITE_URL } from "@/lib/settlements/format";
+
+export const TERMS_META: PageMeta = {
+  title: `Terms of Service | ${SITE_NAME}`,
+  description: "The terms for using BreachPay, a free and independent directory of data breach settlements.",
+  canonical: `${SITE_URL}/terms`,
+  jsonLd: [],
+};
 
 const TermsOfService = () => (
-  <div className="min-h-screen bg-background">
-    <header className="border-b bg-card/80 backdrop-blur-sm">
-      <div className="mx-auto max-w-3xl px-4 py-4 flex items-center gap-3">
-        <Link to="/" className="flex items-center gap-2">
-          <img src={logo} alt="BreachPay" className="h-7 w-7" />
-          <span className="text-sm font-bold">BreachPay</span>
-        </Link>
-        <div className="ml-auto">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/"><ArrowLeft className="h-3 w-3 mr-1" /> Back</Link>
-          </Button>
-        </div>
-      </div>
-    </header>
+  <LegalPage meta={TERMS_META} title="Terms of Service" updated="November 17, 2026">
+    <LegalSection heading="1. What BreachPay is">
+      <p>
+        BreachPay is an independent directory of data breach class action settlements. It lists settlements, shows the
+        claim deadline and the payout stated in the settlement notice, and links to the site where claims are filed.
+        With a free account you can also check your email address against known breaches and keep track of claims you
+        have filed.
+      </p>
+      <p>
+        BreachPay is <strong>not a law firm</strong>, is <strong>not a settlement administrator</strong>, and is not
+        affiliated with the companies or settlements listed. Nothing on BreachPay is legal advice.
+      </p>
+    </LegalSection>
 
-    <main className="mx-auto max-w-3xl px-4 py-10 prose prose-sm dark:prose-invert">
-      <h1 className="text-2xl font-bold mb-1">Terms of Service</h1>
-      <p className="text-muted-foreground text-sm mb-8">Last updated: February 26, 2026</p>
+    <LegalSection heading="2. No fees">
+      <p>
+        BreachPay is free. We do not charge to list settlements, to link you to a claim form, or for an account, and we
+        do not take any part of a settlement payment.
+      </p>
+    </LegalSection>
 
-      <section className="space-y-4 text-sm leading-relaxed text-muted-foreground">
-        <h2 className="text-lg font-semibold text-foreground">1. Platform Description</h2>
-        <p>BreachPay is a <strong className="text-foreground">claims assistance platform</strong> that helps users identify data breach settlements they may be eligible for and assists in preparing claim submissions. BreachPay is <strong className="text-foreground">not a law firm</strong>, does not provide legal advice, and does not guarantee any particular outcome or payout.</p>
+    <LegalSection heading="3. You file your own claims">
+      <ul>
+        <li>You file claims yourself, directly with the settlement administrator, on the administrator's site.</li>
+        <li>BreachPay does not file claims for you and does not receive, hold or send settlement money.</li>
+        <li>
+          The settlement administrator and the court decide who is eligible, whether a claim is approved, and how much
+          is paid. BreachPay has no say in those decisions.
+        </li>
+        <li>
+          A "match" in your account means a listed settlement involves a company from your breach check results. It is
+          not a statement that you are eligible.
+        </li>
+      </ul>
+    </LegalSection>
 
-        <h2 className="text-lg font-semibold text-foreground">2. Facilitation, Not Representation</h2>
-        <p>BreachPay facilitates the claims filing process on behalf of users. We do not represent users in any legal proceeding. All claims are submitted to and reviewed by independent settlement administrators. We have no control over eligibility determinations or payout amounts.</p>
+    <LegalSection heading="4. Settlement information">
+      <p>
+        Listings are compiled from public sources and reviewed before they are published, but they can be incomplete or
+        out of date. Deadlines can change by court order. Always confirm deadlines, eligibility and payment terms on the
+        official settlement site before you file. If a listing differs from the official notice, the official notice
+        governs.
+      </p>
+      <p>
+        Payout amounts shown are the amounts stated in settlement notices. The amount actually paid depends on the
+        settlement terms and the number of valid claims, and can be lower.
+      </p>
+    </LegalSection>
 
-        <h2 className="text-lg font-semibold text-foreground">3. User Responsibilities</h2>
-        <ul className="list-disc pl-5 space-y-1">
-          <li>Users submit claims voluntarily and on their own behalf.</li>
-          <li>Users certify that all information provided is accurate and complete.</li>
-          <li>Accuracy of claim outcomes depends on the information provided by users.</li>
-          <li>Users acknowledge that estimated payouts are approximations and actual amounts may vary significantly.</li>
-        </ul>
+    <LegalSection heading="5. The breach check">
+      <p>
+        The breach check looks up your account email address in the Have I Been Pwned database. Results depend on that
+        service. No database covers every breach, so a result showing no breaches is not a guarantee that your data has
+        never been exposed.
+      </p>
+    </LegalSection>
 
-        <h2 className="text-lg font-semibold text-foreground">4. Settlement Administrator Authority</h2>
-        <p>Final decisions regarding claim eligibility, approval, and payout amounts are made solely by settlement administrators appointed by the relevant courts. BreachPay has no authority to approve, deny, or modify claims once submitted.</p>
+    <LegalSection heading="6. Your account">
+      <ul>
+        <li>Use an email address that belongs to you.</li>
+        <li>Keep your password private. You are responsible for activity on your account.</li>
+        <li>Do not use BreachPay to file false claims, or to collect information about other people.</li>
+        <li>You can delete your account at any time from Settings.</li>
+      </ul>
+    </LegalSection>
 
-        <h2 className="text-lg font-semibold text-foreground">5. Fees</h2>
-        <p>BreachPay charges a platform fee (typically 15%) only on successful payouts. Claim filing is always free. Optional convenience services (expedited review, document verification) are clearly priced and never required.</p>
+    <LegalSection heading="7. Links to other sites">
+      <p>
+        BreachPay links to settlement sites and other sources that we do not control. We show the web address of each
+        link so you can check where it leads. We are not responsible for the content or practices of those sites.
+      </p>
+    </LegalSection>
 
-        <h2 className="text-lg font-semibold text-foreground">6. Third-Party Data</h2>
-        <p>BreachPay relies on publicly available breach data and third-party data sources. While we strive for accuracy, we cannot guarantee the completeness or accuracy of breach information, settlement details, or eligibility criteria.</p>
+    <LegalSection heading="8. No warranty">
+      <p>
+        BreachPay is provided as is, without warranties of any kind. We do not guarantee that any listing is accurate
+        or current, or that you will receive any payment from any settlement.
+      </p>
+    </LegalSection>
 
-        <h2 className="text-lg font-semibold text-foreground">7. No Guaranteed Payouts</h2>
-        <p>BreachPay does not guarantee that any user will receive a payout. Estimated payout ranges are provided for informational purposes only and are based on publicly available settlement data.</p>
+    <LegalSection heading="9. Limitation of liability">
+      <p>
+        To the maximum extent permitted by law, BreachPay is not liable for any indirect, incidental, special,
+        consequential or punitive damages arising from use of the site, including missed deadlines, denied claims,
+        delayed payments or inaccurate settlement or breach information.
+      </p>
+    </LegalSection>
 
-        <h2 className="text-lg font-semibold text-foreground">8. Limitation of Liability</h2>
-        <p>To the maximum extent permitted by law, BreachPay shall not be liable for any indirect, incidental, special, consequential, or punitive damages resulting from use of the platform, including but not limited to denied claims, delayed payouts, or inaccurate breach data.</p>
-
-        <h2 className="text-lg font-semibold text-foreground">9. Modifications</h2>
-        <p>We reserve the right to modify these terms at any time. Continued use of the platform after modifications constitutes acceptance of the updated terms.</p>
-      </section>
-
-      <div className="mt-10 rounded-xl border bg-muted/30 p-4 flex items-start gap-3">
-        <Shield className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-        <p className="text-xs text-muted-foreground">
-          BreachPay is not a law firm and does not provide legal advice. All settlement data is sourced from third parties. Eligibility and payouts are determined by settlement administrators.
-        </p>
-      </div>
-    </main>
-  </div>
+    <LegalSection heading="10. Changes">
+      <p>
+        We may update these terms. The date at the top shows when they last changed. Continuing to use BreachPay after
+        a change means you accept the updated terms.
+      </p>
+    </LegalSection>
+  </LegalPage>
 );
 
 export default TermsOfService;

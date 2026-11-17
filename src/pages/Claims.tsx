@@ -1,224 +1,130 @@
+import { Link } from "react-router-dom";
+import { ExternalLink, Loader2 } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
-import { StatCard } from "@/components/StatCard";
-import { StatusPill } from "@/components/StatusPill";
-import { Wallet, Clock, CheckCircle, DollarSign, CreditCard, Crown, TrendingUp, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
-import { useEffect, useState } from "react";
-import type { ClaimStatus } from "@/types";
+import { DeadlineChip } from "@/components/public/SettlementCard";
+import { type TrackedClaim, claimStatusLabel, useAccountOverview, useMarkClaimFiled } from "@/lib/account";
+import { claimLink, deadlineState, formatDate, settlementPath } from "@/lib/settlements/format";
+import { cn } from "@/lib/utils";
+import { toast } from "@/hooks/use-toast";
 
-const statusSteps: ClaimStatus[] = ["draft", "submitted", "under_review", "approved", "paid"];
+const toneClass = {
+  done: "bg-primary/10 text-primary",
+  todo: "bg-warning/10 text-warning",
+  info: "bg-muted text-muted-foreground",
+  bad: "bg-destructive/10 text-destructive",
+};
 
-interface PayoutData {
-  id: string;
-  amount: number;
-  status: string;
-  claim_id: string;
-  paid_at: string | null;
-  stripe_ref: string | null;
-}
-
-interface ClaimData {
-  id: string;
-  settlement_id: string;
-  status: string;
-  est_payout: number;
-  final_payout: number | null;
-  net_payout: number | null;
-  platform_fee: number | null;
-  filed_at: string | null;
-  updated_at: string;
-  settlement_name?: string;
-  estimated_payout?: number;
-}
-
+/** "My claims": the person's own record of what they have filed. */
 const Claims = () => {
-  const { user, plan } = useAuth();
-  const [claims, setClaims] = useState<ClaimData[]>([]);
-  const [payouts, setPayouts] = useState<PayoutData[]>([]);
-  const [matchEstimate, setMatchEstimate] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const isPremium = plan === "premium";
+  const { data, isLoading, isError, refetch } = useAccountOverview();
+  const markFiled = useMarkClaimFiled();
+  const claims = data?.claims ?? [];
+  const matches = data?.matches ?? [];
 
-  useEffect(() => {
-    if (!user) return;
-
-    const fetchData = async () => {
-      try {
-        const [claimsRes, payoutsRes, matchesRes] = await Promise.all([
-          supabase
-            .from("claims")
-            .select(`id, settlement_id, status, est_payout, final_payout, net_payout, platform_fee, filed_at, updated_at, settlements(name)`)
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false }),
-          supabase
-            .from("payouts")
-            .select("*")
-            .eq("user_id", user.id)
-            .order("created_at", { ascending: false }),
-          supabase
-            .from("settlement_matches")
-            .select("payout_estimate")
-            .eq("user_id", user.id),
-        ]);
-
-        if (claimsRes.data) {
-          setClaims(claimsRes.data.map((c: any) => ({
-            ...c,
-            settlement_name: c.settlements?.name || "Unknown Settlement",
-            estimated_payout: Number(c.est_payout) || 0,
-            final_payout: c.final_payout ? Number(c.final_payout) : null,
-            net_payout: c.net_payout ? Number(c.net_payout) : null,
-            platform_fee: c.platform_fee ? Number(c.platform_fee) : null,
-          })));
-        }
-        if (payoutsRes.data) setPayouts(payoutsRes.data);
-        if (matchesRes.data) {
-          setMatchEstimate(matchesRes.data.reduce((a: number, m: any) => a + (Number(m.payout_estimate) || 0), 0));
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [user]);
-
-  const totalRecovered = payouts
-    .filter(p => p.status === "paid")
-    .reduce((a, p) => a + (Number(p.amount) || 0), 0);
-  const pendingPayouts = claims
-    .filter(c => c.status === "approved")
-    .reduce((a, c) => a + (Number(c.net_payout) || Number(c.est_payout) || 0), 0);
-  const approvedTotal = claims
-    .filter(c => c.status === "approved" || c.status === "paid")
-    .reduce((a, c) => a + (Number(c.net_payout) || Number(c.est_payout) || 0), 0);
+  const finish = (claim: TrackedClaim) => {
+    const match = matches.find((m) => m.settlement.id === claim.settlementId);
+    if (!match) return;
+    markFiled.mutate(match, {
+      onSuccess: () => toast({ title: "Marked as filed" }),
+      onError: (e) => toast({ title: "Not saved", description: e.message, variant: "destructive" }),
+    });
+  };
 
   return (
-    <div>
-      <PageHeader title="Compensation Wallet" subtitle="Track your claims and payouts" />
+    <div className="mx-auto max-w-3xl">
+      <PageHeader title="My claims" subtitle="Your own record of the claims you've filed" />
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-8">
-        <StatCard icon={Wallet} label="Total Recovered" value={`$${totalRecovered.toLocaleString()}`} variant="teal" />
-        <StatCard icon={Clock} label="Pending Payouts" value={`$${pendingPayouts.toLocaleString()}`} />
-        <StatCard icon={CheckCircle} label="Approved Value" value={`$${approvedTotal.toLocaleString()}`} variant="teal" />
-        <StatCard icon={Scale} label="Estimated Eligible" value={`$${matchEstimate.toLocaleString()}`} />
-      </div>
-
-      {/* Premium Auto-Filing Upsell */}
-      {!isPremium && (
-        <div className="mb-6 glass-card-glow p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Crown className="h-5 w-5 text-primary shrink-0" />
-            <div>
-              <p className="text-sm font-semibold">Auto-file all eligible claims</p>
-              <p className="text-xs text-muted-foreground">Premium members get automatic filing — 15% fee only if paid</p>
-            </div>
-          </div>
-          <Button asChild size="sm" className="rounded-xl bg-primary text-primary-foreground shrink-0">
-            <Link to="/pricing">Upgrade</Link>
+      {isLoading ? (
+        <div className="flex justify-center py-16" role="status" aria-label="Loading">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : isError ? (
+        <div className="glass-card p-8 text-center">
+          <p className="font-medium">We couldn't load your claims.</p>
+          <Button onClick={() => refetch()} className="mt-4 rounded-xl">
+            Try again
           </Button>
         </div>
-      )}
-
-      {/* Claim Tracker */}
-      {!loading && (
+      ) : claims.length === 0 ? (
+        <div className="glass-card p-8 text-center">
+          <h2 className="text-lg font-semibold">Nothing tracked yet</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+            After you file a claim on a settlement's official site, mark it as filed from My matches and it will appear
+            here.
+          </p>
+          <Button asChild className="mt-5 rounded-xl">
+            <Link to="/settlements">Go to My matches</Link>
+          </Button>
+        </div>
+      ) : (
         <>
-          <h2 className="mb-4 text-lg font-semibold">Claim Tracker</h2>
-          <div className="space-y-3 mb-8">
-            {claims.length === 0 ? (
-              <div className="glass-card p-6 text-center text-muted-foreground">No claims filed yet</div>
-            ) : (
-              claims.map((claim) => {
-                const currentIndex = statusSteps.indexOf(claim.status as any);
-                const displayPayout = claim.net_payout || claim.estimated_payout || 0;
-                return (
-                  <Link key={claim.id} to={`/claims/${claim.id}`} className="glass-card p-6 block hover:border-primary/25 transition-colors">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold">{claim.settlement_name}</h3>
-                        <p className="text-xs text-muted-foreground">Filed: {claim.filed_at ? new Date(claim.filed_at).toLocaleDateString() : "—"} · Updated: {new Date(claim.updated_at).toLocaleDateString()}</p>
-                      </div>
-                      <div className="text-right">
-                        <StatusPill variant={claim.status as ClaimStatus} />
-                        <p className="mt-1 text-sm font-semibold text-primary">${displayPayout.toLocaleString()}</p>
-                        {claim.platform_fee && (
-                          <p className="text-[10px] text-muted-foreground">Fee: ${claim.platform_fee.toLocaleString()}</p>
+          <p className="mb-6 rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+            This list is for your own reference. BreachPay doesn't file or process claims, and can't see their status:
+            the settlement administrator will contact you directly. Keep the confirmation number from the claim form.
+          </p>
+          <ul className="space-y-3">
+            {claims.map((claim) => {
+              const s = claim.settlement;
+              const status = claimStatusLabel(claim.status);
+              const link = s ? claimLink(s) : null;
+              const canFinish =
+                claim.status === "draft" && !!s && deadlineState(s).kind !== "closed" &&
+                matches.some((m) => m.settlement.id === claim.settlementId);
+              return (
+                <li key={claim.id} className="glass-card p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        {s?.company ?? "Settlement"}
+                      </p>
+                      <h2 className="mt-1 font-semibold leading-snug">
+                        {s ? (
+                          <Link to={settlementPath(s)} className="hover:text-primary hover:underline">
+                            {s.name}
+                          </Link>
+                        ) : (
+                          "This settlement is no longer listed"
                         )}
-                      </div>
+                      </h2>
                     </div>
-                    <div className="flex items-center gap-1">
-                      {statusSteps.map((step, i) => {
-                        const isComplete = i <= currentIndex;
-                        const isCurrent = i === currentIndex;
-                        return (
-                          <div key={step} className="flex flex-1 items-center">
-                            <div className="flex flex-col items-center flex-1">
-                              <div className={`h-2.5 w-2.5 rounded-full ${isComplete ? "bg-primary" : "bg-muted"} ${isCurrent ? "ring-2 ring-primary/30" : ""}`} />
-                              <span className={`mt-1 text-[10px] ${isComplete ? "text-primary" : "text-muted-foreground"}`}>
-                                {step === "under_review" ? "Review" : step.charAt(0).toUpperCase() + step.slice(1)}
-                              </span>
-                            </div>
-                            {i < statusSteps.length - 1 && (
-                              <div className={`h-0.5 flex-1 ${i < currentIndex ? "bg-primary" : "bg-muted"}`} />
-                            )}
-                          </div>
-                        );
-                      })}
+                    <span className={cn("shrink-0 rounded-full px-2.5 py-1 text-xs font-medium", toneClass[status.tone])}>
+                      {status.label}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
+                    {claim.status !== "draft" && (
+                      <span>
+                        Marked as filed{claim.filedAt && formatDate(claim.filedAt) ? ` on ${formatDate(claim.filedAt)}` : ""}
+                      </span>
+                    )}
+                    {s && <DeadlineChip state={deadlineState(s)} className="text-sm" />}
+                  </div>
+
+                  {(link || canFinish) && (
+                    <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+                      {link && (
+                        <Button asChild size="sm" variant="outline" className="rounded-xl">
+                          <a href={link.url} target="_blank" rel="noopener noreferrer">
+                            {link.official ? "Official claim site" : "Claim link"}
+                            <ExternalLink className="ml-1.5 h-3.5 w-3.5" aria-hidden />
+                          </a>
+                        </Button>
+                      )}
+                      {canFinish && (
+                        <Button size="sm" className="rounded-xl" disabled={markFiled.isPending} onClick={() => finish(claim)}>
+                          I've filed this
+                        </Button>
+                      )}
                     </div>
-                  </Link>
-                );
-              })
-            )}
-          </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
         </>
       )}
-
-      {/* Payout Timeline */}
-      <h2 className="mb-4 text-lg font-semibold">Payout Timeline</h2>
-      <div className="glass-card p-6 mb-8">
-        <div className="space-y-4">
-          {payouts.length === 0 ? (
-            <p className="text-center text-sm text-muted-foreground">No payouts yet</p>
-          ) : (
-            payouts.map((payout) => {
-              const claim = claims.find(c => c.id === payout.claim_id);
-              return (
-                <div key={payout.id} className="flex items-center gap-4">
-                  <div className={`h-3 w-3 rounded-full shrink-0 ${
-                    payout.status === "paid" ? "bg-success" : payout.status === "processing" ? "bg-primary" : "bg-muted"
-                  }`} />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{claim?.settlement_name || "Unknown"}</p>
-                    <p className="text-xs text-muted-foreground">{new Date(payout.paid_at || Date.now()).toLocaleDateString()}</p>
-                  </div>
-                  <div className="text-right">
-                     <p className="text-sm font-semibold text-primary">${Number(payout.amount).toLocaleString()}</p>
-                     <div className="flex flex-col gap-1 items-end mt-1">
-                       <span className="text-xs bg-muted/50 px-2 py-0.5 rounded capitalize">{payout.status}</span>
-                       {payout.stripe_ref && (
-                         <span className="text-[10px] text-muted-foreground font-mono">{payout.stripe_ref}</span>
-                       )}
-                     </div>
-                   </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-
-      {/* Payment Method */}
-      <div className="glass-card border-dashed p-6 text-center">
-        <CreditCard className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-        <h3 className="font-semibold mb-1">Payment Method</h3>
-        <p className="text-sm text-muted-foreground">Direct deposit and payment setup coming soon</p>
-      </div>
     </div>
   );
 };

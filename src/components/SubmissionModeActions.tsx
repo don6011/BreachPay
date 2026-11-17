@@ -6,7 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { useTrackEvent } from "@/hooks/useTrackEvent";
 import {
-  Download, ExternalLink, Send, Loader2, CheckCircle, FileText,
+  Download, ExternalLink, Loader2, CheckCircle, FileText,
 } from "lucide-react";
 
 interface SubmissionModeActionsProps {
@@ -24,7 +24,7 @@ interface SubmissionModeActionsProps {
 export const SubmissionModeActions = ({
   settlementId,
   settlementName,
-  submissionMode,
+  submissionMode: requestedMode,
   claimUrl,
   claimId,
   claimStatus,
@@ -34,8 +34,11 @@ export const SubmissionModeActions = ({
 }: SubmissionModeActionsProps) => {
   const { user } = useAuth();
   const track = useTrackEvent();
+  // There is no connection to any settlement administrator, so nothing can be
+  // submitted for the user. "partner_api" settlements are handled like the
+  // others: the person files on the official site and confirms it here.
+  const submissionMode = requestedMode === "partner_api" ? (claimUrl ? "redirect_official" : "packet_only") : requestedMode;
   const [generatingPacket, setGeneratingPacket] = useState(false);
-  const [submittingPartner, setSubmittingPartner] = useState(false);
   const [markedSubmitted, setMarkedSubmitted] = useState(false);
   const [redirectConfirmed, setRedirectConfirmed] = useState(false);
 
@@ -139,25 +142,6 @@ export const SubmissionModeActions = ({
     }
   };
 
-  const handlePartnerSubmit = async () => {
-    if (!claimId) return;
-    setSubmittingPartner(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("submit-claim-partner", {
-        body: { claim_id: claimId },
-      });
-      if (error) throw error;
-      if (!data?.ok) throw new Error(data?.error || "Submission failed");
-      toast({ title: "Claim Submitted", description: `Submitted to settlement administrator. Ref: ${data.external_ref}` });
-      track("partner_api_submitted", { claim_id: claimId, ref: data.external_ref });
-      onClaimUpdate();
-    } catch (e: any) {
-      toast({ title: "Error", description: e.message, variant: "destructive" });
-    } finally {
-      setSubmittingPartner(false);
-    }
-  };
-
   if (!claimId) return null;
 
   // Already submitted via partner_api
@@ -178,9 +162,8 @@ export const SubmissionModeActions = ({
 
   // Already submitted (non-partner)
   if (claimStatus === "submitted" || claimStatus === "under_review" || claimStatus === "approved" || claimStatus === "paid") {
-    const modeLabel = submissionMode === "redirect_official" ? "Submit on official claim website." :
-      submissionMode === "partner_api" ? "Submitted to settlement administrator." :
-      "Claim packet ready for submission.";
+    const modeLabel = submissionMode === "redirect_official" ? "You marked this claim as filed on the official site." :
+      "You marked this claim as filed.";
     return (
       <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
         <div className="flex items-center gap-2">
@@ -234,19 +217,6 @@ export const SubmissionModeActions = ({
             </label>
           </div>
         )}
-      </div>
-    );
-  }
-
-  // partner_api mode
-  if (submissionMode === "partner_api") {
-    return (
-      <div className="rounded-xl border bg-card p-4 space-y-3">
-        <p className="text-sm text-muted-foreground">Submit your claim directly to the settlement administrator.</p>
-        <Button size="sm" className="rounded-xl gap-2" onClick={handlePartnerSubmit} disabled={submittingPartner}>
-          {submittingPartner ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          Submit Claim
-        </Button>
       </div>
     );
   }

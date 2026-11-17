@@ -1,7 +1,6 @@
 import { BarChart3, FileText, Settings, ArrowLeft, TrendingUp, Users, DollarSign, Code2, Key, Clock } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import logo from "@/assets/logo.png";
 
 const partnerNav = [
   { title: "Dashboard", url: "/partner", icon: BarChart3 },
@@ -21,7 +20,7 @@ export function PartnerSidebar() {
   return (
     <aside className="flex h-screen w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
       <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-5">
-        <img src={logo} alt="BreachPay" className="h-9" />
+        <img src="/logo.png" alt="BreachPay" className="h-9" />
         <span className="ml-auto rounded-lg bg-secondary/15 px-2 py-0.5 text-[10px] font-bold text-secondary uppercase tracking-wider">Partner</span>
       </div>
 

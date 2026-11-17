@@ -1,365 +1,236 @@
-import { useState, useEffect } from "react";
+import { useState, type FormEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowRight, Check, ExternalLink, FileSearch, Search, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Database, DollarSign, Users, Radio, ArrowRight, Shield, Search, FileText, Check, Crown, Lock, LogOut, Zap, AlertTriangle, TrendingUp } from "lucide-react";
-import { Link } from "react-router-dom";
-import logo from "@/assets/logo.png";
-
-const stats = [
-  { icon: Database, value: "10,000+", label: "Breach Databases" },
-  { icon: DollarSign, value: "Billions", label: "In Active Settlements" },
-  { icon: Users, value: "Real-Time", label: "Identity Monitoring" },
-  { icon: Radio, value: "Daily", label: "Breach Detection" },
-];
+import { FaqList } from "@/components/public/FaqList";
+import { LoadError, PageSpinner, PublicLayout } from "@/components/public/PublicLayout";
+import { SettlementGrid } from "@/components/public/SettlementCard";
+import { HOME_FAQS, homeMeta } from "@/lib/settlements/content";
+import { usePublicSettlements } from "@/lib/settlements/data";
+import { DIRECTORY_PATH, daysUntil, effectiveDeadline, isOpen } from "@/lib/settlements/format";
+import { useSeo } from "@/lib/useSeo";
 
 const steps = [
-  { icon: Search, title: "Check Your Exposure", description: "Enter your email to scan breach databases and find your exposure." },
-  { icon: Shield, title: "See Your Opportunities", description: "Discover which settlements you may be eligible for." },
-  { icon: FileText, title: "File Your Claim", description: "We prepare and submit your claim to the settlement administrator." },
-  { icon: DollarSign, title: "Get Compensated", description: "Track your claim and receive your payout when it's approved." },
-];
-
-const pricingPlans = [
   {
-    name: "Free",
-    price: "$0",
-    period: "",
-    description: "Get started with basic breach scanning",
-    cta: "Start Free Scan",
-    ctaLink: "/signup",
-    highlighted: false,
-    features: [
-      "1 secure scan (manual)",
-      "Weekly monitoring scans",
-      "Breach exposure summary",
-      "Standard settlement matching",
-      "14-day deadline alerts",
-      "Email alerts (batched)",
-    ],
+    icon: Search,
+    title: "Find a settlement",
+    body: "Search by company or browse what's open. Each listing shows the claim deadline and the payout stated in the notice.",
   },
   {
-    name: "Premium",
-    price: "$4.99",
-    period: "/mo",
-    description: "Advanced monitoring and priority matching",
-    cta: "Upgrade to Premium",
-    ctaLink: "/signup",
-    highlighted: true,
-    badge: "Most Popular",
-    features: [
-      "Daily monitoring scans",
-      "Instant email alerts",
-      "30-day deadline alerts",
-      "Priority settlement matching",
-      "Risk trend history + score changes",
-      "Priority support",
-    ],
+    icon: FileSearch,
+    title: "Check the official terms",
+    body: "We show where each detail came from. Read the class definition on the official site to see if you're covered.",
+  },
+  {
+    icon: ExternalLink,
+    title: "File for free",
+    body: "You file directly with the settlement administrator. It costs nothing and you don't need a lawyer.",
   },
 ];
 
-const breachTickerItems = [
-  { company: "Change Healthcare", records: "100M", date: "2024" },
-  { company: "National Public Data", records: "2.7B", date: "2024" },
-  { company: "AT&T", records: "73M", date: "2024" },
-  { company: "23andMe", records: "6.9M", date: "2023" },
-  { company: "T-Mobile", records: "76.6M", date: "2021" },
-  { company: "Equifax", records: "147M", date: "2017" },
-  { company: "Capital One", records: "106M", date: "2019" },
-  { company: "Marriott", records: "500M", date: "2018" },
+const does = [
+  "Lists data breach settlements that are open for claims",
+  "Shows the deadline, the listed payout and who can file",
+  "Links to the claim site and shows its web address first",
+  "Tells you how each listing was checked",
 ];
 
-const urgencyStats = [
-  { value: "Thousands", label: "Known Data Breaches", icon: AlertTriangle, color: "text-critical" },
-  { value: "Billions", label: "In Unclaimed Settlements", icon: DollarSign, color: "text-primary" },
-  { value: "Active", label: "Filing Deadlines Closing", icon: TrendingUp, color: "text-warning" },
+const doesNot = [
+  "Charge you to find or file a claim",
+  "Decide whether you're eligible, or pay settlements",
+  "Ask for your Social Security number or bank login",
+  "Give legal advice or act as your lawyer",
 ];
 
 const Landing = () => {
-  const [calcBreaches, setCalcBreaches] = useState("3");
-  const calcMin = parseInt(calcBreaches || "0") * 75;
-  const calcMax = parseInt(calcBreaches || "0") * 5000;
+  const navigate = useNavigate();
+  const [query, setQuery] = useState("");
+  const { data, isLoading, isError, refetch } = usePublicSettlements();
+  useSeo(homeMeta());
 
-  const [tickerOffset, setTickerOffset] = useState(0);
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setTickerOffset((prev) => prev + 1);
-    }, 3000);
-    return () => clearInterval(interval);
-  }, []);
+  const open = (data ?? []).filter((s) => isOpen(s));
+  const closingSoon = open.filter((s) => {
+    const d = daysUntil(effectiveDeadline(s));
+    return d !== null && d <= 30;
+  });
 
-  const currentBreach = breachTickerItems[tickerOffset % breachTickerItems.length];
+  const onSearch = (e: FormEvent) => {
+    e.preventDefault();
+    const q = query.trim();
+    navigate(q ? `${DIRECTORY_PATH}?q=${encodeURIComponent(q)}` : DIRECTORY_PATH);
+  };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Breach Ticker */}
-      <div className="border-b border-border bg-destructive/5 py-2">
-        <div className="mx-auto max-w-6xl px-6 flex items-center justify-center gap-3 text-sm">
-          <span className="flex items-center gap-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-destructive" />
-            </span>
-            <span className="font-semibold text-destructive">LIVE</span>
-          </span>
-          <span className="text-muted-foreground">
-            <span className="font-medium text-foreground">{currentBreach.company}</span> breach — {currentBreach.records} records exposed · {currentBreach.date}
-          </span>
-        </div>
-      </div>
-
-      {/* Navbar */}
-      <header className="sticky top-0 z-50 border-b border-border backdrop-blur-xl bg-background/85">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <img src={logo} alt="BreachPay" className="h-10" />
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" asChild>
-              <Link to="/pricing">Pricing</Link>
-            </Button>
-            <Button variant="ghost" asChild>
-              <Link to="/login">Log In</Link>
-            </Button>
-            <Button asChild className="rounded-xl">
-              <Link to="/signup">Start Free Scan</Link>
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      {/* Hero */}
-      <section className="relative overflow-hidden py-24 lg:py-32">
+    <PublicLayout>
+      <section className="relative overflow-hidden border-b border-border">
         <div
-          className="absolute inset-0 pointer-events-none"
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
           style={{
-            background: 'radial-gradient(ellipse 80% 50% at 50% 0%, hsl(164 100% 45% / 0.07) 0%, hsl(172 100% 37% / 0.03) 40%, transparent 70%)',
+            background:
+              "radial-gradient(ellipse 80% 60% at 50% 0%, hsl(164 100% 45% / 0.08) 0%, transparent 70%)",
           }}
         />
-        <div
-          className="absolute left-1/2 top-1/3 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] pointer-events-none"
-          style={{
-            background: 'radial-gradient(ellipse at center, hsl(164 100% 45% / 0.05) 0%, transparent 70%)',
-          }}
-        />
-        <div className="relative mx-auto max-w-4xl px-6 text-center">
-          {/* Logo */}
-          <div className="mb-8 flex justify-center">
-            <img src={logo} alt="BreachPay" className="h-24 sm:h-28 lg:h-32 w-auto drop-shadow-[0_0_30px_hsl(164_100%_45%/0.25)]" />
-          </div>
-
-          <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-            You May Be Owed Money{" "}
-            <span className="gradient-emerald-text">
-              From Data Breaches.
-            </span>
+        <div className="relative mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-24">
+          <p className="text-sm font-semibold uppercase tracking-wider text-primary">Free and independent</p>
+          <h1 className="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">
+            Find data breach settlements you can still claim
           </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-            BreachPay scans settlements and files claims on your behalf — so you get the compensation you deserve.
-          </p>
-          <p className="mx-auto mt-3 max-w-2xl text-sm text-muted-foreground/60 tracking-wide">
-            Encrypted identity scan • No credit impact • Results in seconds
+          <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
+            A directory of open data breach class action settlements, with claim deadlines, listed payouts and links
+            to the official claim sites.
           </p>
 
-          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Button size="lg" asChild className="rounded-xl shadow-[0_0_20px_hsl(164_100%_45%/0.25)] hover:shadow-[0_0_32px_hsl(164_100%_45%/0.4)] transition-all duration-500">
-              <Link to="/signup">Run My Free Scan <ArrowRight className="ml-2 h-4 w-4" /></Link>
-            </Button>
-            <Button variant="outline" size="lg" asChild className="rounded-xl">
-              <Link to="/signup">See If I Qualify</Link>
-            </Button>
-          </div>
-
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-x-8 gap-y-3 text-sm text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-primary" />
-              <span>No upfront claim fees</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Lock className="h-4 w-4 text-primary" />
-              <span>Bank-level encryption</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <LogOut className="h-4 w-4 text-primary" />
-              <span>Cancel anytime</span>
-            </div>
-          </div>
-
-          <p className="mt-6 text-xs text-muted-foreground/50">
-            Scanning 12,000+ verified breach and settlement databases.
-          </p>
-        </div>
-      </section>
-
-      {/* Urgency Breach Stats */}
-      <section className="border-y border-destructive/10 bg-destructive/[0.03]">
-        <div className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-6 py-8 sm:grid-cols-3">
-          {urgencyStats.map((s) => (
-            <div key={s.label} className="glass-card flex items-center gap-4 p-5">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-destructive/10">
-                <s.icon className={`h-5 w-5 ${s.color}`} />
-              </div>
-              <div>
-                <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-                <p className="text-xs text-muted-foreground">{s.label}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Stats Bar */}
-      <section className="border-b border-border bg-card/50">
-        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-6 px-6 py-10 lg:grid-cols-4">
-          {stats.map((s) => (
-            <div key={s.label} className="flex flex-col items-center text-center">
-              <s.icon className="mb-2 h-6 w-6 text-primary" />
-              <span className="text-2xl font-bold">{s.value}</span>
-              <span className="text-sm text-muted-foreground">{s.label}</span>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Trust Band */}
-      <section className="py-8 bg-background">
-        <div className="mx-auto max-w-4xl px-6 flex flex-wrap items-center justify-center gap-6">
-          {[
-            { icon: Shield, text: "Verified Settlement Database" },
-            { icon: Lock, text: "Secure Document Vault" },
-            { icon: Check, text: "Automated Eligibility Checks" },
-            { icon: FileText, text: "Partnered Claims Processing" },
-          ].map((badge) => (
-            <div key={badge.text} className="flex items-center gap-2 rounded-xl border border-border bg-card/50 px-4 py-2.5 text-sm text-muted-foreground">
-              <badge.icon className="h-4 w-4 text-primary" />
-              {badge.text}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section className="py-20 bg-background">
-        <div className="mx-auto max-w-6xl px-6">
-          <h2 className="mb-12 text-center text-3xl font-bold">How It Works</h2>
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-            {steps.map((step, i) => (
-              <div
-                key={step.title}
-                className="glass-card p-6 text-center transition-all duration-300 hover:border-primary/20 hover:shadow-[0_0_20px_0_hsl(164_100%_45%/0.06)]"
-              >
-                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10">
-                  <step.icon className="h-5 w-5 text-primary" />
-                </div>
-                <div className="mb-1 text-xs font-bold uppercase tracking-wider text-primary">STEP {i + 1}</div>
-                <h3 className="mb-2 text-lg font-semibold">{step.title}</h3>
-                <p className="text-sm text-muted-foreground">{step.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Settlement Calculator */}
-      <section className="py-16 bg-background border-t border-border">
-        <div className="mx-auto max-w-xl px-6">
-          <h2 className="mb-2 text-center text-3xl font-bold">Estimate Your Payout</h2>
-          <p className="mb-8 text-center text-muted-foreground">See how much you could recover from data breach settlements.</p>
-          <div className="glass-card-glow p-8">
-            <label className="block text-sm font-medium mb-2">How many breaches have affected you?</label>
+          <form
+            onSubmit={onSearch}
+            action={DIRECTORY_PATH}
+            method="get"
+            role="search"
+            className="mx-auto mt-8 flex max-w-xl flex-col gap-3 sm:flex-row"
+          >
+            <label htmlFor="home-search" className="sr-only">
+              Search settlements by company
+            </label>
             <Input
-              type="number"
-              min="1"
-              max="20"
-              value={calcBreaches}
-              onChange={(e) => setCalcBreaches(e.target.value)}
-              className="rounded-xl text-center text-lg font-bold mb-6"
+              id="home-search"
+              name="q"
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by company, e.g. a bank or phone carrier"
+              className="h-12 rounded-xl text-base"
             />
-            <div className="rounded-xl bg-muted/50 p-6 text-center">
-              <p className="text-sm text-muted-foreground mb-1">Estimated Recovery Range</p>
-              <p className="text-3xl font-bold gradient-emerald-text">
-                ${calcMin.toLocaleString()} – ${calcMax.toLocaleString()}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">Based on average settlement payouts</p>
-            </div>
-            <Button
-              asChild
-              size="lg"
-              className="w-full mt-6 rounded-xl"
-            >
-              <Link to="/signup">Scan Now — It's Free <ArrowRight className="ml-2 h-4 w-4" /></Link>
+            <Button type="submit" size="lg" className="h-12 rounded-xl px-6">
+              <Search className="mr-2 h-4 w-4" aria-hidden /> Search
             </Button>
-          </div>
+          </form>
+
+          {open.length > 0 && (
+            <p className="mt-5 text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">{open.length}</span> open settlement
+              {open.length === 1 ? "" : "s"} listed
+              {closingSoon.length > 0 && (
+                <>
+                  {" · "}
+                  <span className="font-semibold text-foreground">{closingSoon.length}</span> closing within 30 days
+                </>
+              )}
+            </p>
+          )}
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section className="py-20 bg-background border-t border-border">
-        <div className="mx-auto max-w-4xl px-6">
-          <h2 className="mb-3 text-center text-3xl font-bold">Pricing</h2>
-          <p className="mb-12 text-center text-muted-foreground">Start for free. Upgrade when you need more.</p>
-          <div className="grid gap-6 md:grid-cols-2">
-            {pricingPlans.map((plan) => (
-              <div
-                key={plan.name}
-                className={`relative p-8 transition-all duration-300 ${
-                  plan.highlighted ? "glass-card-glow" : "glass-card"
-                }`}
-              >
-                {plan.badge && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full gradient-emerald px-4 py-1 text-xs font-bold text-primary-foreground">
-                    {plan.badge}
-                  </div>
-                )}
-                <h3 className="text-lg font-semibold">{plan.name}</h3>
-                <div className="mt-2 flex items-baseline gap-1">
-                  <span className="text-4xl font-bold">{plan.price}</span>
-                  {plan.period && <span className="text-muted-foreground">{plan.period}</span>}
+      <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6" aria-labelledby="closing-heading">
+        <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 id="closing-heading" className="text-2xl font-bold">
+              Deadlines coming up
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">Open settlements, soonest deadline first.</p>
+          </div>
+          <Link to={DIRECTORY_PATH} className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+            {open.length > 6 ? `See all ${open.length} open settlements` : "Browse all settlements"}
+            <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
+        </div>
+
+        {isLoading ? (
+          <PageSpinner />
+        ) : isError ? (
+          <LoadError onRetry={() => refetch()} />
+        ) : open.length > 0 ? (
+          <SettlementGrid settlements={open.slice(0, 6)} />
+        ) : (
+          <div className="glass-card p-8 text-center">
+            <p className="font-medium">No open settlements are listed right now.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              We only publish a settlement after it has been reviewed. Check back soon.
+            </p>
+          </div>
+        )}
+      </section>
+
+      <section className="border-y border-border bg-card/40" aria-labelledby="how-heading">
+        <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6">
+          <h2 id="how-heading" className="text-2xl font-bold">
+            How it works
+          </h2>
+          <ol className="mt-8 grid gap-6 md:grid-cols-3">
+            {steps.map((step, i) => (
+              <li key={step.title} className="glass-card p-6">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                    <step.icon className="h-5 w-5 text-primary" aria-hidden />
+                  </span>
+                  <span className="text-xs font-bold uppercase tracking-wider text-primary">Step {i + 1}</span>
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">{plan.description}</p>
-                {plan.highlighted && (
-                  <p className="mt-1 text-xs text-muted-foreground">Cancel anytime</p>
-                )}
-                <ul className="mt-6 space-y-3">
-                  {plan.features.map((f) => (
-                    <li key={f} className="flex items-center gap-2.5 text-sm">
-                      <Check className="h-4 w-4 shrink-0 text-primary" />
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <Button
-                  asChild
-                  variant={plan.highlighted ? "default" : "secondary"}
-                  className="mt-8 w-full rounded-xl"
-                >
-                  <Link to={plan.ctaLink}>{plan.cta}</Link>
-                </Button>
-              </div>
+                <h3 className="mt-4 text-lg font-semibold">{step.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step.body}</p>
+              </li>
             ))}
-          </div>
-          <p className="mt-6 text-center text-xs text-muted-foreground">
-            BreachPay is not a law firm and does not provide legal advice.
-          </p>
+          </ol>
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-border py-8 bg-background">
-        <div className="mx-auto max-w-6xl px-6 flex flex-col items-center gap-4">
-          <div className="flex items-center gap-6 text-sm text-muted-foreground">
-            <Link to="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
-            <Link to="/login" className="hover:text-foreground transition-colors">Log In</Link>
-            <Link to="/signup" className="hover:text-foreground transition-colors">Sign Up</Link>
-            <Link to="/terms" className="hover:text-foreground transition-colors">Terms</Link>
-            <Link to="/privacy" className="hover:text-foreground transition-colors">Privacy</Link>
+      <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6" aria-labelledby="trust-heading">
+        <h2 id="trust-heading" className="text-2xl font-bold">
+          What BreachPay does, and what it doesn't
+        </h2>
+        <div className="mt-8 grid gap-6 md:grid-cols-2">
+          <div className="glass-card p-6">
+            <h3 className="font-semibold">BreachPay</h3>
+            <ul className="mt-4 space-y-3 text-sm">
+              {does.map((item) => (
+                <li key={item} className="flex items-start gap-3">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                  {item}
+                </li>
+              ))}
+            </ul>
           </div>
-          <div className="text-center text-xs text-muted-foreground space-y-1">
-            <p>BreachPay is not a law firm and does not provide legal advice.</p>
-            <p>We help users identify eligible settlement claims and track deadlines.</p>
-            <p>Data may be sourced from third-party providers and may be incomplete.</p>
-            <p className="pt-2">© 2026 BreachPay. All rights reserved.</p>
+          <div className="glass-card p-6">
+            <h3 className="font-semibold">BreachPay does not</h3>
+            <ul className="mt-4 space-y-3 text-sm">
+              {doesNot.map((item) => (
+                <li key={item} className="flex items-start gap-3">
+                  <X className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                  {item}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
-      </footer>
-    </div>
+      </section>
+
+      <section className="border-y border-border bg-card/40">
+        <div className="mx-auto flex max-w-6xl flex-col items-start gap-6 px-4 py-12 sm:px-6 md:flex-row md:items-center md:justify-between">
+          <div className="max-w-2xl">
+            <h2 className="flex items-center gap-2 text-xl font-bold">
+              <ShieldCheck className="h-5 w-5 text-primary" aria-hidden /> Not sure which breaches you were in?
+            </h2>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+              With a free account you can check your email address against known breaches, using data from Have I
+              Been Pwned, and keep track of the settlements you've filed.
+            </p>
+          </div>
+          <Button asChild size="lg" className="shrink-0 rounded-xl">
+            <Link to="/signup">
+              Create a free account <ArrowRight className="ml-2 h-4 w-4" aria-hidden />
+            </Link>
+          </Button>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-3xl px-4 py-14 sm:px-6" aria-labelledby="faq-heading">
+        <h2 id="faq-heading" className="text-2xl font-bold">
+          Common questions
+        </h2>
+        <div className="mt-6">
+          <FaqList faqs={HOME_FAQS} />
+        </div>
+      </section>
+    </PublicLayout>
   );
 };
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,12 +8,72 @@ import { MonitoredEmailsManager } from "@/components/MonitoredEmailsManager";
 import { User, Shield, Download, Trash2, FileText, ExternalLink, LogOut, Crown, CreditCard, Calendar, CheckCircle, ArrowRight, Loader2, AlertTriangle } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { FEATURES } from "@/config/features";
+import { Switch } from "@/components/ui/switch";
+
+/** Lets people turn BreachPay's emails on or off. The emails themselves link here. */
+function EmailAlertSettings({ userId }: { userId: string }) {
+  const [emailAlerts, setEmailAlerts] = useState<boolean | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    supabase
+      .from("user_profiles")
+      .select("email_alerts")
+      .eq("user_id", userId)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!cancelled) setEmailAlerts(data?.email_alerts ?? true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  const toggle = async (value: boolean) => {
+    const previous = emailAlerts;
+    setEmailAlerts(value);
+    setSaving(true);
+    const { error } = await supabase
+      .from("user_profiles")
+      .update({ email_alerts: value, deadline_alerts: value })
+      .eq("user_id", userId);
+    setSaving(false);
+    if (error) {
+      setEmailAlerts(previous);
+      toast.error("Couldn't save that. Please try again.");
+    } else {
+      toast.success(value ? "Email alerts are on" : "Email alerts are off");
+    }
+  };
+
+  return (
+    <section className="mb-6 rounded-2xl border bg-card p-6">
+      <h2 className="font-semibold mb-4">Email alerts</h2>
+      <div className="flex items-start justify-between gap-4">
+        <label htmlFor="email-alerts" className="text-sm">
+          <span className="font-medium">Matches and deadlines</span>
+          <span className="mt-1 block text-xs text-muted-foreground">
+            Emails about listed settlements that may relate to your breach check results, and their claim deadlines.
+            Emails you ask for, such as password resets, are always sent.
+          </span>
+        </label>
+        <Switch
+          id="email-alerts"
+          checked={emailAlerts ?? false}
+          disabled={emailAlerts === null || saving}
+          onCheckedChange={toggle}
+        />
+      </div>
+    </section>
+  );
+}
 
 const Settings = () => {
   const { user, signOut, plan } = useAuth();
   const navigate = useNavigate();
   const [exporting, setExporting] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
 
@@ -37,9 +97,14 @@ const Settings = () => {
         <div className="space-y-3 text-sm">
           <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span>{user?.email ?? "—"}</span></div>
           <div className="flex justify-between"><span className="text-muted-foreground">Member Since</span><span>{user?.created_at ? new Date(user.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : "—"}</span></div>
+          {!FEATURES.paidPlans && (
+            <div className="flex justify-between"><span className="text-muted-foreground">Plan</span><span>Free. There is no paid plan.</span></div>
+          )}
         </div>
       </section>
 
+      {FEATURES.paidPlans && (
+      <>
       {/* Plan & Subscription */}
       <section className="mb-6 rounded-2xl border bg-card p-6">
         <div className="flex items-center gap-2 mb-4">
@@ -99,7 +164,11 @@ const Settings = () => {
           </div>
         )}
       </section>
+      </>
+      )}
 
+      {FEATURES.scheduledScans && (
+      <>
       {/* Monitored Emails */}
       <MonitoredEmailsManager />
 
@@ -111,12 +180,16 @@ const Settings = () => {
         </div>
         <p className="text-sm text-muted-foreground">Phone numbers, SSNs, and other identifiers from your scans appear here.</p>
       </section>
+      </>
+      )}
+
+      {user && <EmailAlertSettings userId={user.id} />}
 
       {/* Data Controls */}
       <section className="mb-6 rounded-2xl border bg-card p-6">
         <h2 className="font-semibold mb-4">Data Controls</h2>
         <p className="text-xs text-muted-foreground mb-4">
-          Your data is encrypted at rest. Documents are stored securely with time-limited access. Monitored identifiers are stored as hashes, never plaintext.
+          Download a copy of everything stored for your account. To remove your data, delete your account below.
         </p>
         <div className="flex flex-wrap gap-3">
           <Button
@@ -171,36 +244,6 @@ const Settings = () => {
             {exporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />}
             {exporting ? "Exporting…" : "Export My Data"}
           </Button>
-          <Button
-            variant="destructive"
-            className="rounded-xl"
-            disabled={deleting}
-            onClick={async () => {
-              if (!user) return;
-              if (!confirm("Are you sure you want to request deletion of all your data? This action cannot be undone.")) return;
-              setDeleting(true);
-              try {
-                const { error } = await supabase.from("data_deletion_requests").insert({
-                  user_id: user.id,
-                  reason: "User-initiated deletion request",
-                });
-                if (error) {
-                  console.error("Deletion request error:", error);
-                  toast.error("Failed to submit request. Please try again.");
-                } else {
-                  toast.success("Your data deletion request has been submitted. We will process it within 30 days.");
-                }
-              } catch (err) {
-                console.error("Deletion request error:", err);
-                toast.error("Something went wrong. Please try again.");
-              } finally {
-                setDeleting(false);
-              }
-            }}
-          >
-            {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-            {deleting ? "Submitting…" : "Request Data Deletion"}
-          </Button>
         </div>
       </section>
 
@@ -211,7 +254,7 @@ const Settings = () => {
           <h2 className="font-semibold text-destructive">Delete Account</h2>
         </div>
         <p className="text-sm text-muted-foreground mb-4">
-          Permanently delete your account and all associated data. This action is <strong>irreversible</strong> — all claims, scan history, breach data, and profile information will be removed.
+          Permanently delete your account and everything stored with it: your profile, breach check results, matches and claim records. This cannot be undone.
         </p>
         <div className="space-y-3">
           <div>

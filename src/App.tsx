@@ -1,9 +1,9 @@
-import { lazy, Suspense, useState, useCallback } from "react";
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Navigate, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminRoute } from "@/components/AdminRoute";
@@ -11,11 +11,20 @@ import { PartnerRoute } from "@/components/PartnerRoute";
 import { AppLayout } from "@/layouts/AppLayout";
 import { AdminLayout } from "@/layouts/AdminLayout";
 import { PartnerLayout } from "@/layouts/PartnerLayout";
-import { SplashScreen } from "@/components/SplashScreen";
 import Landing from "./pages/Landing";
+import Directory from "./pages/Directory";
+import SettlementPublic from "./pages/SettlementPublic";
+import BreachCompany from "./pages/BreachCompany";
+import Pricing from "./pages/Pricing";
+import Help from "./pages/Help";
+import TermsOfService from "./pages/TermsOfService";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import NotFound from "./pages/NotFound";
+import { seedQueryClient } from "@/lib/settlements/data";
+import { DIRECTORY_PATH } from "@/lib/settlements/format";
+import { FEATURES } from "@/config/features";
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
-const Pricing = lazy(() => import("./pages/Pricing"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Scan = lazy(() => import("./pages/Scan"));
 const Settlements = lazy(() => import("./pages/Settlements"));
@@ -53,16 +62,16 @@ const PartnerIntegrations = lazy(() => import("./pages/partner/PartnerIntegratio
 const PartnerApiAccess = lazy(() => import("./pages/partner/PartnerApiAccess"));
 const PartnerSLA = lazy(() => import("./pages/partner/PartnerSLA"));
 const Support = lazy(() => import("./pages/Support"));
-const NotFound = lazy(() => import("./pages/NotFound"));
 const ShareClaim = lazy(() => import("./pages/ShareClaim"));
-const SettlementPublic = lazy(() => import("./pages/SettlementPublic"));
-const BreachCompany = lazy(() => import("./pages/BreachCompany"));
 const CheckEligibility = lazy(() => import("./pages/CheckEligibility"));
-const TermsOfService = lazy(() => import("./pages/TermsOfService"));
-const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
 const queryClient = new QueryClient();
+// Pre-rendered pages embed their data, so the first render needs no request.
+if (typeof window !== "undefined") seedQueryClient(queryClient, window.__BREACHPAY_DATA__);
+
+// Screens behind a switched-off feature send people back to the dashboard.
+const home = <Navigate to="/dashboard" replace />;
 
 // Shown while a route's code chunk is being fetched.
 const RouteFallback = () => (
@@ -71,16 +80,11 @@ const RouteFallback = () => (
   </div>
 );
 
-const App = () => {
-  const [showSplash, setShowSplash] = useState(true);
-  const handleSplashComplete = useCallback(() => setShowSplash(false), []);
-
-  return (
+const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
       <BrowserRouter>
         <AuthProvider>
           <Suspense fallback={<RouteFallback />}>
@@ -89,6 +93,8 @@ const App = () => {
             <Route path="/login" element={<Login />} />
             <Route path="/signup" element={<Signup />} />
             <Route path="/pricing" element={<Pricing />} />
+            <Route path={DIRECTORY_PATH} element={<Directory />} />
+            <Route path="/help" element={<Help />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* User App - Protected */}
@@ -98,13 +104,13 @@ const App = () => {
               <Route path="/settlements" element={<Settlements />} />
               <Route path="/settlements/:id" element={<SettlementDetail />} />
               <Route path="/claims" element={<Claims />} />
-              <Route path="/claims/file" element={<ClaimFiling />} />
-              <Route path="/claims/:claimId" element={<ClaimTracker />} />
-              <Route path="/monitoring" element={<Monitoring />} />
-              <Route path="/wallet" element={<Wallet />} />
-              <Route path="/payouts" element={<Payouts />} />
-              <Route path="/vault" element={<Vault />} />
-              <Route path="/support" element={<Support />} />
+              <Route path="/claims/file" element={FEATURES.claimPackets ? <ClaimFiling /> : <Navigate to="/settlements" replace />} />
+              <Route path="/claims/:claimId" element={FEATURES.claimPackets ? <ClaimTracker /> : <Navigate to="/claims" replace />} />
+              <Route path="/monitoring" element={FEATURES.scheduledScans ? <Monitoring /> : home} />
+              <Route path="/wallet" element={FEATURES.payouts ? <Wallet /> : home} />
+              <Route path="/payouts" element={FEATURES.payouts ? <Payouts /> : home} />
+              <Route path="/vault" element={FEATURES.documentUploads ? <Vault /> : home} />
+              <Route path="/support" element={FEATURES.aiSupport ? <Support /> : <Navigate to="/help" replace />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
 
@@ -159,7 +165,6 @@ const App = () => {
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
-  );
-};
+);
 
 export default App;

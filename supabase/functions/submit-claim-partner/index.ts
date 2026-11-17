@@ -78,32 +78,15 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Simulate partner API submission
-    // In production, this would call the partner's actual API endpoint
-    const externalRef = `BP-${claim_id.slice(0, 8)}-${Date.now().toString(36).toUpperCase()}`;
-
-    // Update claim
-    await admin.from("claims").update({
-      status: "submitted",
-      submission_channel: "partner_api",
-      submitted_to_admin_at: new Date().toISOString(),
-      external_submission_ref: externalRef,
-      updated_at: new Date().toISOString(),
-    }).eq("id", claim_id);
-
-    // Log status history
-    await admin.from("claim_status_history").insert({
-      claim_id,
-      status: "submitted",
-      note: `Submitted to settlement administrator via partner API. Ref: ${externalRef}`,
-      updated_by: "system",
-    });
-
+    // BreachPay has no connection to any settlement administrator, so it cannot
+    // submit a claim for anyone. This used to mark the claim "submitted" and
+    // return a made-up reference, which could leave someone believing they had
+    // filed when they had not. It now refuses and changes nothing.
     return new Response(JSON.stringify({
-      ok: true,
-      external_ref: externalRef,
-      submitted_at: new Date().toISOString(),
+      ok: false,
+      error: "Claims can't be submitted through BreachPay. Please file on the official settlement site.",
     }), {
+      status: 501,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

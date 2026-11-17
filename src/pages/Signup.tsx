@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import logo from "@/assets/logo.png";
+import { FEATURES } from "@/config/features";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -33,7 +33,7 @@ const Signup = () => {
       toast.error(error.message);
     } else {
       // If referral code provided, create referral record
-      if (referralCode && signUpData.user) {
+      if (FEATURES.referralRewards && referralCode && signUpData.user) {
         // Find referrer by code
         const { data: referrer } = await supabase
           .from("user_profiles")
@@ -60,24 +60,24 @@ const Signup = () => {
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 flex items-center justify-center">
-          <img src={logo} alt="BreachPay" className="h-12 drop-shadow-[0_0_20px_hsl(164_100%_45%/0.2)]" />
+          <Link to="/" aria-label="BreachPay home"><img src="/logo.png" alt="BreachPay" width={145} height={48} className="h-12 w-auto" /></Link>
         </div>
         <div className="rounded-2xl border border-border bg-card p-8">
-          <h2 className="mb-1 text-xl font-bold">Create Account</h2>
-          <p className="mb-6 text-sm text-muted-foreground">Start protecting your identity today</p>
-          {referralCode && (
+          <h1 className="mb-1 text-xl font-bold">Create Account</h1>
+          <p className="mb-6 text-sm text-muted-foreground">Free. Check your email against known breaches and keep track of your claims.</p>
+          {FEATURES.referralRewards && referralCode && (
             <div className="mb-4 rounded-xl bg-primary/5 border border-primary/20 px-3 py-2 text-xs text-primary">
               🎉 You were referred by a friend — you'll both benefit when you submit a claim!
             </div>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Email</label>
-              <Input type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="rounded-xl" />
+              <label htmlFor="signup-email" className="mb-1.5 block text-sm font-medium">Email</label>
+              <Input id="signup-email" type="email" autoComplete="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required className="rounded-xl" />
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium">Password</label>
-              <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required className="rounded-xl" />
+              <label htmlFor="signup-password" className="mb-1.5 block text-sm font-medium">Password</label>
+              <Input id="signup-password" type="password" autoComplete="new-password" minLength={8} placeholder="At least 8 characters" value={password} onChange={(e) => setPassword(e.target.value)} required className="rounded-xl" />
             </div>
             <div className="space-y-3 pt-2">
               <div className="flex items-start gap-2">
@@ -89,13 +89,17 @@ const Signup = () => {
               <div className="flex items-start gap-2">
                 <Checkbox id="consent" checked={consent} onCheckedChange={(v) => setConsent(!!v)} />
                 <label htmlFor="consent" className="text-sm text-muted-foreground leading-tight">
-                  I authorize BreachPay to scan breach databases on my behalf
+                  BreachPay may look up my email address in the Have I Been Pwned breach database when I run a breach check
                 </label>
               </div>
             </div>
             <Button type="submit" className="w-full rounded-xl" disabled={!terms || !consent || loading}>
               {loading ? "Creating…" : "Create Account"}
             </Button>
+            <p className="text-xs text-muted-foreground">
+              We'll email you about settlements that may relate to your results and their deadlines. You can turn this
+              off in Settings.
+            </p>
           </form>
           <p className="mt-4 text-center text-sm text-muted-foreground">
             Already have an account? <Link to="/login" className="text-primary hover:underline">Log in</Link>
