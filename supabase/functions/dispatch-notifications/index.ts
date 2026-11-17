@@ -20,6 +20,15 @@ function mustGetEnv(name: string): string {
   return v;
 }
 
+function escapeHtml(value: unknown): string {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function buildUnsubscribeFooter(appBaseUrl: string) {
   const settingsUrl = `${appBaseUrl.replace(/\/$/, "")}/settings`;
   return `
@@ -39,10 +48,13 @@ function buildEmailHtml(
   appBaseUrl: string
 ) {
   const settlementId = String(payload.settlement_id ?? "");
-  const settlementName = String(payload.settlement_name ?? "Settlement");
-  const company = String(payload.company ?? "");
+  // Settlement names/companies originate from scraped third-party pages, so
+  // they are escaped before being placed in email HTML.
+  const rawSettlementName = String(payload.settlement_name ?? "Settlement");
+  const settlementName = escapeHtml(rawSettlementName);
+  const company = escapeHtml(payload.company ?? "");
   const payout = payload.payout_estimate ?? payload.payout_est ?? "";
-  const daysLeft = payload.days_left ?? "";
+  const daysLeft = escapeHtml(payload.days_left ?? "");
 
   const detailsUrl = settlementId
     ? `${appBaseUrl.replace(/\/$/, "")}/settlements/${encodeURIComponent(settlementId)}`
@@ -85,8 +97,8 @@ function buildEmailHtml(
       <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
         <h2>Scan complete</h2>
         <p>Your scheduled scan finished successfully.</p>
-        ${payload.breaches ? `<p>Exposures found: <strong>${payload.breaches}</strong></p>` : ""}
-        ${payload.score ? `<p>Risk score: <strong>${payload.score}/100</strong></p>` : ""}
+        ${payload.breaches ? `<p>Exposures found: <strong>${escapeHtml(payload.breaches)}</strong></p>` : ""}
+        ${payload.score ? `<p>Risk score: <strong>${escapeHtml(payload.score)}/100</strong></p>` : ""}
         <p><a href="${appBaseUrl.replace(/\/$/, "")}/dashboard" style="color:#2563eb">Open dashboard →</a></p>
         ${footer}
       </div>
@@ -96,7 +108,7 @@ function buildEmailHtml(
 
   // claim_submitted
   if (template === "claim_submitted") {
-    const subject = `Your claim is filed — ${settlementName}`;
+    const subject = `Your claim is filed — ${rawSettlementName}`;
     const html = `
       <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
         <h2>Your claim has been filed</h2>
@@ -111,7 +123,7 @@ function buildEmailHtml(
 
   // claim_approved
   if (template === "claim_approved") {
-    const subject = `Your claim could be worth $${payout ? Number(payout).toFixed(2) : "___"} — ${settlementName}`;
+    const subject = `Your claim could be worth $${payout ? Number(payout).toFixed(2) : "___"} — ${rawSettlementName}`;
     const html = `
       <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
         <h2>🎉 Your claim has been approved</h2>
@@ -128,7 +140,7 @@ function buildEmailHtml(
   // claim_paid
   if (template === "claim_paid") {
     const finalPayout = payload.final_payout ?? payout;
-    const subject = `Payout processed: ${settlementName}`;
+    const subject = `Payout processed: ${rawSettlementName}`;
     const html = `
       <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
         <h2>💰 Your payout has been processed</h2>
@@ -145,7 +157,7 @@ function buildEmailHtml(
   // payout_paid (from rpc_admin_mark_claim_paid)
   if (template === "payout_paid") {
     const amount = payload.amount ?? payout;
-    const method = String(payload.method ?? "").replace(/_/g, " ");
+    const method = escapeHtml(String(payload.method ?? "").replace(/_/g, " "));
     const claimId = String(payload.claim_id ?? "");
     const claimUrl = claimId
       ? `${appBaseUrl.replace(/\/$/, "")}/claims/${encodeURIComponent(claimId)}`
@@ -166,12 +178,12 @@ function buildEmailHtml(
   }
 
   // fallback: generic claim_update / claim_rejected
-  const subject = `Claim update: ${settlementName}`;
+  const subject = `Claim update: ${rawSettlementName}`;
   const html = `
     <div style="font-family:sans-serif;max-width:560px;margin:auto;padding:24px">
       <h2>Claim status update</h2>
       <p>Your claim for <strong>${settlementName}</strong>${company ? ` — ${company}` : ""} has been updated.</p>
-      <p>New status: <strong>${String(payload.new_status ?? "updated")}</strong></p>
+      <p>New status: <strong>${escapeHtml(payload.new_status ?? "updated")}</strong></p>
       <p><a href="${detailsUrl}" style="color:#2563eb">View details →</a></p>
       ${footer}
     </div>
@@ -204,10 +216,65 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ── Access control ──────────────────────────────────────────────────────────
+// verify_jwt is off for this function, so it must authenticate callers itself.
+// Allowed: (1) scheduled jobs sending the x-cron-secret header that matches the
+// CRON_SECRET function secret, (2) a signed-in admin user.
+function timingSafeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const ab = enc.encode(a);
+  const bb = enc.encode(b);
+  if (ab.length !== bb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < ab.length; i++) diff |= ab[i] ^ bb[i];
+  return diff === 0;
+}
+
+async function requireAdminOrCron(req: Request): Promise<Response | null> {
+  const deny = (status: number, error: string) =>
+    new Response(JSON.stringify({ error }), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const providedSecret = req.headers.get("x-cron-secret");
+  if (cronSecret && providedSecret && timingSafeEqual(providedSecret, cronSecret)) {
+    return null;
+  }
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return deny(401, "Unauthorized");
+
+  const url = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !anonKey || !serviceKey) return deny(500, "Missing env");
+
+  const userClient = createClient(url, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: userData, error: userErr } = await userClient.auth.getUser();
+  if (userErr || !userData?.user) return deny(401, "Unauthorized");
+
+  const { data: roleRow } = await createClient(url, serviceKey)
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userData.user.id)
+    .eq("role", "admin")
+    .maybeSingle();
+  if (!roleRow) return deny(403, "Forbidden");
+
+  return null;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const denied = await requireAdminOrCron(req);
+  if (denied) return denied;
 
   try {
     const supabaseUrl = mustGetEnv("SUPABASE_URL");

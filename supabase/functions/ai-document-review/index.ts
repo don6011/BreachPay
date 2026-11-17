@@ -6,8 +6,63 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// ── Access control ──────────────────────────────────────────────────────────
+// verify_jwt is off for this function, so it must authenticate callers itself.
+// Allowed: (1) scheduled jobs sending the x-cron-secret header that matches the
+// CRON_SECRET function secret, (2) a signed-in admin user.
+function timingSafeEqual(a: string, b: string): boolean {
+  const enc = new TextEncoder();
+  const ab = enc.encode(a);
+  const bb = enc.encode(b);
+  if (ab.length !== bb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < ab.length; i++) diff |= ab[i] ^ bb[i];
+  return diff === 0;
+}
+
+async function requireAdminOrCron(req: Request): Promise<Response | null> {
+  const deny = (status: number, error: string) =>
+    new Response(JSON.stringify({ error }), {
+      status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const providedSecret = req.headers.get("x-cron-secret");
+  if (cronSecret && providedSecret && timingSafeEqual(providedSecret, cronSecret)) {
+    return null;
+  }
+
+  const authHeader = req.headers.get("Authorization");
+  if (!authHeader?.startsWith("Bearer ")) return deny(401, "Unauthorized");
+
+  const url = Deno.env.get("SUPABASE_URL");
+  const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !anonKey || !serviceKey) return deny(500, "Missing env");
+
+  const userClient = createClient(url, anonKey, {
+    global: { headers: { Authorization: authHeader } },
+  });
+  const { data: userData, error: userErr } = await userClient.auth.getUser();
+  if (userErr || !userData?.user) return deny(401, "Unauthorized");
+
+  const { data: roleRow } = await createClient(url, serviceKey)
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", userData.user.id)
+    .eq("role", "admin")
+    .maybeSingle();
+  if (!roleRow) return deny(403, "Forbidden");
+
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const denied = await requireAdminOrCron(req);
+  if (denied) return denied;
 
   try {
     const supabase = createClient(

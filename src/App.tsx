@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { lazy, Suspense, useState, useCallback } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,56 +13,63 @@ import { AdminLayout } from "@/layouts/AdminLayout";
 import { PartnerLayout } from "@/layouts/PartnerLayout";
 import { SplashScreen } from "@/components/SplashScreen";
 import Landing from "./pages/Landing";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import Pricing from "./pages/Pricing";
-import Dashboard from "./pages/Dashboard";
-import Scan from "./pages/Scan";
-import Settlements from "./pages/Settlements";
-import SettlementDetail from "./pages/SettlementDetail";
-import Claims from "./pages/Claims";
-import ClaimFiling from "./pages/ClaimFiling";
-import ClaimTracker from "./pages/ClaimTracker";
-import Monitoring from "./pages/Monitoring";
-import Settings from "./pages/Settings";
-import Wallet from "./pages/Wallet";
-import Payouts from "./pages/Payouts";
-import Vault from "./pages/Vault";
-import AdminAnalytics from "./pages/admin/AdminAnalytics";
-import AdminUsers from "./pages/admin/AdminUsers";
-import AdminSettlements from "./pages/admin/AdminSettlements";
-import AdminClaims from "./pages/admin/AdminClaims";
-import AdminActivityLogs from "./pages/admin/AdminActivityLogs";
-import AdminAutomationLogs from "./pages/admin/AdminAutomationLogs";
-import AdminPayouts from "./pages/admin/AdminPayouts";
-import AdminPartners from "./pages/admin/AdminPartners";
-import AdminBreachCatalog from "./pages/admin/AdminBreachCatalog";
-import AdminCron from "./pages/admin/AdminCron";
-import AdminDocuments from "./pages/admin/AdminDocuments";
-import AdminNotifications from "./pages/admin/AdminNotifications";
-import AdminInvoices from "./pages/admin/AdminInvoices";
-import AdminOpsConsole from "./pages/admin/AdminOpsConsole";
-import PartnerDashboard from "./pages/partner/PartnerDashboard";
-import PartnerClaims from "./pages/partner/PartnerClaims";
-import PartnerClaimDetail from "./pages/partner/PartnerClaimDetail";
-import PartnerReporting from "./pages/partner/PartnerReporting";
-import PartnerSettings from "./pages/partner/PartnerSettings";
-import PartnerIntake from "./pages/partner/PartnerIntake";
-import PartnerRevenue from "./pages/partner/PartnerRevenue";
-import PartnerIntegrations from "./pages/partner/PartnerIntegrations";
-import PartnerApiAccess from "./pages/partner/PartnerApiAccess";
-import PartnerSLA from "./pages/partner/PartnerSLA";
-import Support from "./pages/Support";
-import NotFound from "./pages/NotFound";
-import ShareClaim from "./pages/ShareClaim";
-import SettlementPublic from "./pages/SettlementPublic";
-import BreachCompany from "./pages/BreachCompany";
-import CheckEligibility from "./pages/CheckEligibility";
-import TermsOfService from "./pages/TermsOfService";
-import PrivacyPolicy from "./pages/PrivacyPolicy";
-import ResetPassword from "./pages/ResetPassword";
+const Login = lazy(() => import("./pages/Login"));
+const Signup = lazy(() => import("./pages/Signup"));
+const Pricing = lazy(() => import("./pages/Pricing"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Scan = lazy(() => import("./pages/Scan"));
+const Settlements = lazy(() => import("./pages/Settlements"));
+const SettlementDetail = lazy(() => import("./pages/SettlementDetail"));
+const Claims = lazy(() => import("./pages/Claims"));
+const ClaimFiling = lazy(() => import("./pages/ClaimFiling"));
+const ClaimTracker = lazy(() => import("./pages/ClaimTracker"));
+const Monitoring = lazy(() => import("./pages/Monitoring"));
+const Settings = lazy(() => import("./pages/Settings"));
+const Wallet = lazy(() => import("./pages/Wallet"));
+const Payouts = lazy(() => import("./pages/Payouts"));
+const Vault = lazy(() => import("./pages/Vault"));
+const AdminAnalytics = lazy(() => import("./pages/admin/AdminAnalytics"));
+const AdminUsers = lazy(() => import("./pages/admin/AdminUsers"));
+const AdminSettlements = lazy(() => import("./pages/admin/AdminSettlements"));
+const AdminClaims = lazy(() => import("./pages/admin/AdminClaims"));
+const AdminActivityLogs = lazy(() => import("./pages/admin/AdminActivityLogs"));
+const AdminAutomationLogs = lazy(() => import("./pages/admin/AdminAutomationLogs"));
+const AdminPayouts = lazy(() => import("./pages/admin/AdminPayouts"));
+const AdminPartners = lazy(() => import("./pages/admin/AdminPartners"));
+const AdminBreachCatalog = lazy(() => import("./pages/admin/AdminBreachCatalog"));
+const AdminCron = lazy(() => import("./pages/admin/AdminCron"));
+const AdminDocuments = lazy(() => import("./pages/admin/AdminDocuments"));
+const AdminNotifications = lazy(() => import("./pages/admin/AdminNotifications"));
+const AdminInvoices = lazy(() => import("./pages/admin/AdminInvoices"));
+const AdminOpsConsole = lazy(() => import("./pages/admin/AdminOpsConsole"));
+const PartnerDashboard = lazy(() => import("./pages/partner/PartnerDashboard"));
+const PartnerClaims = lazy(() => import("./pages/partner/PartnerClaims"));
+const PartnerClaimDetail = lazy(() => import("./pages/partner/PartnerClaimDetail"));
+const PartnerReporting = lazy(() => import("./pages/partner/PartnerReporting"));
+const PartnerSettings = lazy(() => import("./pages/partner/PartnerSettings"));
+const PartnerIntake = lazy(() => import("./pages/partner/PartnerIntake"));
+const PartnerRevenue = lazy(() => import("./pages/partner/PartnerRevenue"));
+const PartnerIntegrations = lazy(() => import("./pages/partner/PartnerIntegrations"));
+const PartnerApiAccess = lazy(() => import("./pages/partner/PartnerApiAccess"));
+const PartnerSLA = lazy(() => import("./pages/partner/PartnerSLA"));
+const Support = lazy(() => import("./pages/Support"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const ShareClaim = lazy(() => import("./pages/ShareClaim"));
+const SettlementPublic = lazy(() => import("./pages/SettlementPublic"));
+const BreachCompany = lazy(() => import("./pages/BreachCompany"));
+const CheckEligibility = lazy(() => import("./pages/CheckEligibility"));
+const TermsOfService = lazy(() => import("./pages/TermsOfService"));
+const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 
 const queryClient = new QueryClient();
+
+// Shown while a route's code chunk is being fetched.
+const RouteFallback = () => (
+  <div className="flex min-h-screen items-center justify-center" role="status" aria-label="Loading">
+    <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
+  </div>
+);
 
 const App = () => {
   const [showSplash, setShowSplash] = useState(true);
@@ -76,6 +83,7 @@ const App = () => {
       {showSplash && <SplashScreen onComplete={handleSplashComplete} />}
       <BrowserRouter>
         <AuthProvider>
+          <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
@@ -146,6 +154,7 @@ const App = () => {
 
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </Suspense>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
