@@ -3,8 +3,7 @@
  * step (vite-plugin-prerender.ts); never shipped to the browser.
  */
 import { renderToString } from "react-dom/server";
-import { StaticRouter } from "react-router-dom/server";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, StaticRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Landing from "@/pages/Landing";
 import Directory from "@/pages/Directory";

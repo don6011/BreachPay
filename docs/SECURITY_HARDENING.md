@@ -68,6 +68,41 @@ select cron.schedule(
 Check `select jobname from cron.job;` first: if a job name differs in your
 database, use the name shown there.
 
+Then add the two email jobs (deadline reminders daily at 15:00 UTC, the weekly
+email on Mondays at 14:00 UTC):
+
+```sql
+select cron.schedule(
+  'subscription-deadline-reminders',
+  '0 15 * * *',
+  $$
+  select net.http_post(
+    url := 'https://zmjikithlaxeldvsmklz.supabase.co/functions/v1/send-subscription-emails',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret')
+    ),
+    body := '{}'::jsonb
+  ) as request_id;
+  $$
+);
+
+select cron.schedule(
+  'subscription-weekly-digest',
+  '0 14 * * 1',
+  $$
+  select net.http_post(
+    url := 'https://zmjikithlaxeldvsmklz.supabase.co/functions/v1/send-subscription-emails?mode=weekly',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'x-cron-secret', (select decrypted_secret from vault.decrypted_secrets where name = 'cron_secret')
+    ),
+    body := '{}'::jsonb
+  ) as request_id;
+  $$
+);
+```
+
 ## 3. Verify
 
 ```sql
@@ -77,3 +112,28 @@ from net._http_response order by created desc limit 5;
 
 You should see `200` responses. A `401` means the function secret and the Vault
 value do not match.
+
+## 4. Function settings that are now off by default
+
+These backend functions refuse requests unless a function secret turns them on.
+Leave them off until the thing they do is real:
+
+| Secret | Turns on | Why it's off |
+| --- | --- | --- |
+| `PARTNER_API_ENABLED=true` | `enterprise-api`, `partner-intake-breach`, `partner-intake-claim` | Partner intake creates accounts for other people's email addresses without their consent. Fix that before enabling. |
+| `AI_SUPPORT_ENABLED=true` | `ai-support` | It tells people their question was escalated to a team. |
+| `SCHEDULED_SCANS_ENABLED=true` | `run-scheduled-scans` | It writes generated breach results, not real ones. |
+| `PAYOUTS_ENABLED=true` | payout emails in `dispatch-notifications` | BreachPay doesn't handle payouts. |
+
+Optional: set `SUBSCRIBE_SALT` to a random value. It's used to hash the
+network address of email sign-ups for abuse limits; without it a value
+derived from the service key is used.
+
+## 5. Settlements table access (migration `20261117160000`)
+
+Applying the migrations locks the settlements table down. Visitors and regular
+users can read only published listings, and only public columns. Internal
+notes, credibility scores, the author and the source are admin-only, and the
+admin console reads them through `admin_settlement_internal()`. Backend
+functions use the service role and are unaffected. The scraper's source list is
+also admin-only now.

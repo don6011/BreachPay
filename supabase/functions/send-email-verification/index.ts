@@ -6,6 +6,16 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+/** A 6-digit code from a cryptographically secure source. */
+function secureCode(): string {
+  const n = crypto.getRandomValues(new Uint32Array(1))[0] % 900000;
+  return String(100000 + n);
+}
+
+/** Minimum time between verification emails for one address. */
+const RESEND_COOLDOWN_MS = 60_000;
+const CODE_LIFETIME_MS = 15 * 60 * 1000;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -107,7 +117,7 @@ Deno.serve(async (req) => {
       }
 
       // Generate 6-digit code
-      const verificationCode = String(Math.floor(100000 + Math.random() * 900000));
+      const verificationCode = secureCode();
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 min
 
       // Insert identifier record
@@ -211,8 +221,15 @@ Deno.serve(async (req) => {
         !record.verification_code ||
         record.verification_code !== String(code).trim()
       ) {
+        // One wrong guess cancels the code, so it can't be found by trying them all.
+        if (record.verification_code) {
+          await adminClient
+            .from("monitored_identifiers")
+            .update({ verification_code: null })
+            .eq("id", identifier_id);
+        }
         return new Response(
-          JSON.stringify({ error: "Invalid verification code" }),
+          JSON.stringify({ error: "That code didn't match. Please request a new one." }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -267,7 +284,18 @@ Deno.serve(async (req) => {
         );
       }
 
-      const newCode = String(Math.floor(100000 + Math.random() * 900000));
+      // Limit how often a code can be re-sent, so this can't be used to flood an inbox.
+      const lastSentAt = record.verification_expires_at
+        ? new Date(record.verification_expires_at).getTime() - CODE_LIFETIME_MS
+        : 0;
+      if (Date.now() - lastSentAt < RESEND_COOLDOWN_MS) {
+        return new Response(
+          JSON.stringify({ error: "Please wait a minute before requesting another code." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      const newCode = secureCode();
       const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
       await adminClient

@@ -123,6 +123,30 @@ const emptyForm = () => ({
 });
 
 // ── Component ──────────────────────────────────────────
+// Columns any signed-in user may read. Internal fields (notes, credibility
+// score, author, source) come from an admin-only database function instead.
+const SETTLEMENT_COLUMNS = [
+  "id", "name", "company", "status", "breach_year", "payout_min", "payout_max",
+  "deadline", "url", "description", "tags", "created_at", "updated_at",
+  "verified", "verification_level", "jurisdiction", "case_number",
+  "administrator_name", "official_source_url", "claims_filing_url",
+  "claim_deadline", "source_type", "source_name", "source_url",
+  "last_verified_at", "category", "final_approval_date",
+  "eligibility_summary", "claim_url", "canonical_key",
+  "verification_status", "media_references", "verification_sources",
+  "submission_mode", "is_test", "is_demo", "discovered_at",
+  "last_checked_at", "lifecycle_status", "closed_at", "eligibility_rules",
+].join(",");
+
+/** Adds the admin-only fields to settlement rows. */
+async function withInternalFields<T extends { id: string }>(rows: T[]): Promise<T[]> {
+  if (rows.length === 0) return rows;
+  const { data, error } = await supabase.rpc("admin_settlement_internal" as never, { p_ids: rows.map((r) => r.id) } as never);
+  if (error || !Array.isArray(data)) return rows;
+  const byId = new Map((data as Array<{ id: string; internal: Record<string, unknown> }>).map((r) => [r.id, r.internal]));
+  return rows.map((r) => ({ ...r, ...(byId.get(r.id) ?? {}) }));
+}
+
 const AdminSettlements = () => {
   const { user } = useAuth();
   const [tab, setTab] = useState("queue");
@@ -210,9 +234,10 @@ const AdminSettlements = () => {
 
     if (data && data.length > 0) {
       const sIds = data.map((q: any) => q.settlement_id);
-      const { data: sData } = await supabase.from("settlements").select("*").in("id", sIds);
+      const { data: sRows } = await supabase.from("settlements").select(SETTLEMENT_COLUMNS).in("id", sIds);
+      const sData = await withInternalFields((sRows || []) as unknown as Settlement[]);
       const sMap: Record<string, Settlement> = {};
-      (sData || []).forEach((s: any) => { sMap[s.id] = s; });
+      sData.forEach((s) => { sMap[s.id] = s; });
       setQueueItems(data.map((q: any) => ({ ...q, settlement: sMap[q.settlement_id] })));
     } else {
       setQueueItems([]);
@@ -224,10 +249,10 @@ const AdminSettlements = () => {
     setSettlementsLoading(true);
     const { data } = await supabase
       .from("settlements")
-      .select("*")
+      .select(SETTLEMENT_COLUMNS)
       .in("status", ["verified", "open"])
       .order("created_at", { ascending: false });
-    if (data) setSettlements(data as Settlement[]);
+    if (data) setSettlements(await withInternalFields(data as unknown as Settlement[]));
     setSettlementsLoading(false);
   };
 
@@ -262,25 +287,25 @@ const AdminSettlements = () => {
     setPendingLoading(true);
     const { data } = await supabase
       .from("settlements")
-      .select("*")
+      .select(SETTLEMENT_COLUMNS)
       .in("status", ["pending_review", "pending"])
       .eq("is_demo", false)
       .order("discovered_at", { ascending: false });
-    if (data) setPendingSettlements(data as Settlement[]);
+    if (data) setPendingSettlements(await withInternalFields(data as unknown as Settlement[]));
     setPendingLoading(false);
   };
 
   const fetchAdminAlerts = async () => {
     const { count: pendingCount } = await supabase
       .from("settlements")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .in("status", ["pending_review", "pending"]);
 
     const in14Days = new Date();
     in14Days.setDate(in14Days.getDate() + 14);
     const { count: deadlineCount } = await supabase
       .from("settlements")
-      .select("*", { count: "exact", head: true })
+      .select("id", { count: "exact", head: true })
       .eq("status", "verified")
       .lte("claim_deadline", in14Days.toISOString().split("T")[0])
       .gte("claim_deadline", new Date().toISOString().split("T")[0]);

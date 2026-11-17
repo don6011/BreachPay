@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Check, ExternalLink, FileSearch, Search, ShieldCheck, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { EmailSignup } from "@/components/public/EmailSignup";
 import { FaqList } from "@/components/public/FaqList";
 import { LoadError, PageSpinner, PublicLayout } from "@/components/public/PublicLayout";
 import { SettlementGrid } from "@/components/public/SettlementCard";
@@ -221,6 +222,14 @@ const Landing = () => {
           </Button>
         </div>
       </section>
+
+      <div className="mx-auto max-w-3xl px-4 pt-14 sm:px-6">
+        <EmailSignup
+          kind="weekly"
+          title="New settlements and deadlines, once a week"
+          description="One short email: new or updated settlements and claim deadlines coming up. Nothing else."
+        />
+      </div>
 
       <section className="mx-auto max-w-3xl px-4 py-14 sm:px-6" aria-labelledby="faq-heading">
         <h2 id="faq-heading" className="text-2xl font-bold">

@@ -20,7 +20,19 @@ const PrivacyPolicy = () => (
       </p>
     </LegalSection>
 
-    <LegalSection heading="2. What we collect when you have an account">
+    <LegalSection heading="2. Email reminders without an account">
+      <p>
+        If you ask for a deadline reminder or the weekly email, we store your email address, what you signed up for,
+        whether you have confirmed it, and which emails we have sent. We also keep a one-way scrambled (hashed) form of
+        the network address the request came from, only to stop people signing up others in bulk.
+      </p>
+      <p>
+        We send nothing except a confirmation link until you confirm, and delete sign-ups that are not confirmed within a
+        week. Every email has a one-click unsubscribe link.
+      </p>
+    </LegalSection>
+
+    <LegalSection heading="3. What we collect when you have an account">
       <ul>
         <li>
           <strong>Sign-in details:</strong> your email address and a password. The password is stored by our
@@ -48,11 +60,11 @@ const PrivacyPolicy = () => (
       </p>
     </LegalSection>
 
-    <LegalSection heading="3. How we use it">
+    <LegalSection heading="4. How we use it">
       <ul>
         <li>To run the breach check you ask for and show you the results.</li>
         <li>To show listed settlements that may relate to your results, and their deadlines.</li>
-        <li>To send the email alerts you have turned on, and emails you request such as password resets.</li>
+        <li>To send the email alerts and reminders you have asked for, and emails you request such as password resets.</li>
         <li>To keep the service working and improve it.</li>
       </ul>
       <p>
@@ -60,7 +72,7 @@ const PrivacyPolicy = () => (
       </p>
     </LegalSection>
 
-    <LegalSection heading="4. Who receives your data">
+    <LegalSection heading="5. Who receives your data">
       <p>We share data only with the services needed to run BreachPay:</p>
       <ul>
         <li>
@@ -80,14 +92,14 @@ const PrivacyPolicy = () => (
       </p>
     </LegalSection>
 
-    <LegalSection heading="5. Storage in your browser">
+    <LegalSection heading="6. Storage in your browser">
       <p>
         We use your browser's local storage to keep you signed in. Clearing your browser data, or logging out, removes
         it.
       </p>
     </LegalSection>
 
-    <LegalSection heading="6. Keeping and deleting data">
+    <LegalSection heading="7. Keeping and deleting data">
       <p>
         We keep your account data until you delete your account. You can do that at any time from{" "}
         <Link to="/settings" className="text-primary hover:underline">Settings</Link>: it removes your profile, breach
@@ -95,13 +107,14 @@ const PrivacyPolicy = () => (
       </p>
     </LegalSection>
 
-    <LegalSection heading="7. Your choices">
+    <LegalSection heading="8. Your choices">
       <ul>
         <li>
           <strong>Export:</strong> download a copy of your data from Settings.
         </li>
         <li>
-          <strong>Email alerts:</strong> turn them on or off in Settings.
+          <strong>Email alerts:</strong> turn account alerts on or off in Settings, and use the unsubscribe link in any
+          reminder or weekly email.
         </li>
         <li>
           <strong>Deletion:</strong> delete your account and its data from Settings.
@@ -109,7 +122,7 @@ const PrivacyPolicy = () => (
       </ul>
     </LegalSection>
 
-    <LegalSection heading="8. Security">
+    <LegalSection heading="9. Security">
       <p>
         Account records are protected by access rules so that each account can read only its own data, and connections
         to BreachPay are encrypted in transit. No service can promise perfect security, so use a password you do not use
@@ -117,7 +130,7 @@ const PrivacyPolicy = () => (
       </p>
     </LegalSection>
 
-    <LegalSection heading="9. Changes">
+    <LegalSection heading="10. Changes">
       <p>
         If we change this policy we will update the date at the top. If a change affects how we use data you have
         already given us, we will tell account holders by email.

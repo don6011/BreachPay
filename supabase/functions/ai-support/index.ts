@@ -9,6 +9,15 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // The support chat is off unless AI_SUPPORT_ENABLED is "true": it tells people
+  // questions are escalated to a team, so turn it on only once someone answers them.
+  if (Deno.env.get("AI_SUPPORT_ENABLED") !== "true") {
+    return new Response(JSON.stringify({ error: "Support chat is not available." }), {
+      status: 503,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     const authHeader = req.headers.get("Authorization");
     const supabaseAnon = createClient(

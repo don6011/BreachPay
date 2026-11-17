@@ -82,12 +82,23 @@ The `submit-claim-partner` function now refuses instead of faking a submission.
 - New pages: Help, a real 404, and redirects from old `/settlements/:id`,
   `/check/:slug` and claim-wizard links.
 
+## Email reminders and the weekly digest
+
+- Settlement pages offer "Get a reminder before it closes" (emails 7 days and
+  1 day before the deadline). The home page and directory offer one weekly email
+  with new or updated settlements and deadlines in the next two weeks.
+- No account needed. Every address confirms by email first (double opt-in),
+  the confirm and unsubscribe pages wait for a click so mail scanners can't act
+  for people, and every email has one-click unsubscribe headers.
+- Abuse limits: 10 sign-ups per hour per network address, one confirmation
+  email per address every 10 minutes, unconfirmed sign-ups deleted after 7 days.
+- Needs `RESEND_API_KEY`, `RESEND_FROM_EMAIL` and `APP_BASE_URL` function
+  secrets, plus the two cron jobs in `docs/SECURITY_HARDENING.md`.
+
 ## Still open
 
-- **Settlements table policy.** A migration lets anonymous users read the
-  settlements table directly. The site only selects public columns, but
-  internal columns are readable through the API. Consider column-level grants or
-  moving internal notes to a separate admin-only table.
+- **Partner intake consent.** Before turning on the partner APIs, change
+  intake so it invites people instead of creating accounts for them.
 - **Listing quality is the growth lever.** Traffic depends on having many
   accurate, current settlements with official claim links. Check that the
   discovery job's output is being reviewed and published.

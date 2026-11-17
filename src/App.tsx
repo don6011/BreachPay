@@ -20,6 +20,7 @@ import Help from "./pages/Help";
 import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
+import { EmailConfirm, EmailUnsubscribe } from "./pages/EmailAction";
 import { seedQueryClient } from "@/lib/settlements/data";
 import { DIRECTORY_PATH } from "@/lib/settlements/format";
 import { FEATURES } from "@/config/features";
@@ -95,6 +96,8 @@ const App = () => (
             <Route path="/pricing" element={<Pricing />} />
             <Route path={DIRECTORY_PATH} element={<Directory />} />
             <Route path="/help" element={<Help />} />
+            <Route path="/email/confirm" element={<EmailConfirm />} />
+            <Route path="/email/unsubscribe" element={<EmailUnsubscribe />} />
             <Route path="/reset-password" element={<ResetPassword />} />
 
             {/* User App - Protected */}

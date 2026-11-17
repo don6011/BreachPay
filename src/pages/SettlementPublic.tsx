@@ -2,6 +2,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { ArrowRight, ExternalLink, Info, ShieldAlert, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AddToCalendar } from "@/components/public/AddToCalendar";
+import { EmailSignup } from "@/components/public/EmailSignup";
 import { FaqList } from "@/components/public/FaqList";
 import { LoadError, PageSpinner, PublicLayout } from "@/components/public/PublicLayout";
 import { DeadlineChip, SettlementGrid } from "@/components/public/SettlementCard";
@@ -140,6 +141,16 @@ export function SettlementArticle({
           )}
         </div>
       </section>
+
+      {state.kind === "open" && state.daysLeft >= 1 && (
+        <EmailSignup
+          kind="deadline"
+          settlementId={s.id}
+          className="mt-6"
+          title="Get a reminder before it closes"
+          description={`We'll email you a week before and the day before the ${state.date} deadline.`}
+        />
+      )}
 
       <section className="mt-10" aria-labelledby="details-heading">
         <h2 id="details-heading" className="text-xl font-semibold">Settlement details</h2>

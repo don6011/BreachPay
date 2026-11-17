@@ -188,6 +188,12 @@ Deno.serve(async (req) => {
   const { error: authError, serviceClient: supabase } = await requireAdmin(req);
   if (authError || !supabase) return authError!;
 
+  // This job writes generated breach results, not results from a real breach
+  // source, so it only runs when explicitly enabled (e.g. on a test project).
+  if (Deno.env.get("SCHEDULED_SCANS_ENABLED") !== "true") {
+    return jsonResponse({ error: "Scheduled scans are disabled: they do not use a real breach source." }, 503);
+  }
+
   // Optional override: run for a single user_id
   const url = new URL(req.url);
   const userOverride = url.searchParams.get("user_id");

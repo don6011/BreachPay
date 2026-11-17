@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { EmailSignup } from "@/components/public/EmailSignup";
 import { LoadError, PageSpinner, PublicLayout } from "@/components/public/PublicLayout";
 import { SettlementGrid } from "@/components/public/SettlementCard";
 import { directoryMeta } from "@/lib/settlements/content";
@@ -170,6 +171,13 @@ const Directory = () => {
             </div>
           )}
         </div>
+
+        <EmailSignup
+          kind="weekly"
+          className="mt-12 max-w-2xl"
+          title="Get new settlements by email"
+          description="One short email a week with new or updated settlements and deadlines coming up."
+        />
       </div>
     </PublicLayout>
   );

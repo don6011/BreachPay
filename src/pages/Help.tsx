@@ -8,6 +8,10 @@ import { useSeo } from "@/lib/useSeo";
 
 export const ACCOUNT_FAQS: Faq[] = [
   {
+    q: "Can I get deadline reminders without an account?",
+    a: "Yes. On any open settlement, enter your email under \"Get a reminder before it closes\". After you confirm your address, we email you a week before and the day before the deadline. You can also get one weekly email with newly listed settlements and upcoming deadlines.",
+  },
+  {
     q: "What does the breach check do?",
     a: "It looks up your account email address in the Have I Been Pwned database of known breaches and lists the ones that include it. Only the email address you signed up with is checked.",
   },
@@ -25,7 +29,7 @@ export const ACCOUNT_FAQS: Faq[] = [
   },
   {
     q: "How do I stop emails from BreachPay?",
-    a: "Open Settings in your account and turn off email alerts. Emails about signing in, such as password resets, are still sent when you ask for them.",
+    a: "Every reminder and weekly email has an unsubscribe link. For account alerts, open Settings and turn off email alerts. Emails about signing in, such as password resets, are still sent when you ask for them.",
   },
   {
     q: "How do I delete my account?",

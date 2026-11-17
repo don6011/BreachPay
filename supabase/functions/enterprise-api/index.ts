@@ -31,14 +31,14 @@ async function authenticateRequest(req: Request) {
   if (!keyData) return { error: "Invalid or expired API key", status: 401 };
 
   // Rate limit check
-  const { data: usage } = await sb
+  // One usage log row is written per request, so count rows in the last hour.
+  const { count: totalReqs } = await sb
     .from("api_usage_logs")
-    .select("request_count")
+    .select("id", { count: "exact", head: true })
     .eq("api_key_id", keyData.id)
     .gte("created_at", new Date(Date.now() - 3600000).toISOString());
 
-  const totalReqs = (usage || []).reduce((sum: number, u: any) => sum + (u.request_count || 0), 0);
-  if (totalReqs >= keyData.rate_limit) {
+  if ((totalReqs ?? 0) >= (keyData.rate_limit ?? 100)) {
     return { error: "Rate limit exceeded", status: 429 };
   }
 
@@ -76,7 +76,10 @@ async function handleSettlements(sb: any, url: URL) {
       .from("settlements")
       .select("id, name, company, breach_year, claim_deadline, deadline, payout_min, payout_max, status, verification_status, verified, description, eligibility_summary, claim_url, category, tags, jurisdiction, administrator_name")
       .eq("id", id)
-      .eq("status", "open")
+      .in("status", ["open", "verified"])
+      .eq("verified", true)
+      .eq("is_demo", false)
+      .eq("is_test", false)
       .maybeSingle();
 
     if (error || !data) return json({ error: "Settlement not found" }, 404);
@@ -87,6 +90,9 @@ async function handleSettlements(sb: any, url: URL) {
     .from("settlements")
     .select("id, name, company, breach_year, claim_deadline, deadline, payout_min, payout_max, status, verification_status, verified, category, tags", { count: "exact" })
     .in("status", ["open", "verified"])
+    .eq("verified", true)
+    .eq("is_demo", false)
+    .eq("is_test", false)
     .order("claim_deadline", { ascending: true, nullsFirst: false })
     .range(offset, offset + limit - 1);
 
@@ -94,37 +100,11 @@ async function handleSettlements(sb: any, url: URL) {
 }
 
 // ─── Exposure + Eligibility ───
-async function handleExposureCheck(sb: any, body: any) {
-  const email = (body.email || "").trim().toLowerCase();
-  if (!email) return json({ error: "email is required" }, 400);
-
-  // Get matching breaches from catalog by checking if the email domain matches known breach companies
-  const { data: settlements } = await sb
-    .from("settlements")
-    .select("id, name, company, breach_year, payout_min, payout_max, claim_deadline, status, verified")
-    .in("status", ["open", "verified"])
-    .order("payout_max", { ascending: false });
-
-  // Simple domain-based matching + return all verified settlements as potential matches
-  const emailDomain = email.split("@")[1] || "";
-  const matches = (settlements || []).map((s: any) => {
-    let confidence = 40; // Base confidence for open settlement
-    if (s.verified) confidence += 20;
-    if (emailDomain && s.company && emailDomain.toLowerCase().includes(s.company.toLowerCase().split(" ")[0])) {
-      confidence += 30; // Domain match bonus
-    }
-    const payoutEstimate = s.payout_min && s.payout_max ? Math.round((s.payout_min + s.payout_max) / 2) : null;
-    return {
-      settlement_id: s.id,
-      settlement: s.name,
-      company: s.company,
-      confidence: Math.min(confidence, 100),
-      payout_estimate: payoutEstimate,
-      claim_deadline: s.claim_deadline,
-    };
-  }).filter((m: any) => m.confidence >= 40);
-
-  return json({ matches, checked_at: new Date().toISOString() });
+// This endpoint used to return every open settlement as a "match" with an
+// invented confidence score, without checking any breach data. It now says it
+// is unavailable instead of returning results that look real.
+async function handleExposureCheck(_sb: unknown, _body: unknown) {
+  return json({ error: "Exposure checks are not available through this API." }, 501);
 }
 
 // ─── Claims Intake ───
@@ -139,6 +119,9 @@ async function handleClaimsIntake(sb: any, body: any, partnerId: string) {
     .from("settlements")
     .select("id, name, company")
     .eq("id", settlement_id)
+    .eq("verified", true)
+    .eq("is_demo", false)
+    .eq("is_test", false)
     .maybeSingle();
 
   if (!settlement) return json({ error: "Settlement not found" }, 404);
@@ -158,7 +141,7 @@ async function handleClaimsIntake(sb: any, body: any, partnerId: string) {
     intake_id: log?.id,
     settlement: settlement.name,
     status: "received",
-    message: "Claim intake received and queued for processing",
+    message: "Recorded. BreachPay does not file claims; the person must file on the official settlement site.",
   }, 201);
 }
 
@@ -166,6 +149,14 @@ async function handleClaimsIntake(sb: any, body: any, partnerId: string) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // The enterprise API is off unless the PARTNER_API_ENABLED function secret is "true".
+  if (Deno.env.get("PARTNER_API_ENABLED") !== "true") {
+    return new Response(JSON.stringify({ error: "This API is not available." }), {
+      status: 503,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   const startTime = Date.now();

@@ -3,5 +3,6 @@ Allow: /
 Disallow: /admin
 Disallow: /partner
 Disallow: /dashboard
+Disallow: /email/
 
 Sitemap: https://breachpay.com/sitemap.xml

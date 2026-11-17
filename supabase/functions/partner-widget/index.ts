@@ -27,21 +27,17 @@ const WIDGET_JS = `
 
   container.innerHTML = \`
     <div class="bp-widget">
-      <h3>🔍 Check Your Breach Eligibility</h3>
-      <p>See if you're owed money from data breach settlements.</p>
-      <input type="email" placeholder="Enter your email" class="bp-email" />
-      <button class="bp-btn">Check Now — It's Free</button>
+      <h3>Were you in a data breach?</h3>
+      <p>Check which known breaches include your email, and see related settlements. Free.</p>
+      <button class="bp-btn">Check for free on BreachPay</button>
       <div class="bp-footer">Powered by <a href="https://breachpay.com" target="_blank">BreachPay</a></div>
     </div>
   \`;
 
+  // The email address is entered on BreachPay itself, so it never appears in a URL.
   var btn = container.querySelector('.bp-btn');
-  var input = container.querySelector('.bp-email');
   btn.addEventListener('click', function() {
-    var email = input.value.trim();
-    if (!email || !email.includes('@')) { alert('Please enter a valid email.'); return; }
-    var url = 'https://breachpay.com/signup?ref=' + encodeURIComponent(partnerId) + '&email=' + encodeURIComponent(email);
-    window.open(url, '_blank');
+    window.open('https://breachpay.com/signup?ref=' + encodeURIComponent(partnerId), '_blank', 'noopener');
   });
 })();
 `;

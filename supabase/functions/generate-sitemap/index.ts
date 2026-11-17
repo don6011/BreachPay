@@ -10,6 +10,12 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // The site now publishes a static sitemap at build time, which lists only
+  // published listings. Send anything still pointing here to it.
+  const site = (Deno.env.get("APP_BASE_URL") || "https://breachpay.com").replace(/\/$/, "");
+  return Response.redirect(`${site}/sitemap.xml`, 301);
+
+  // eslint-disable-next-line no-unreachable
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,

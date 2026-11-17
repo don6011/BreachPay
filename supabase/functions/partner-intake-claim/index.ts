@@ -14,6 +14,14 @@ async function hashKey(raw: string): Promise<string> {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  // Partner intake creates accounts for other people's email addresses, so it is off unless the PARTNER_API_ENABLED function secret is "true".
+  if (Deno.env.get("PARTNER_API_ENABLED") !== "true") {
+    return new Response(JSON.stringify({ error: "This API is not available." }), {
+      status: 503,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   try {
     // --- API Key Authentication ---
     const apiKey = req.headers.get("x-api-key");
@@ -43,14 +51,14 @@ Deno.serve(async (req) => {
     }
 
     // Rate limit check
-    const { data: usage } = await supabase
+    // One usage log row is written per request, so count rows in the last hour.
+    const { count: totalReqs } = await supabase
       .from("api_usage_logs")
-      .select("request_count")
+      .select("id", { count: "exact", head: true })
       .eq("api_key_id", keyData.id)
       .gte("created_at", new Date(Date.now() - 3600000).toISOString());
 
-    const totalReqs = (usage || []).reduce((sum: number, u: any) => sum + (u.request_count || 0), 0);
-    if (totalReqs >= keyData.rate_limit) {
+    if ((totalReqs ?? 0) >= (keyData.rate_limit ?? 100)) {
       return new Response(JSON.stringify({ error: "Rate limit exceeded" }), {
         status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -58,6 +66,8 @@ Deno.serve(async (req) => {
 
     const startTime = Date.now();
     await supabase.from("api_keys").update({ last_used_at: new Date().toISOString() }).eq("id", keyData.id);
+    // Count this request toward the hourly limit.
+    await supabase.from("api_usage_logs").insert({ api_key_id: keyData.id, endpoint: "partner-intake-claim", method: req.method, status_code: 200 });
 
     const { full_name, email, breach, notes } = await req.json();
     const partner_id = keyData.partner_id;

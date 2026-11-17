@@ -192,6 +192,7 @@ async function run(config: ResolvedConfig) {
       "Disallow: /admin",
       "Disallow: /partner",
       "Disallow: /dashboard",
+      "Disallow: /email/",
       "",
       `Sitemap: ${entry.SITE_URL}/sitemap.xml`,
       "",
